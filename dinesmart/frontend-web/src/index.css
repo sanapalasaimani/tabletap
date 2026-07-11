@@ -1,0 +1,86 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #FF7A00;
+  --color-primary-hover: #E06B00;
+  --color-secondary: #FFD369;
+  --color-brand-bg: #FFF8F0;
+  --color-brand-text: #2D2D2D;
+  
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+body {
+  background-color: #FFF8F0; /* Fallback */
+  background-color: var(--color-brand-bg);
+  color: var(--color-brand-text);
+  font-family: var(--font-sans);
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.customer-container {
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100vh;
+  background-color: #ffffff;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.05);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+/* For screens larger than mobile, render a nice frame background only for customer screens */
+@media (min-width: 481px) {
+  body:has(.customer-container) {
+    background-color: #f1ebd9;
+    background-image: radial-gradient(#e5dbbe 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+}
+
+/* Hide scrollbar utility */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Custom animations */
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out forwards;
+}
