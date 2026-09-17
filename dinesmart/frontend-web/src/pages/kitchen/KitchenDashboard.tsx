@@ -5,7 +5,7 @@ import { MENU_ITEMS } from '../../data/menu';
 import { 
   Clock, PlayCircle, CheckCircle, RefreshCw, LogOut,
   ChefHat, Calendar, Check, X, ShieldAlert, ShoppingBag, 
-  Settings, Flame, Search, Plus, Maximize2, Minimize2
+  Settings, Flame, Search, Plus, Maximize2, Minimize2, ClipboardList
 } from 'lucide-react';
 
 interface KitchenDashboardProps {
@@ -507,6 +507,8 @@ export const KitchenDashboard: React.FC<KitchenDashboardProps> = ({ onLogout }) 
               <Settings size={16} />
               <span>Today's Menu</span>
             </button>
+
+
           </nav>
         </div>
 
@@ -869,11 +871,16 @@ export const KitchenDashboard: React.FC<KitchenDashboardProps> = ({ onLogout }) 
                     );
                   })
                 ) : (
-                  <p className="text-xs text-slate-400 col-span-full py-12 text-center font-semibold">No menu items found</p>
+                  <div className="col-span-full py-12 flex flex-col items-center justify-center bg-slate-50 rounded-2xl border border-slate-100">
+                    <Search size={32} className="text-slate-300 mb-3" />
+                    <p className="text-slate-500 font-semibold text-sm">No menu items found</p>
+                  </div>
                 )}
               </div>
             </div>
           )}
+
+
 
         </div>
 

@@ -3,13 +3,12 @@ import { KitchenLogin } from './KitchenLogin';
 import { KitchenDashboard } from './KitchenDashboard';
 
 export const KitchenModule: React.FC = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  // BYPASS: Automatically set to true to bypass the login console
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('tabletap_kitchen_token');
-    if (token === 'session_chef1') {
-      setIsAuthenticated(true);
-    }
+    // Automatically set the token to bypass login in the future
+    localStorage.setItem('tabletap_kitchen_token', 'session_chef1');
   }, []);
 
   const handleLoginSuccess = () => {
@@ -18,6 +17,7 @@ export const KitchenModule: React.FC = () => {
 
   const handleLogout = () => {
     setIsAuthenticated(false);
+    localStorage.removeItem('tabletap_kitchen_token');
   };
 
   if (!isAuthenticated) {

@@ -61,3 +61,13 @@ export interface WaiterRequest {
   status: 'Pending' | 'Completed';
   createdAt: string;
 }
+
+export interface PendingStaff {
+  id: string;
+  name: string;
+  mobile: string;
+  whatsapp: string;
+  email: string;
+  status: 'Pending' | 'Approved' | 'Rejected';
+  createdAt?: string;
+}

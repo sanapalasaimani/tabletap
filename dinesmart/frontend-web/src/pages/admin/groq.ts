@@ -35,13 +35,7 @@ export interface BusinessSuggestion {
   impact: 'High' | 'Medium' | 'Low';
 }
 
-export interface InventoryDepletion {
-  ingredient: string;
-  remainingDays: number;
-  alertStatus: 'ok' | 'warning' | 'danger';
-  recommendedPurchaseQty: string;
-  predictionReason: string;
-}
+
 
 export interface PeakTimePrediction {
   breakfastRush: string; // e.g. "Low - 15% occupancy"
@@ -125,56 +119,7 @@ export async function predictSales(orders: any[]): Promise<SalesPrediction> {
   }
 }
 
-// ----------------------------------------------------
-// 2. INVENTORY DEPLETION PREDICTIONS
-// ----------------------------------------------------
-export async function predictInventoryDepletion(inventory: any[], orders: any[]): Promise<InventoryDepletion[]> {
-  const systemPrompt = `You are the DineSmart AI Inventory Optimizer. Analyze current ingredients inventory levels and predict stockouts. Return ONLY a valid JSON array of objects matching this structure:
-  [
-    {
-      "ingredient": "string",
-      "remainingDays": number,
-      "alertStatus": "ok" | "warning" | "danger",
-      "recommendedPurchaseQty": "string",
-      "predictionReason": "string"
-    }
-  ]`;
 
-  const userPrompt = `Predict stockouts for these ingredients: ${JSON.stringify(inventory)}. Total orders placed today: ${orders.length}. Generate remaining days and recommended purchases.`;
-
-  try {
-    return await callGroqAPI(systemPrompt, userPrompt) as InventoryDepletion[];
-  } catch (error) {
-    console.warn('Groq predictInventoryDepletion error, using smart fallback:', error);
-    // Smart Fallback based on typical usage
-    return inventory.map(item => {
-      const remaining = item.stock;
-      let days = Math.round(remaining / 4);
-      if (days < 1) days = 1;
-      
-      let status: 'ok' | 'warning' | 'danger' = 'ok';
-      if (days <= 2) status = 'danger';
-      else if (days <= 5) status = 'warning';
-
-      let recommendedQty = '0';
-      if (status === 'danger') {
-        recommendedQty = `${Math.round(item.minStock * 2.5)} ${item.unit}`;
-      } else if (status === 'warning') {
-        recommendedQty = `${Math.round(item.minStock * 1.5)} ${item.unit}`;
-      }
-
-      return {
-        ingredient: item.name,
-        remainingDays: days,
-        alertStatus: status,
-        recommendedPurchaseQty: recommendedQty === '0' ? 'No action needed' : recommendedQty,
-        predictionReason: status === 'danger' 
-          ? `High consumption pattern indicates this stock will finish within ${days} day(s).` 
-          : `Moderate usage detected. Next restocking advisable within ${days} days.`,
-      };
-    });
-  }
-}
 
 // ----------------------------------------------------
 // 3. CUSTOMER INSIGHTS
@@ -348,5 +293,82 @@ export async function analyzeReviewSentiment(comment: string): Promise<Sentiment
       commonComplaints: complaints.length > 0 ? complaints : (sentiment === 'Negative' ? ['General Dissatisfaction'] : []),
       aiSummary: summary,
     };
+  }
+}
+
+// ----------------------------------------------------
+// 7. BHAKASURA AI CHAT BOT
+// ----------------------------------------------------
+export interface ChatBotResponse {
+  message: string;
+}
+
+export async function askBhakasuraAI(history: { role: string; content: string }[], contextData: any): Promise<string> {
+  const systemPrompt = `You are TableTap's Core AI, the advanced intelligence system for this restaurant management platform. 
+Your primary goal is to provide immediate, actionable, and data-driven insights to the restaurant owner/admin.
+
+AI Personality & Tone:
+- Professional, Friendly, Concise, Data-driven.
+- Very Fast, Short, Direct. No unnecessary explanations.
+- Use Bullet-point answers and Dashboard-first responses.
+- Never guess when data is unavailable. Clearly distinguish between live dashboard data, retrieved knowledge (RAG), and general hospitality best practices.
+
+Core Capabilities & Intelligence:
+1. Business Aware: Know Daily Sales, Monthly Revenue, Profit, Expenses, Taxes, GST, Discounts, Payment Modes, Peak Hours, Customer Trends.
+2. Dashboard Expert: Understand and explain every dashboard widget.
+3. Data Analyst: Find trends automatically.
+4. Predictive Intelligence: Predict future demand based on history, weather, holidays.
+5. Recommendation Engine: NEVER give only numbers. ALWAYS provide actionable recommendations (e.g., "Increase stock of Chicken Biryani", "Launch lunch combo offers").
+
+7. Staff Intelligence: Track employee performance, orders handled, service time, ratings.
+8. Customer Intelligence: Identify loyal customers, repeat visits, average spend.
+9. Menu Intelligence: Identify profitable and least profitable dishes, recommend bundling.
+10. Sales & Comparative Analysis: Compare metrics across time periods (yesterday vs today, last month vs this month).
+11. Explain Metrics: Explain formulas like Average Order Value or Food Cost % on request.
+12. Actionable Insights: Explain WHY something happened instead of just stating that it happened.
+13. Anomaly Detection: Highlight unusual drops or increases in sales, waste, or idle time.
+14. Natural Conversation & Memory: Remember conversation context. Respond to short follow-ups naturally.
+15. Multi-language: Support English, Hindi, Telugu, Tamil, Kannada, etc.
+
+Response Rules:
+✅ Answer in under 5 seconds (be concise to generate tokens faster).
+✅ Prefer live dashboard data (provided in context).
+✅ If dashboard lacks the answer, use your RAG knowledge of hotel documents, SOPs, recipes, GST rules, food safety, vendor contracts, and government regulations.
+✅ If still unavailable, answer using general hospitality best practices and explicitly state that it is a general recommendation.
+✅ Provide recommendations whenever appropriate.
+✅ Use tables, percentages, or concise lists when helpful.
+
+Live Dashboard Context Data:
+${JSON.stringify(contextData)}
+
+Respond strictly following these rules and format. Output a plain text or markdown response directly without wrapping in JSON.`;
+
+  try {
+    if (!API_KEY) throw new Error('No key');
+    const response = await fetch(GROQ_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'llama-3.1-8b-instant',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...history
+        ],
+        temperature: 0.7,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('API Error');
+    }
+
+    const data = await response.json();
+    return data.choices[0]?.message?.content || 'I am currently processing other data, please try again.';
+  } catch (error) {
+    console.warn('Groq askBhakasuraAI error, using smart fallback:', error);
+    return "Connection to Core AI lost. Please check your network or API settings.";
   }
 }

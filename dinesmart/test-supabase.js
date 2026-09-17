@@ -23,7 +23,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 async function checkTables() {
-  const tables = ['menu_items', 'orders', 'waiter_requests', 'loyalty_profiles', 'feedback', 'inventory', 'staff', 'tables', 'promotions', 'reviews', 'activity_logs'];
+  const tables = ['menu_items', 'orders', 'waiter_requests', 'loyalty_profiles', 'feedback', 'inventory', 'staff', 'tables', 'promotions', 'reviews', 'activity_logs', 'pending_staff'];
   
   for (const table of tables) {
     try {

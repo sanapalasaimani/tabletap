@@ -372,51 +372,6 @@ export const db = {
     return false;
   },
 
-  // 5. INVENTORY
-  getInventory: async (): Promise<any[]> => {
-    if (isRealSupabase) {
-      const { data, error } = await supabaseClient
-        .from('inventory')
-        .select('*')
-        .order('name');
-      if (!error && data) return data;
-    }
-    return getMockData<any[]>('inventory', []);
-  },
-
-  saveInventoryItem: async (item: any): Promise<any> => {
-    if (isRealSupabase) {
-      const { data, error } = await supabaseClient
-        .from('inventory')
-        .upsert(item)
-        .select()
-        .single();
-      if (!error && data) return data;
-    }
-    const inv = getMockData<any[]>('inventory', []);
-    const idx = inv.findIndex(i => i.id === item.id);
-    if (idx !== -1) {
-      inv[idx] = item;
-    } else {
-      inv.push(item);
-    }
-    saveMockData('inventory', inv);
-    return item;
-  },
-
-  deleteInventoryItem: async (id: string): Promise<boolean> => {
-    if (isRealSupabase) {
-      const { error } = await supabaseClient
-        .from('inventory')
-        .delete()
-        .eq('id', id);
-      if (!error) return true;
-    }
-    const inv = getMockData<any[]>('inventory', []);
-    const updated = inv.filter(i => i.id !== id);
-    saveMockData('inventory', updated);
-    return true;
-  },
 
   // 6. STAFF
   getStaff: async (): Promise<any[]> => {
@@ -628,6 +583,8 @@ export const db = {
     return log;
   },
 
+
+
   // 11. FEEDBACK RATINGS
   submitFeedback: async (
     orderId: string,
@@ -693,5 +650,97 @@ export const db = {
 
   saveLoyaltyRules: async (rules: any): Promise<void> => {
     saveMockData('loyaltyConfig', rules);
+  },
+
+  // 13. PENDING STAFF (WAITER ONBOARDING)
+  getPendingStaff: async (): Promise<any[]> => {
+    if (isRealSupabase) {
+      const { data, error } = await supabaseClient
+        .from('pending_staff')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (!error && data) return data;
+    }
+    return getMockData<any[]>('pending_staff', []);
+  },
+
+  updatePendingStaff: async (staff: any): Promise<any> => {
+    if (isRealSupabase) {
+      const { data, error } = await supabaseClient
+        .from('pending_staff')
+        .upsert(staff)
+        .select()
+        .single();
+      if (!error && data) return data;
+    }
+    const staffList = getMockData<any[]>('pending_staff', []);
+    const idx = staffList.findIndex(s => s.id === staff.id);
+    if (idx !== -1) {
+      staffList[idx] = staff;
+    } else {
+      staffList.push(staff);
+    }
+    saveMockData('pending_staff', staffList);
+    return staff;
+  },
+
+  deletePendingStaff: async (id: string): Promise<boolean> => {
+    if (isRealSupabase) {
+      const { error } = await supabaseClient
+        .from('pending_staff')
+        .delete()
+        .eq('id', id);
+      if (!error) return true;
+    }
+    const staffList = getMockData<any[]>('pending_staff', []);
+    const updated = staffList.filter(s => s.id !== id);
+    saveMockData('pending_staff', updated);
+    return true;
+  },
+
+  // 14. HOTEL SETTINGS
+  getSettings: async (): Promise<any> => {
+    if (isRealSupabase) {
+      const { data, error } = await supabaseClient
+        .from('hotel_settings')
+        .select('*')
+        .eq('id', 'default')
+        .single();
+      if (!error && data) return data;
+    }
+    return getMockData<any>('hotel_settings', { 
+      tax: 5, 
+      currency: '₹', 
+      gstNo: '27AAAAA1111A1Z1',
+      restaurantName: 'DineSmart Hotel & Resto',
+      ownerName: '',
+      branchName: '',
+      email: '',
+      mobile: '',
+      alternateMobile: '',
+      fssai: '',
+      address: '',
+      city: '',
+      state: '',
+      country: '',
+      pinCode: '',
+      landmark: '',
+      mapsLocation: ''
+    });
+  },
+
+  saveSettings: async (settings: any): Promise<any> => {
+    const defaultSettings = { ...settings, id: 'default' };
+    if (isRealSupabase) {
+      const { data, error } = await supabaseClient
+        .from('hotel_settings')
+        .upsert(defaultSettings)
+        .select()
+        .single();
+      if (!error && data) return data;
+      console.error('Supabase error saving settings:', error);
+    }
+    saveMockData('hotel_settings', defaultSettings);
+    return defaultSettings;
   }
 };
