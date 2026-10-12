@@ -753,49 +753,99 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
     setLoading(false);
   };
 
-  // Memoized Chart Data
+  // Real Dynamic Chart Calculations from Actual Orders (Default to 0)
+  const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const dayRevenues: Record<string, number> = { Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0 };
+  orders.forEach(o => {
+    try {
+      const d = new Date(o.createdAt);
+      const dayName = daysOfWeek[d.getDay()];
+      if (dayName && dayRevenues[dayName] !== undefined) {
+        dayRevenues[dayName] += (o.total || 0);
+      }
+    } catch (e) {}
+  });
+
   const weeklyData = [
-    { name: 'Mon', revenue: 32000 },
-    { name: 'Tue', revenue: 28000 },
-    { name: 'Wed', revenue: 41000 },
-    { name: 'Thu', revenue: 38000 },
-    { name: 'Fri', revenue: 52000 },
-    { name: 'Sat', revenue: 61000 },
-    { name: 'Sun', revenue: 48000 }
+    { name: 'Mon', revenue: dayRevenues['Mon'] },
+    { name: 'Tue', revenue: dayRevenues['Tue'] },
+    { name: 'Wed', revenue: dayRevenues['Wed'] },
+    { name: 'Thu', revenue: dayRevenues['Thu'] },
+    { name: 'Fri', revenue: dayRevenues['Fri'] },
+    { name: 'Sat', revenue: dayRevenues['Sat'] },
+    { name: 'Sun', revenue: dayRevenues['Sun'] }
   ];
 
-  const categoryData = [
-    { name: 'Biryani', value: 18500, color: '#f97316' },
-    { name: 'Main Course', value: 10700, color: '#fb923c' },
-    { name: 'Chinese', value: 7300, color: '#fbd38d' },
-    { name: 'Starters', value: 5840, color: '#fde68a' },
-    { name: 'Soups', value: 2430, color: '#fef08a' },
-    { name: 'Drinks', value: 2430, color: '#fef9c3' },
-    { name: 'Desserts', value: 1460, color: '#ffedd5' }
-  ];
+  const categoryTotals: Record<string, number> = {};
+  orders.forEach(o => {
+    (o.items || []).forEach(it => {
+      const cat = menuItems.find(m => m.id === it.menuItemId)?.category || 'Main Course';
+      categoryTotals[cat] = (categoryTotals[cat] || 0) + (it.price * it.quantity);
+    });
+  });
 
-  const hourlyData = [
-    { hour: '10 AM', orders: 20 },
-    { hour: '11 AM', orders: 45 },
-    { hour: '12 PM', orders: 105 },
-    { hour: '1 PM', orders: 140 },
-    { hour: '2 PM', orders: 85 },
-    { hour: '6 PM', orders: 90 },
-    { hour: '7 PM', orders: 135 },
-    { hour: '8 PM', orders: 160 },
-    { hour: '9 PM', orders: 95 }
-  ];
-  
+  const categoryColors: Record<string, string> = {
+    'Main Course': '#f97316',
+    'Biryani': '#fb923c',
+    'Starters': '#fbd38d',
+    'Soups': '#fde68a',
+    'Desserts': '#ffedd5',
+    'Beverages': '#fef9c3',
+    'Breads': '#fed7aa',
+  };
+
+  const categoryData = Object.keys(categoryTotals).length > 0
+    ? Object.entries(categoryTotals).map(([name, value]) => ({
+        name,
+        value,
+        color: categoryColors[name] || '#f97316'
+      }))
+    : [{ name: 'No Orders', value: 0, color: '#e5e7eb' }];
+
+  const hoursMap: Record<string, number> = {
+    '10 AM': 0, '11 AM': 0, '12 PM': 0, '1 PM': 0, '2 PM': 0,
+    '6 PM': 0, '7 PM': 0, '8 PM': 0, '9 PM': 0
+  };
+  orders.forEach(o => {
+    try {
+      const hr = new Date(o.createdAt).getHours();
+      let slot = '';
+      if (hr === 10) slot = '10 AM';
+      else if (hr === 11) slot = '11 AM';
+      else if (hr === 12) slot = '12 PM';
+      else if (hr === 13) slot = '1 PM';
+      else if (hr === 14) slot = '2 PM';
+      else if (hr === 18) slot = '6 PM';
+      else if (hr === 19) slot = '7 PM';
+      else if (hr === 20) slot = '8 PM';
+      else if (hr === 21) slot = '9 PM';
+      if (slot && hoursMap[slot] !== undefined) hoursMap[slot]++;
+    } catch (e) {}
+  });
+
+  const hourlyData = Object.entries(hoursMap).map(([hour, ordersCount]) => ({ hour, orders: ordersCount }));
+
+  const itemSalesMap: Record<string, { name: string; sold: number; rev: number }> = {};
+  orders.forEach(o => {
+    (o.items || []).forEach(it => {
+      if (!itemSalesMap[it.name]) {
+        itemSalesMap[it.name] = { name: it.name, sold: 0, rev: 0 };
+      }
+      itemSalesMap[it.name].sold += it.quantity;
+      itemSalesMap[it.name].rev += (it.price * it.quantity);
+    });
+  });
+  const topSellingDishes = Object.values(itemSalesMap)
+    .sort((a, b) => b.sold - a.sold)
+    .slice(0, 7)
+    .map((item, idx) => ({ ...item, rank: idx + 1, trend: 0 }));
+
   const yearlyData = [
-    { year: '2022', revenue: 3100000 },
-    { year: '2023', revenue: 3800000 },
-    { year: '2024', revenue: 4600000 },
-    { year: '2025', revenue: 5200000 },
-    { year: '2026', revenue: 4900000 }
+    { year: '2026', revenue: orders.reduce((s, o) => s + (o.total || 0), 0) }
   ];
 
   // Helper Metrics Calculations
-  const getTodayRevenue = () => orders.reduce((sum, o) => sum + o.total, 0);
+  const getTodayRevenue = () => orders.reduce((sum, o) => sum + (o.total || 0), 0);
   const getAverageOrderValue = () => orders.length ? Math.round(getTodayRevenue() / orders.length) : 0;
   const formatPrice = (amount: number) => `₹${amount.toLocaleString('en-IN')}`;
 
@@ -1016,10 +1066,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                 <div className={`p-4 rounded-3xl border shadow-sm flex items-center justify-between ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-50'}`}>
                   <div>
                     <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Today's Revenue</span>
-                    <strong className="text-xl font-black mt-1 block">{formatPrice(getTodayRevenue() || 48760)}</strong>
+                    <strong className="text-xl font-black mt-1 block">{formatPrice(getTodayRevenue())}</strong>
                     <div className="flex items-center gap-1 mt-1 text-[10px] font-bold text-green-500">
                       <ArrowUpRight size={12} />
-                      <span>+12.4% vs yesterday</span>
+                      <span>{orders.length > 0 ? '+100% live' : '₹0 today'}</span>
                     </div>
                   </div>
                   <div className="w-10 h-10 bg-green-50 text-green-500 rounded-2xl flex items-center justify-center"><DollarSign size={18} /></div>
@@ -1028,9 +1078,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                 <div className={`p-4 rounded-3xl border shadow-sm flex items-center justify-between ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-50'}`}>
                   <div>
                     <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Total Orders</span>
-                    <strong className="text-xl font-black mt-1 block">{orders.length > 0 ? orders.length : 327}</strong>
+                    <strong className="text-xl font-black mt-1 block">{orders.length}</strong>
                     <div className="flex items-center gap-1 mt-1 text-[10px] font-bold text-gray-400">
-                      <span>Avg every 2.6 min</span>
+                      <span>{orders.length > 0 ? `${orders.length} orders recorded` : '0 orders recorded'}</span>
                     </div>
                   </div>
                   <div className="w-10 h-10 bg-blue-50 text-blue-500 rounded-2xl flex items-center justify-center"><ShoppingBag size={18} /></div>
@@ -1039,9 +1089,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                 <div className={`p-4 rounded-3xl border shadow-sm flex items-center justify-between ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-50'}`}>
                   <div>
                     <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Repeat Customers</span>
-                    <strong className="text-xl font-black mt-1 block">68%</strong>
+                    <strong className="text-xl font-black mt-1 block">0%</strong>
                     <div className="flex items-center gap-1 mt-1 text-[10px] font-bold text-gray-400">
-                      <span>223 of 327 orders</span>
+                      <span>0 of {orders.length} orders</span>
                     </div>
                   </div>
                   <div className="w-10 h-10 bg-orange-50 text-orange-500 rounded-2xl flex items-center justify-center"><Users size={18} /></div>
@@ -1050,10 +1100,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                 <div className={`p-4 rounded-3xl border shadow-sm flex items-center justify-between ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-50'}`}>
                   <div>
                     <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Avg Spend / Visit</span>
-                    <strong className="text-xl font-black mt-1 block">{formatPrice(getAverageOrderValue() || 412)}</strong>
-                    <div className="flex items-center gap-1 mt-1 text-[10px] font-bold text-green-500">
-                      <ArrowUpRight size={12} />
-                      <span>+₹28 this week</span>
+                    <strong className="text-xl font-black mt-1 block">{formatPrice(getAverageOrderValue())}</strong>
+                    <div className="flex items-center gap-1 mt-1 text-[10px] font-bold text-gray-400">
+                      <span>Per completed bill</span>
                     </div>
                   </div>
                   <div className="w-10 h-10 bg-purple-50 text-purple-500 rounded-2xl flex items-center justify-center"><CreditCard size={18} /></div>
@@ -1065,9 +1114,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                 <div className={`p-4 rounded-3xl border shadow-sm flex items-center justify-between ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-50'}`}>
                   <div>
                     <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">New Customers</span>
-                    <strong className="text-xl font-black mt-1 block">32%</strong>
+                    <strong className="text-xl font-black mt-1 block">{orders.length > 0 ? '100%' : '0%'}</strong>
                     <div className="flex items-center gap-1 mt-1 text-[10px] font-bold text-gray-400">
-                      <span>104 first-time visitors</span>
+                      <span>{orders.length} customer visits</span>
                     </div>
                   </div>
                   <div className="w-10 h-10 bg-indigo-50 text-indigo-500 rounded-2xl flex items-center justify-center"><UserPlus size={18} /></div>
@@ -1076,9 +1125,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                 <div className={`p-4 rounded-3xl border shadow-sm flex items-center justify-between ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-50'}`}>
                   <div>
                     <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Satisfaction Score</span>
-                    <strong className="text-xl font-black mt-1 block flex items-center gap-1">4.8 <Star size={16} fill="currentColor" className="text-yellow-400" /></strong>
+                    <strong className="text-xl font-black mt-1 block flex items-center gap-1">
+                      {reviews.length > 0 ? (reviews.reduce((acc, r) => acc + (r.rating || 5), 0) / reviews.length).toFixed(1) : '0.0'} 
+                      <Star size={16} fill="currentColor" className="text-yellow-400" />
+                    </strong>
                     <div className="flex items-center gap-1 mt-1 text-[10px] font-bold text-gray-400">
-                      <span>Based on 186 reviews</span>
+                      <span>Based on {reviews.length} reviews</span>
                     </div>
                   </div>
                   <div className="w-10 h-10 bg-yellow-50 text-yellow-500 rounded-2xl flex items-center justify-center"><Star size={18} /></div>
@@ -1087,9 +1139,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                 <div className={`p-4 rounded-3xl border shadow-sm flex items-center justify-between ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-50'}`}>
                   <div>
                     <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Kitchen Queue</span>
-                    <strong className="text-xl font-black mt-1 block">{orders.filter(o => o.status === 'Preparing' || o.status === 'Cooking').length || 18}</strong>
+                    <strong className="text-xl font-black mt-1 block">
+                      {orders.filter(o => o.status === 'Preparing' || o.status === 'Cooking').length}
+                    </strong>
                     <div className="flex items-center gap-1 mt-1 text-[10px] font-bold text-orange-500">
-                      <span>On track</span>
+                      <span>Active tickets</span>
                     </div>
                   </div>
                   <div className="w-10 h-10 bg-orange-50 text-orange-500 rounded-2xl flex items-center justify-center"><ChefHat size={18} /></div>
@@ -1098,7 +1152,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                 <div className={`p-4 rounded-3xl border shadow-sm flex items-center justify-between ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-50'}`}>
                   <div>
                     <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Live Floor</span>
-                    <strong className="text-xl font-black mt-1 block">{tables.filter(t => t.status === 'Available').length} / {tables.length > 0 ? tables.length : 12}</strong>
+                    <strong className="text-xl font-black mt-1 block">
+                      {tables.filter(t => t.status === 'Available').length} / {tables.length > 0 ? tables.length : 10}
+                    </strong>
                     <div className="flex items-center gap-1 mt-1 text-[10px] font-bold text-gray-400">
                       <span>Tables Available</span>
                     </div>
@@ -1117,21 +1173,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                       <div className="mt-4">
                         <p className="text-[10px] text-gray-400 font-bold">Total Revenue</p>
                         <div className="flex items-center gap-2">
-                          <strong className="text-2xl font-black">₹48.7K</strong>
-                          <span className="text-[10px] font-bold text-green-500 bg-green-50 px-2 py-0.5 rounded flex items-center"><ArrowUpRight size={10} className="mr-0.5" /> +12.4%</span>
+                          <strong className="text-2xl font-black">{formatPrice(getTodayRevenue())}</strong>
+                          <span className="text-[10px] font-bold text-green-500 bg-green-50 px-2 py-0.5 rounded flex items-center">
+                            Live Database
+                          </span>
                         </div>
                       </div>
                     </div>
-                    <select className={`text-xs border rounded-lg px-2 py-1 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
-                      <option>This Week</option>
-                      <option>Last Week</option>
-                    </select>
+                    <span className="text-xs text-gray-400 font-bold">This Week</span>
                   </div>
                   <div className="h-64 w-full">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={weeklyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                         <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9ca3af' }} dy={10} />
-                        <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9ca3af' }} tickFormatter={(val) => `₹${val/1000}K`} />
+                        <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9ca3af' }} tickFormatter={(val) => `₹${val}`} />
                         <Tooltip cursor={{ fill: isDarkMode ? '#1f2937' : '#f3f4f6' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }} />
                         <Bar dataKey="revenue" fill="#f97316" radius={[6, 6, 6, 6]} barSize={24} />
                       </BarChart>
@@ -1139,7 +1194,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                   </div>
                   <div className="mt-4 p-3 bg-orange-500 text-white rounded-xl text-xs font-semibold flex items-center gap-2">
                     <Sparkles size={16} />
-                    <span><strong>Saturday</strong> was your highest revenue day. You earned ₹61K which is 20% higher than weekly average.</span>
+                    <span>
+                      {orders.length > 0 
+                        ? `Live order data is connected. Total revenue: ${formatPrice(getTodayRevenue())}.` 
+                        : 'No sales recorded yet. As customers order from tables, revenue charts will update automatically.'}
+                    </span>
                   </div>
                 </div>
 
@@ -1169,11 +1228,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                     </ResponsiveContainer>
                     <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                       <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Total Revenue</span>
-                      <strong className="text-sm font-black">₹48.7K</strong>
+                      <strong className="text-sm font-black">{formatPrice(getTodayRevenue())}</strong>
                     </div>
                   </div>
                   <div className="mt-auto space-y-2.5 pt-4 border-t border-gray-100">
-                    {categoryData.slice(0, 5).map((cat, i) => (
+                    {categoryData.filter(c => c.value > 0).slice(0, 5).map((cat, i) => (
                       <div key={i} className="flex items-center justify-between text-xs font-semibold">
                         <div className="flex items-center gap-2">
                           <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: cat.color }}></span>
@@ -1181,10 +1240,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                         </div>
                         <div className="flex gap-4">
                           <span>₹{cat.value.toLocaleString()}</span>
-                          <span className="text-gray-400 w-8 text-right">{Math.round((cat.value / 48700) * 100)}%</span>
                         </div>
                       </div>
                     ))}
+                    {categoryData.filter(c => c.value > 0).length === 0 && (
+                      <p className="text-[11px] text-gray-400 text-center py-2">No category sales recorded yet</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1197,34 +1258,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                       <h3 className="font-extrabold text-brand-text">Top Selling Dishes</h3>
                       <p className="text-[11px] text-gray-400 mt-1">Best performing dishes today</p>
                     </div>
-                    <span className="text-[10px] font-bold text-orange-500 bg-orange-50 px-2.5 py-1 rounded-full border border-orange-100">Top 10</span>
+                    <span className="text-[10px] font-bold text-orange-500 bg-orange-50 px-2.5 py-1 rounded-full border border-orange-100">Live</span>
                   </div>
                   <div className="space-y-4">
-                    {[
-                      { rank: 1, name: 'Chicken Dum Biryani', sold: 142, rev: 35400, trend: 14 },
-                      { rank: 2, name: 'Paneer Dum Biryani', sold: 96, rev: 22900, trend: 8 },
-                      { rank: 3, name: 'Chicken Fried Rice', sold: 84, rev: 18400, trend: -3 },
-                      { rank: 4, name: 'Veg Spring Roll', sold: 71, rev: 10650, trend: 22 },
-                      { rank: 5, name: 'Mutton Rogan Josh', sold: 63, rev: 15750, trend: 5 },
-                      { rank: 6, name: 'Dal Makhani', sold: 58, rev: 8700, trend: -1 },
-                      { rank: 7, name: 'Mango Lassi', sold: 54, rev: 4320, trend: 18 }
-                    ].map(item => (
-                      <div key={item.rank} className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-3">
-                          <span className={`w-5 text-center font-black ${item.rank <= 3 ? 'text-orange-500' : 'text-gray-400'}`}>
-                            {item.rank === 1 ? '🥇' : item.rank === 2 ? '🥈' : item.rank === 3 ? '🥉' : item.rank}
-                          </span>
-                          <span className="font-bold">{item.name}</span>
+                    {topSellingDishes.length > 0 ? (
+                      topSellingDishes.map(item => (
+                        <div key={item.rank} className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-3">
+                            <span className={`w-5 text-center font-black ${item.rank <= 3 ? 'text-orange-500' : 'text-gray-400'}`}>
+                              {item.rank === 1 ? '🥇' : item.rank === 2 ? '🥈' : item.rank === 3 ? '🥉' : item.rank}
+                            </span>
+                            <span className="font-bold">{item.name}</span>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <span className="text-gray-500">{item.sold} sold</span>
+                            <span className="font-bold w-16 text-right">₹{item.rev.toLocaleString()}</span>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-4">
-                          <span className="text-gray-500">{item.sold} sold</span>
-                          <span className="font-bold w-16 text-right">₹{item.rev.toLocaleString()}</span>
-                          <span className={`w-12 text-right font-bold ${item.trend > 0 ? 'text-green-500' : 'text-red-500'}`}>
-                            {item.trend > 0 ? '↗' : '↘'} {Math.abs(item.trend)}%
-                          </span>
-                        </div>
+                      ))
+                    ) : (
+                      <div className="py-8 text-center text-gray-400 text-xs">
+                        No dishes sold yet today. Real orders will rank dishes automatically.
                       </div>
-                    ))}
+                    )}
                   </div>
                 </div>
 
