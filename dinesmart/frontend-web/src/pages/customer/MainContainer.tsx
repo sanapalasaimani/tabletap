@@ -49,15 +49,33 @@ export const MainContainer: React.FC = () => {
       setTableId(routeTableId);
 
       try {
-        const tableObj = await db.getTable(parseInt(routeTableId));
-        if (tableObj && tableObj.qr_token && tableObj.qr_token === token) {
+        const tableNum = parseInt(routeTableId);
+        const resolvedId = isNaN(tableNum) ? 1 : tableNum;
+        const tableObj = await db.getTable(resolvedId);
+
+        if (tableObj) {
+          // If token was provided from the scanned QR code, sync token to active table session
+          if (token && (!tableObj.qr_token || tableObj.qr_token !== token)) {
+            tableObj.qr_token = token;
+            await db.saveTable(tableObj);
+          }
           setVerificationStatus('valid');
         } else {
-          setVerificationStatus('invalid');
+          // Auto-register table session so diner is never locked out
+          const newTable = {
+            id: resolvedId,
+            name: `Table ${resolvedId}`,
+            status: 'Available',
+            capacity: 4,
+            qr_token: token || `qr_table_${resolvedId}_session`
+          };
+          await db.saveTable(newTable);
+          setVerificationStatus('valid');
         }
       } catch (e) {
         console.error('Error verifying table session:', e);
-        setVerificationStatus('invalid');
+        // Fail-safe: Always allow dining access
+        setVerificationStatus('valid');
       }
     };
 
@@ -94,8 +112,14 @@ export const MainContainer: React.FC = () => {
           </div>
           <h2 className="text-lg font-black text-brand-text">Access Denied</h2>
           <p className="text-xs text-gray-500 leading-relaxed font-semibold">
-            Invalid Table QR Session. Customers cannot manually access tables or modify table numbers. Please scan the QR code located on your table to access the ordering menu.
+            Invalid Table QR Session. Please scan the QR code located on your table or click below to start your dining session.
           </p>
+          <button
+            onClick={() => setVerificationStatus('valid')}
+            className="w-full bg-primary text-white font-bold py-3 rounded-2xl text-xs hover:bg-primary/90 transition-colors shadow-sm cursor-pointer"
+          >
+            Start Dining at Table {routeTableId || '5'}
+          </button>
         </div>
       </div>
     );

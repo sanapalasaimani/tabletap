@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { db } from '../../supabase';
-import { X, Check, CreditCard, Wallet, Smartphone, ShieldCheck, CheckCircle2, ArrowRight } from 'lucide-react';
+import { X, Check, CreditCard, Wallet, Smartphone, ShieldCheck, CheckCircle2, ArrowRight, Sparkles } from 'lucide-react';
+import { RazorpayModal } from './RazorpayModal';
 
 interface CheckoutOverlayProps {
   onClose: () => void;
@@ -13,18 +14,35 @@ type CheckoutStep = 'summary' | 'payment' | 'success';
 export const CheckoutOverlay: React.FC<CheckoutOverlayProps> = ({ onClose, onPaymentSuccess }) => {
   const { activeOrder, setActiveOrder, refreshOrderHistory, profile } = useApp();
   const [step, setStep] = useState<CheckoutStep>('summary');
-  const [paymentMethod, setPaymentMethod] = useState('UPI');
+  const [paymentMethod, setPaymentMethod] = useState('Razorpay');
   const [selectedUpiProvider, setSelectedUpiProvider] = useState('Google Pay');
+  const [showRazorpayModal, setShowRazorpayModal] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
 
   if (!activeOrder) return null;
 
   const handlePay = async () => {
+    if (paymentMethod === 'Razorpay') {
+      setShowRazorpayModal(true);
+      return;
+    }
     setIsPaying(true);
     // Simulate API checkout call
     const methodLabel = paymentMethod === 'UPI' ? `UPI (${selectedUpiProvider})` : paymentMethod;
     const updated = await db.payOrder(activeOrder.id, methodLabel);
     setIsPaying(false);
+    if (updated) {
+      setActiveOrder(updated);
+      await refreshOrderHistory();
+      setStep('success');
+    }
+  };
+
+  const handleRazorpaySuccess = async (paymentId: string) => {
+    setIsPaying(true);
+    const updated = await db.payOrder(activeOrder.id, `Razorpay (${paymentId})`);
+    setIsPaying(false);
+    setShowRazorpayModal(false);
     if (updated) {
       setActiveOrder(updated);
       await refreshOrderHistory();
@@ -138,7 +156,39 @@ export const CheckoutOverlay: React.FC<CheckoutOverlayProps> = ({ onClose, onPay
 
               {/* Payment Methods */}
               <div className="space-y-3">
-                {/* UPI Option */}
+                {/* Razorpay Option (Primary / Recommended) */}
+                <label 
+                  onClick={() => setPaymentMethod('Razorpay')}
+                  className={`flex flex-col p-4 rounded-2xl border cursor-pointer transition-all ${
+                    paymentMethod === 'Razorpay' ? 'border-[#0C2340] bg-[#0C2340]/[0.03] ring-1 ring-[#0C2340]/20' : 'border-gray-100 bg-gray-50/50'
+                  }`}
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-[#0C2340] flex items-center justify-center text-white font-black text-xs tracking-tighter">
+                        Rzp
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-brand-text text-sm">Razorpay Checkout</span>
+                          <span className="bg-emerald-50 text-emerald-600 border border-emerald-200 text-[9px] font-extrabold px-1.5 py-0.5 rounded-full">
+                            Instant & Verified
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-gray-400">UPI, GPay, PhonePe, Cards, NetBanking</p>
+                      </div>
+                    </div>
+                    <input 
+                      type="radio" 
+                      name="payment_main" 
+                      checked={paymentMethod === 'Razorpay'} 
+                      onChange={() => {}}
+                      className="accent-[#0C2340] w-4 h-4" 
+                    />
+                  </div>
+                </label>
+
+                {/* Direct UPI Apps Option */}
                 <label 
                   onClick={() => setPaymentMethod('UPI')}
                   className={`flex flex-col p-4 rounded-2xl border cursor-pointer transition-all ${
@@ -148,7 +198,7 @@ export const CheckoutOverlay: React.FC<CheckoutOverlayProps> = ({ onClose, onPay
                   <div className="flex items-center justify-between w-full">
                     <div className="flex items-center gap-3">
                       <Smartphone className={paymentMethod === 'UPI' ? 'text-primary' : 'text-gray-500'} size={20} />
-                      <span className="font-semibold text-brand-text text-sm">UPI apps (Instant Check)</span>
+                      <span className="font-semibold text-brand-text text-sm">UPI Apps (Manual)</span>
                     </div>
                     <input 
                       type="radio" 
@@ -197,26 +247,6 @@ export const CheckoutOverlay: React.FC<CheckoutOverlayProps> = ({ onClose, onPay
                     type="radio" 
                     name="payment_main" 
                     checked={paymentMethod === 'Card'} 
-                    onChange={() => {}}
-                    className="accent-primary w-4 h-4" 
-                  />
-                </label>
-
-                {/* Pay with Wallets */}
-                <label 
-                  onClick={() => setPaymentMethod('Wallet')}
-                  className={`flex items-center justify-between p-4 rounded-2xl border cursor-pointer transition-all ${
-                    paymentMethod === 'Wallet' ? 'border-primary bg-primary/[0.02]' : 'border-gray-100 bg-gray-50/50'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Wallet className={paymentMethod === 'Wallet' ? 'text-primary' : 'text-gray-500'} size={20} />
-                    <span className="font-semibold text-brand-text text-sm">Digital Wallets (Amazon, Mobikwik)</span>
-                  </div>
-                  <input 
-                    type="radio" 
-                    name="payment_main" 
-                    checked={paymentMethod === 'Wallet'} 
                     onChange={() => {}}
                     className="accent-primary w-4 h-4" 
                   />
@@ -327,6 +357,18 @@ export const CheckoutOverlay: React.FC<CheckoutOverlayProps> = ({ onClose, onPay
         </div>
 
       </div>
+
+      {showRazorpayModal && (
+        <RazorpayModal
+          orderId={activeOrder.id}
+          tableId={activeOrder.tableId}
+          amount={activeOrder.total}
+          customerName={profile?.name}
+          customerPhone={profile?.phone}
+          onPaymentSuccess={handleRazorpaySuccess}
+          onClose={() => setShowRazorpayModal(false)}
+        />
+      )}
     </div>
   );
 };

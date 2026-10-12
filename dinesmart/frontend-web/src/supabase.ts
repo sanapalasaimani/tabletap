@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { MenuItem, CartItem, Order, UserProfile, WaiterRequest } from './types';
 import { MENU_ITEMS } from './data/menu';
+import { analyzeReviewSentiment } from './utils/nlpSentiment';
 
 // Read Supabase environment variables
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
@@ -31,6 +32,65 @@ const saveMockData = <T>(key: string, data: T): void => {
   localStorage.setItem(`dinesmart_${key}`, JSON.stringify(data));
 };
 
+// Mapping helpers between Supabase snake_case columns and TypeScript MenuItem
+const mapSupabaseToMenuItem = (row: any): MenuItem => ({
+  id: String(row.id),
+  name: row.name || 'Unnamed Dish',
+  price: Number(row.price || 0),
+  category: row.category || 'Main Course',
+  subcategory: row.subcategory || undefined,
+  image: row.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500',
+  rating: Number(row.rating || 4.5),
+  reviewsCount: Number(row.reviews_count ?? row.reviewsCount ?? 50),
+  isVeg: row.is_veg !== undefined ? Boolean(row.is_veg) : Boolean(row.isVeg),
+  spicyLevel: row.spicy_level !== undefined ? (row.spicy_level as 0 | 1 | 2 | 3) : ((row.spicyLevel ?? 1) as 0 | 1 | 2 | 3),
+  isSpecial: row.is_special !== undefined ? Boolean(row.is_special) : Boolean(row.isSpecial),
+  calories: Number(row.calories || 300),
+  prepTime: row.prep_time || row.prepTime || '15 mins',
+  description: row.description || '',
+});
+
+const mapMenuItemToSupabase = (item: MenuItem): any => ({
+  id: String(item.id),
+  name: item.name,
+  price: Number(item.price),
+  category: item.category,
+  image: item.image,
+  rating: Number(item.rating || 4.5),
+  reviews_count: Number(item.reviewsCount || 50),
+  is_veg: Boolean(item.isVeg),
+  spicy_level: Number(item.spicyLevel || 1),
+  is_special: Boolean(item.isSpecial),
+  calories: Number(item.calories || 300),
+  prep_time: item.prepTime || '15 mins',
+  description: item.description || '',
+  available: true,
+});
+
+export const mapSupabaseToOrder = (row: any): Order => ({
+  id: String(row.id || ''),
+  tableId: String(row.table_id || row.tableId || '05'),
+  items: Array.isArray(row.items) ? row.items : [],
+  subtotal: Number(row.subtotal || 0),
+  gst: Number(row.gst || 0),
+  discount: Number(row.discount || 0),
+  tip: Number(row.tip || 0),
+  total: Number(row.total || 0),
+  status: row.status || 'Confirmed',
+  createdAt: row.created_at || row.createdAt || new Date().toISOString(),
+  paymentStatus: row.payment_status || row.paymentStatus || 'Pending',
+  paymentMethod: row.payment_method || row.paymentMethod,
+  feedbackSubmitted: Boolean(row.feedback_submitted || row.feedbackSubmitted)
+});
+
+export const mapSupabaseToWaiterRequest = (row: any): WaiterRequest => ({
+  id: String(row.id || ''),
+  tableId: String(row.table_id || row.tableId || '05'),
+  requestType: row.request_type || row.requestType || 'Assistance',
+  status: row.status || 'Pending',
+  createdAt: row.created_at || row.createdAt || new Date().toISOString()
+});
+
 // EXPORTED SERVICES
 export const db = {
   isSupabase: () => isRealSupabase,
@@ -39,18 +99,37 @@ export const db = {
   getMenuItems: async (): Promise<MenuItem[]> => {
     let items: MenuItem[] = [];
     if (isRealSupabase) {
-      const { data, error } = await supabaseClient
-        .from('menu_items')
-        .select('*')
-        .order('name');
-      if (!error && data) {
-        items = data;
-      } else {
-        console.error('Supabase error fetching menu:', error);
+      try {
+        const { data, error } = await supabaseClient
+          .from('menu_items')
+          .select('*')
+          .order('id')
+          .limit(1000);
+
+        if (!error && data && data.length > 0) {
+          items = data.map(mapSupabaseToMenuItem);
+
+          // If Supabase somehow has less than 40 dishes, automatically seed the 40 curated dishes
+          if (items.length < 40 && MENU_ITEMS.length >= 40) {
+            console.log(`DineSmart: Supabase returned ${items.length} items. Syncing full ${MENU_ITEMS.length} dishes...`);
+            const payload = MENU_ITEMS.map(mapMenuItemToSupabase);
+            await supabaseClient.from('menu_items').upsert(payload);
+            items = MENU_ITEMS;
+          }
+          saveMockData('menu', items);
+        } else {
+          items = getMockData<MenuItem[]>('menu', MENU_ITEMS);
+          if (items.length < 40) items = MENU_ITEMS;
+          saveMockData('menu', items);
+        }
+      } catch (err) {
+        console.warn('DineSmart: Error retrieving menu from Supabase, fallback to cache:', err);
+        items = getMockData<MenuItem[]>('menu', MENU_ITEMS);
+        if (items.length < 40) items = MENU_ITEMS;
       }
     } else {
       items = getMockData<MenuItem[]>('menu', []);
-      if (items.length === 0) {
+      if (items.length < 40) {
         items = MENU_ITEMS;
         saveMockData('menu', items);
       }
@@ -92,13 +171,25 @@ export const db = {
 
   saveMenuItem: async (item: MenuItem): Promise<MenuItem> => {
     if (isRealSupabase) {
-      const { data, error } = await supabaseClient
-        .from('menu_items')
-        .upsert(item)
-        .select()
-        .single();
-      if (!error && data) return data;
-      console.error('Supabase error saving menu item:', error);
+      try {
+        const payload = mapMenuItemToSupabase(item);
+        const { data, error } = await supabaseClient
+          .from('menu_items')
+          .upsert(payload)
+          .select()
+          .single();
+        if (!error && data) {
+          const saved = mapSupabaseToMenuItem(data);
+          const menu = getMockData<MenuItem[]>('menu', []);
+          const idx = menu.findIndex(m => m.id === saved.id);
+          if (idx !== -1) menu[idx] = saved; else menu.push(saved);
+          saveMockData('menu', menu);
+          return saved;
+        }
+        if (error) console.error('Supabase error saving menu item:', error);
+      } catch (err) {
+        console.error('Exception saving menu item to Supabase:', err);
+      }
     }
     const menu = getMockData<MenuItem[]>('menu', []);
     const idx = menu.findIndex(m => m.id === item.id);
@@ -109,6 +200,21 @@ export const db = {
     }
     saveMockData('menu', menu);
     return item;
+  },
+
+  syncAllMenuToSupabase: async (): Promise<number> => {
+    if (isRealSupabase) {
+      const payload = MENU_ITEMS.map(mapMenuItemToSupabase);
+      const { error } = await supabaseClient
+        .from('menu_items')
+        .upsert(payload);
+      if (error) {
+        console.error('Error syncing all dishes to Supabase:', error);
+        throw error;
+      }
+    }
+    saveMockData('menu', MENU_ITEMS);
+    return MENU_ITEMS.length;
   },
 
   deleteMenuItem: async (id: string): Promise<boolean> => {
@@ -212,17 +318,22 @@ export const db = {
         .select()
         .single();
       if (!error && data) {
+        const mapped = mapSupabaseToOrder(data);
+        const orders = getMockData<Order[]>('orders', []);
+        orders.unshift(mapped);
+        saveMockData('orders', orders);
+
         if (phone) {
           const rules = await db.getLoyaltyRules();
           await db.addLoyaltyPoints(phone, Math.floor((pricing.total / 100) * rules.pointsPerHundred));
         }
-        return data as unknown as Order;
+        return mapped;
       }
       console.error('Supabase error placing order, using mock:', error);
     }
 
     const orders = getMockData<Order[]>('orders', []);
-    orders.push(newOrder);
+    orders.unshift(newOrder);
     saveMockData('orders', orders);
 
     if (phone) {
@@ -239,7 +350,7 @@ export const db = {
         .select('*')
         .eq('id', orderId)
         .single();
-      if (!error && data) return data as unknown as Order;
+      if (!error && data) return mapSupabaseToOrder(data);
     }
     const orders = getMockData<Order[]>('orders', []);
     return orders.find(o => o.id === orderId) || null;
@@ -252,7 +363,7 @@ export const db = {
         .select('*')
         .eq('customer_phone', phone)
         .order('created_at', { ascending: false });
-      if (!error && data) return data as unknown as Order[];
+      if (!error && data) return data.map(mapSupabaseToOrder);
     }
     const orders = getMockData<Order[]>('orders', []);
     return orders
@@ -262,34 +373,52 @@ export const db = {
 
   getAllOrders: async (): Promise<Order[]> => {
     if (isRealSupabase) {
-      const { data, error } = await supabaseClient
-        .from('orders')
-        .select('*')
-        .order('created_at', { ascending: false });
-      if (!error && data) return data as unknown as Order[];
+      try {
+        const { data, error } = await supabaseClient
+          .from('orders')
+          .select('*')
+          .order('created_at', { ascending: false });
+        if (!error && data) {
+          const mapped = data.map(mapSupabaseToOrder);
+          saveMockData('orders', mapped);
+          return mapped;
+        }
+      } catch (err) {
+        console.warn('Supabase getAllOrders failed, fallback to cache:', err);
+      }
     }
     const orders = getMockData<Order[]>('orders', []);
     return orders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   },
 
   updateOrderStatus: async (orderId: string, status: Order['status']): Promise<Order | null> => {
+    let result: Order | null = null;
     if (isRealSupabase) {
-      const { data, error } = await supabaseClient
-        .from('orders')
-        .update({ status })
-        .eq('id', orderId)
-        .select()
-        .single();
-      if (!error && data) return data as unknown as Order;
+      try {
+        const { data, error } = await supabaseClient
+          .from('orders')
+          .update({ status })
+          .eq('id', orderId)
+          .select()
+          .single();
+        if (!error && data) {
+          result = mapSupabaseToOrder(data);
+        }
+      } catch (err) {
+        console.warn('Supabase updateOrderStatus failed:', err);
+      }
     }
     const orders = getMockData<Order[]>('orders', []);
     const idx = orders.findIndex(o => o.id === orderId);
     if (idx !== -1) {
       orders[idx].status = status;
+      if (!result) result = orders[idx];
       saveMockData('orders', orders);
-      return orders[idx];
+    } else if (result) {
+      orders.unshift(result);
+      saveMockData('orders', orders);
     }
-    return null;
+    return result;
   },
 
   payOrder: async (orderId: string, method: string): Promise<Order | null> => {
@@ -300,7 +429,7 @@ export const db = {
         .eq('id', orderId)
         .select()
         .single();
-      if (!error && data) return data as unknown as Order;
+      if (!error && data) return mapSupabaseToOrder(data);
     }
     const orders = getMockData<Order[]>('orders', []);
     const idx = orders.findIndex(o => o.id === orderId);
@@ -311,6 +440,21 @@ export const db = {
       return orders[idx];
     }
     return null;
+  },
+
+  clearAllOrders: async (): Promise<boolean> => {
+    if (isRealSupabase) {
+      try {
+        await supabaseClient.from('orders').delete().neq('id', 'placeholder_id');
+      } catch (e) {
+        console.warn('Supabase clearAllOrders error:', e);
+      }
+    }
+    saveMockData('orders', []);
+    localStorage.removeItem('dinesmart_virtual_statuses');
+    localStorage.removeItem('dinesmart_active_order');
+    localStorage.removeItem('dinesmart_active_cart');
+    return true;
   },
 
   // 4. WAITER REQUESTS
@@ -324,43 +468,73 @@ export const db = {
     };
 
     if (isRealSupabase) {
-      const { data, error } = await supabaseClient
-        .from('waiter_requests')
-        .insert({
-          id: request.id,
-          table_id: tableId,
-          request_type: type,
-          status: 'Pending',
-        })
-        .select()
-        .single();
-      if (!error && data) return data as WaiterRequest;
+      try {
+        const { data, error } = await supabaseClient
+          .from('waiter_requests')
+          .insert({
+            id: request.id,
+            table_id: tableId,
+            request_type: type,
+            status: 'Pending',
+          })
+          .select()
+          .single();
+        if (!error && data) {
+          const mapped = mapSupabaseToWaiterRequest(data);
+          const reqs = getMockData<WaiterRequest[]>('waiter_requests', []);
+          reqs.unshift(mapped);
+          saveMockData('waiter_requests', reqs);
+          return mapped;
+        }
+      } catch (err) {
+        console.warn('Supabase requestWaiter failed, using fallback:', err);
+      }
     }
 
     const requests = getMockData<WaiterRequest[]>('waiter_requests', []);
-    requests.push(request);
+    requests.unshift(request);
     saveMockData('waiter_requests', requests);
     return request;
   },
 
   getWaiterRequests: async (): Promise<WaiterRequest[]> => {
     if (isRealSupabase) {
-      const { data, error } = await supabaseClient
-        .from('waiter_requests')
-        .select('*')
-        .order('created_at', { ascending: false });
-      if (!error && data) return data as WaiterRequest[];
+      try {
+        const { data, error } = await supabaseClient
+          .from('waiter_requests')
+          .select('*')
+          .order('created_at', { ascending: false });
+        if (!error && data) {
+          const mapped = data.map(mapSupabaseToWaiterRequest);
+          saveMockData('waiter_requests', mapped);
+          return mapped;
+        }
+      } catch (err) {
+        console.warn('Supabase getWaiterRequests failed:', err);
+      }
     }
     return getMockData<WaiterRequest[]>('waiter_requests', []);
   },
 
   updateWaiterRequestStatus: async (id: string, status: WaiterRequest['status']): Promise<boolean> => {
     if (isRealSupabase) {
-      const { error } = await supabaseClient
-        .from('waiter_requests')
-        .update({ status })
-        .eq('id', id);
-      if (!error) return true;
+      try {
+        const { error } = await supabaseClient
+          .from('waiter_requests')
+          .update({ status })
+          .eq('id', id);
+        if (!error) {
+          const requests = getMockData<WaiterRequest[]>('waiter_requests', []);
+          const idx = requests.findIndex(r => r.id === id);
+          if (idx !== -1) {
+            requests[idx].status = status;
+            saveMockData('waiter_requests', requests);
+          }
+          return true;
+        }
+      } catch (err) {
+        console.warn('Supabase updateWaiterRequestStatus failed:', err);
+      }
     }
     const requests = getMockData<WaiterRequest[]>('waiter_requests', []);
     const idx = requests.findIndex(r => r.id === id);
@@ -371,7 +545,6 @@ export const db = {
     }
     return false;
   },
-
 
   // 6. STAFF
   getStaff: async (): Promise<any[]> => {
@@ -421,38 +594,63 @@ export const db = {
 
   // 7. TABLES
   getTables: async (): Promise<any[]> => {
+    // Instant local-first retrieval (0ms)
+    const localTables = getMockData<any[]>('tables', []);
     if (isRealSupabase) {
-      const { data, error } = await supabaseClient
-        .from('tables')
-        .select('*')
-        .order('id');
-      if (!error && data) return data;
+      try {
+        const { data, error } = await Promise.race([
+          supabaseClient.from('tables').select('*').order('id'),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 1500))
+        ]) as any;
+        if (!error && data && data.length > 0) {
+          saveMockData('tables', data);
+          return data;
+        }
+      } catch (err) {
+        // Fallback
+      }
     }
-    return getMockData<any[]>('tables', []);
+    return localTables;
   },
 
   getTable: async (id: number): Promise<any | null> => {
-    if (isRealSupabase) {
-      const { data, error } = await supabaseClient
-        .from('tables')
-        .select('*')
-        .eq('id', id)
-        .single();
-      if (!error && data) return data;
-    }
+    const tableNum = Number(id);
     const tables = getMockData<any[]>('tables', []);
-    return tables.find(t => t.id === id) || null;
+    const local = tables.find(t => Number(t.id) === tableNum);
+    if (isRealSupabase) {
+      try {
+        const { data, error } = await Promise.race([
+          supabaseClient.from('tables').select('*').eq('id', tableNum).single(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 1500))
+        ]) as any;
+        if (!error && data) {
+          const idx = tables.findIndex(t => Number(t.id) === tableNum);
+          if (idx !== -1) tables[idx] = data;
+          else tables.push(data);
+          saveMockData('tables', tables);
+          return data;
+        }
+      } catch (err) {
+        // Fallback
+      }
+    }
+    if (local) return local;
+
+    // Auto-create table entry if it didn't exist so user is never locked out
+    const fallbackTable = {
+      id: tableNum,
+      name: `Table ${tableNum}`,
+      status: 'Available',
+      capacity: 4,
+      qr_token: `qr_table_${tableNum}_session`
+    };
+    tables.push(fallbackTable);
+    saveMockData('tables', tables);
+    return fallbackTable;
   },
 
   saveTable: async (table: any): Promise<any> => {
-    if (isRealSupabase) {
-      const { data, error } = await supabaseClient
-        .from('tables')
-        .upsert(table)
-        .select()
-        .single();
-      if (!error && data) return data;
-    }
+    // ⚡ INSTANT LOCAL SAVE (0ms)
     const tables = getMockData<any[]>('tables', []);
     const idx = tables.findIndex(t => t.id === table.id);
     if (idx !== -1) {
@@ -461,20 +659,44 @@ export const db = {
       tables.push(table);
     }
     saveMockData('tables', tables);
+
+    // Non-blocking background sync to Supabase
+    if (isRealSupabase) {
+      Promise.race([
+        supabaseClient.from('tables').upsert(table),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000))
+      ]).catch(() => {});
+    }
     return table;
   },
 
-  deleteTable: async (id: number): Promise<boolean> => {
+  saveTables: async (newTables: any[]): Promise<any[]> => {
+    // ⚡ INSTANT BATCH LOCAL SAVE (0ms)
+    saveMockData('tables', newTables);
+
+    // Non-blocking background batch sync to Supabase
     if (isRealSupabase) {
-      const { error } = await supabaseClient
-        .from('tables')
-        .delete()
-        .eq('id', id);
-      if (!error) return true;
+      Promise.race([
+        supabaseClient.from('tables').upsert(newTables),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2500))
+      ]).catch(() => {});
     }
+    return newTables;
+  },
+
+  deleteTable: async (id: number): Promise<boolean> => {
+    // ⚡ INSTANT LOCAL DELETE (0ms)
     const tables = getMockData<any[]>('tables', []);
     const updated = tables.filter(t => t.id !== id);
     saveMockData('tables', updated);
+
+    // Non-blocking background delete from Supabase
+    if (isRealSupabase) {
+      Promise.race([
+        supabaseClient.from('tables').delete().eq('id', id),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000))
+      ]).catch(() => {});
+    }
     return true;
   },
 
@@ -605,7 +827,8 @@ export const db = {
       }
     }
     
-    // Also save in reviews collection as customer review
+    // Run real-time NLP Sentiment & Aspect Analysis on customer review
+    const nlp = analyzeReviewSentiment(comments, ratings.food);
     const ordersList = getMockData<Order[]>('orders', []);
     const orderObj = ordersList.find(o => o.id === orderId);
     
@@ -613,8 +836,17 @@ export const db = {
       id: `rev_${Date.now()}`,
       order_id: orderId,
       customer_name: orderObj ? `Guest (Table ${orderObj.tableId})` : 'Guest Customer',
+      table_id: orderObj?.tableId || '05',
       rating: ratings.food,
+      service_rating: ratings.service,
+      ambience_rating: ratings.ambience,
       comment: comments,
+      sentiment: nlp.sentiment,
+      sentiment_score: nlp.score,
+      emoji: nlp.emoji,
+      key_phrases: nlp.keyPhrases,
+      kitchen_alert: nlp.kitchenAlert,
+      kitchen_alert_reason: nlp.kitchenAlertReason,
       date: new Date().toISOString().split('T')[0],
       reply: null
     };

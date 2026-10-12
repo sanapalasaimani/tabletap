@@ -103,27 +103,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [phone]);
 
-  // Simulation loop for cooking stages if order is active and mock DB is used
+  // Live polling: synchronize active order status directly from Kitchen & Waiter actions
   useEffect(() => {
     if (!activeOrder || activeOrder.status === 'Delivered') return;
 
-    // Simulate order progress steps
-    const timer = setTimeout(async () => {
-      let nextStatus: Order['status'] = 'Confirmed';
-      if (activeOrder.status === 'Confirmed') nextStatus = 'Preparing';
-      else if (activeOrder.status === 'Preparing') nextStatus = 'Cooking';
-      else if (activeOrder.status === 'Cooking') nextStatus = 'Ready to Serve';
-      else if (activeOrder.status === 'Ready to Serve') nextStatus = 'Delivered';
-
-      const updated = await db.updateOrderStatus(activeOrder.id, nextStatus);
-      if (updated) {
-        setActiveOrder({ ...activeOrder, status: nextStatus });
-        refreshOrderHistory();
+    const interval = setInterval(async () => {
+      try {
+        const liveOrder = await db.getOrder(activeOrder.id);
+        if (liveOrder && liveOrder.status !== activeOrder.status) {
+          setActiveOrder(liveOrder);
+          refreshOrderHistory();
+        }
+      } catch (err) {
+        console.warn('AppContext: Failed to poll order status:', err);
       }
-    }, 15000); // Progress every 15s for demo
+    }, 2000);
 
-    return () => clearTimeout(timer);
-  }, [activeOrder]);
+    return () => clearInterval(interval);
+  }, [activeOrder?.id, activeOrder?.status]);
 
   const loginCustomer = async (num: string, name: string) => {
     setCustomerName(name);

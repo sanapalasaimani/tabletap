@@ -1,0 +1,1648 @@
+{
+  "modelMetadata": {
+    "trainedAt": "2026-10-10",
+    "trainingRecords": 23708,
+    "algorithm": "RandomForestRegressor + Association Rule Mining",
+    "r2Score": 0.957,
+    "maeMinutes": 1.27,
+    "featureImportances": {
+      "kitchen_queue_length": 0.42,
+      "base_prep_time_min": 0.28,
+      "item_count": 0.14,
+      "hour_of_day": 0.09,
+      "guest_count": 0.07
+    }
+  },
+  "bestInHotel": [
+    {
+      "id": "m1",
+      "name": "Butter Chicken",
+      "category": "Main Course",
+      "price": 320,
+      "compositeScore": 88.5,
+      "avgRating": 4.8,
+      "ordersCount": 890,
+      "avgPrepDelayMin": 1.1,
+      "primarySession": "Lunch & Dinner",
+      "recommendationBadge": "Chef Signature",
+      "isBestInHotel": true
+    },
+    {
+      "id": "m3",
+      "name": "Dal Makhani",
+      "category": "Main Course",
+      "price": 210,
+      "compositeScore": 88.5,
+      "avgRating": 4.8,
+      "ordersCount": 890,
+      "avgPrepDelayMin": 1.1,
+      "primarySession": "Lunch & Dinner",
+      "recommendationBadge": "Chef Signature",
+      "isBestInHotel": true
+    },
+    {
+      "id": "m4",
+      "name": "Chicken Dum Biryani",
+      "category": "Main Course",
+      "price": 290,
+      "compositeScore": 88.5,
+      "avgRating": 4.8,
+      "ordersCount": 890,
+      "avgPrepDelayMin": 1.1,
+      "primarySession": "Lunch & Dinner",
+      "recommendationBadge": "Chef Signature",
+      "isBestInHotel": true
+    },
+    {
+      "id": "m5",
+      "name": "Mutton Rogan Josh",
+      "category": "Main Course",
+      "price": 360,
+      "compositeScore": 88.5,
+      "avgRating": 4.8,
+      "ordersCount": 890,
+      "avgPrepDelayMin": 1.1,
+      "primarySession": "Lunch & Dinner",
+      "recommendationBadge": "Chef Signature",
+      "isBestInHotel": true
+    },
+    {
+      "id": "b1",
+      "name": "Masala Dosa",
+      "category": "Breakfast",
+      "price": 90,
+      "compositeScore": 87.7,
+      "avgRating": 4.57,
+      "ordersCount": 4844,
+      "avgPrepDelayMin": 4.3,
+      "primarySession": "Breakfast",
+      "recommendationBadge": "Chef Choice \u2022 Top 1%",
+      "isBestInHotel": true
+    },
+    {
+      "id": "bv5",
+      "name": "Cold Coffee with Ice Cream",
+      "category": "Beverages",
+      "price": 110,
+      "compositeScore": 87.0,
+      "avgRating": 4.47,
+      "ordersCount": 7228,
+      "avgPrepDelayMin": 5.1,
+      "primarySession": "Lunch",
+      "recommendationBadge": "Chef Choice \u2022 Top 1%",
+      "isBestInHotel": true
+    },
+    {
+      "id": "d1",
+      "name": "Gulab Jamun",
+      "category": "Desserts",
+      "price": 90,
+      "compositeScore": 84.3,
+      "avgRating": 4.41,
+      "ordersCount": 5004,
+      "avgPrepDelayMin": 5.6,
+      "primarySession": "Lunch",
+      "recommendationBadge": "Bestseller",
+      "isBestInHotel": true
+    },
+    {
+      "id": "st1",
+      "name": "Paneer Tikka",
+      "category": "Starters",
+      "price": 240,
+      "compositeScore": 84.0,
+      "avgRating": 4.8,
+      "ordersCount": 540,
+      "avgPrepDelayMin": 1.1,
+      "primarySession": "All Day",
+      "recommendationBadge": "Chef Signature",
+      "isBestInHotel": true
+    },
+    {
+      "id": "st2",
+      "name": "Chicken 65",
+      "category": "Starters",
+      "price": 270,
+      "compositeScore": 84.0,
+      "avgRating": 4.8,
+      "ordersCount": 540,
+      "avgPrepDelayMin": 1.1,
+      "primarySession": "All Day",
+      "recommendationBadge": "Chef Signature",
+      "isBestInHotel": true
+    },
+    {
+      "id": "st3",
+      "name": "Tandoori Chicken",
+      "category": "Starters",
+      "price": 310,
+      "compositeScore": 84.0,
+      "avgRating": 4.8,
+      "ordersCount": 540,
+      "avgPrepDelayMin": 1.1,
+      "primarySession": "All Day",
+      "recommendationBadge": "Chef Signature",
+      "isBestInHotel": true
+    },
+    {
+      "id": "st4",
+      "name": "Crispy Corn",
+      "category": "Starters",
+      "price": 190,
+      "compositeScore": 84.0,
+      "avgRating": 4.8,
+      "ordersCount": 540,
+      "avgPrepDelayMin": 1.1,
+      "primarySession": "All Day",
+      "recommendationBadge": "Chef Signature",
+      "isBestInHotel": true
+    },
+    {
+      "id": "st5",
+      "name": "Veg Spring Rolls",
+      "category": "Starters",
+      "price": 180,
+      "compositeScore": 84.0,
+      "avgRating": 4.8,
+      "ordersCount": 540,
+      "avgPrepDelayMin": 1.1,
+      "primarySession": "All Day",
+      "recommendationBadge": "Chef Signature",
+      "isBestInHotel": true
+    },
+    {
+      "id": "m2",
+      "name": "Paneer Butter Masala",
+      "category": "Main Course",
+      "price": 260,
+      "compositeScore": 81.4,
+      "avgRating": 4.34,
+      "ordersCount": 3821,
+      "avgPrepDelayMin": 6.3,
+      "primarySession": "Lunch",
+      "recommendationBadge": "Bestseller",
+      "isBestInHotel": true
+    },
+    {
+      "id": "c1",
+      "name": "Chicken Biryani Combo",
+      "category": "Combos",
+      "price": 360,
+      "compositeScore": 81.0,
+      "avgRating": 4.32,
+      "ordersCount": 3737,
+      "avgPrepDelayMin": 6.4,
+      "primarySession": "Lunch",
+      "recommendationBadge": "Bestseller",
+      "isBestInHotel": true
+    },
+    {
+      "id": "b2",
+      "name": "Idli Sambar",
+      "category": "Breakfast",
+      "price": 70,
+      "compositeScore": 79.5,
+      "avgRating": 4.8,
+      "ordersCount": 890,
+      "avgPrepDelayMin": 1.1,
+      "primarySession": "Breakfast",
+      "recommendationBadge": "Customer Favorite",
+      "isBestInHotel": false
+    },
+    {
+      "id": "b3",
+      "name": "Poori Bhaji",
+      "category": "Breakfast",
+      "price": 85,
+      "compositeScore": 79.5,
+      "avgRating": 4.8,
+      "ordersCount": 890,
+      "avgPrepDelayMin": 1.1,
+      "primarySession": "Breakfast",
+      "recommendationBadge": "Customer Favorite",
+      "isBestInHotel": false
+    },
+    {
+      "id": "b4",
+      "name": "Medu Vada",
+      "category": "Breakfast",
+      "price": 75,
+      "compositeScore": 79.5,
+      "avgRating": 4.8,
+      "ordersCount": 890,
+      "avgPrepDelayMin": 1.1,
+      "primarySession": "Breakfast",
+      "recommendationBadge": "Customer Favorite",
+      "isBestInHotel": false
+    },
+    {
+      "id": "b5",
+      "name": "Chole Bhature",
+      "category": "Breakfast",
+      "price": 120,
+      "compositeScore": 79.5,
+      "avgRating": 4.8,
+      "ordersCount": 890,
+      "avgPrepDelayMin": 1.1,
+      "primarySession": "Breakfast",
+      "recommendationBadge": "Customer Favorite",
+      "isBestInHotel": false
+    },
+    {
+      "id": "s1",
+      "name": "Cream of Tomato Soup",
+      "category": "Soups",
+      "price": 110,
+      "compositeScore": 79.5,
+      "avgRating": 4.8,
+      "ordersCount": 540,
+      "avgPrepDelayMin": 1.1,
+      "primarySession": "All Day",
+      "recommendationBadge": "Customer Favorite",
+      "isBestInHotel": false
+    },
+    {
+      "id": "s2",
+      "name": "Sweet Corn Veg Soup",
+      "category": "Soups",
+      "price": 115,
+      "compositeScore": 79.5,
+      "avgRating": 4.8,
+      "ordersCount": 540,
+      "avgPrepDelayMin": 1.1,
+      "primarySession": "All Day",
+      "recommendationBadge": "Customer Favorite",
+      "isBestInHotel": false
+    },
+    {
+      "id": "s3",
+      "name": "Hot and Sour Soup",
+      "category": "Soups",
+      "price": 125,
+      "compositeScore": 79.5,
+      "avgRating": 4.8,
+      "ordersCount": 540,
+      "avgPrepDelayMin": 1.1,
+      "primarySession": "All Day",
+      "recommendationBadge": "Customer Favorite",
+      "isBestInHotel": false
+    },
+    {
+      "id": "s4",
+      "name": "Chicken Manchow Soup",
+      "category": "Soups",
+      "price": 145,
+      "compositeScore": 79.5,
+      "avgRating": 4.8,
+      "ordersCount": 540,
+      "avgPrepDelayMin": 1.1,
+      "primarySession": "All Day",
+      "recommendationBadge": "Customer Favorite",
+      "isBestInHotel": false
+    },
+    {
+      "id": "s5",
+      "name": "Cream of Mushroom Soup",
+      "category": "Soups",
+      "price": 130,
+      "compositeScore": 79.5,
+      "avgRating": 4.8,
+      "ordersCount": 540,
+      "avgPrepDelayMin": 1.1,
+      "primarySession": "All Day",
+      "recommendationBadge": "Customer Favorite",
+      "isBestInHotel": false
+    },
+    {
+      "id": "c2",
+      "name": "Veg Deluxe Thali",
+      "category": "Combos",
+      "price": 310,
+      "compositeScore": 79.5,
+      "avgRating": 4.8,
+      "ordersCount": 540,
+      "avgPrepDelayMin": 1.1,
+      "primarySession": "All Day",
+      "recommendationBadge": "Customer Favorite",
+      "isBestInHotel": false
+    },
+    {
+      "id": "c3",
+      "name": "South Indian Tiffin Combo",
+      "category": "Combos",
+      "price": 180,
+      "compositeScore": 79.5,
+      "avgRating": 4.8,
+      "ordersCount": 540,
+      "avgPrepDelayMin": 1.1,
+      "primarySession": "All Day",
+      "recommendationBadge": "Customer Favorite",
+      "isBestInHotel": false
+    },
+    {
+      "id": "c4",
+      "name": "Chinese Delight Combo",
+      "category": "Combos",
+      "price": 260,
+      "compositeScore": 79.5,
+      "avgRating": 4.8,
+      "ordersCount": 540,
+      "avgPrepDelayMin": 1.1,
+      "primarySession": "All Day",
+      "recommendationBadge": "Customer Favorite",
+      "isBestInHotel": false
+    },
+    {
+      "id": "c5",
+      "name": "Non-Veg Royal Platter",
+      "category": "Combos",
+      "price": 450,
+      "compositeScore": 79.5,
+      "avgRating": 4.8,
+      "ordersCount": 540,
+      "avgPrepDelayMin": 1.1,
+      "primarySession": "All Day",
+      "recommendationBadge": "Customer Favorite",
+      "isBestInHotel": false
+    },
+    {
+      "id": "br1",
+      "name": "Butter Naan",
+      "category": "Breads",
+      "price": 50,
+      "compositeScore": 79.5,
+      "avgRating": 4.8,
+      "ordersCount": 540,
+      "avgPrepDelayMin": 1.1,
+      "primarySession": "Lunch & Dinner",
+      "recommendationBadge": "Customer Favorite",
+      "isBestInHotel": false
+    },
+    {
+      "id": "br2",
+      "name": "Garlic Naan",
+      "category": "Breads",
+      "price": 65,
+      "compositeScore": 79.5,
+      "avgRating": 4.8,
+      "ordersCount": 540,
+      "avgPrepDelayMin": 1.1,
+      "primarySession": "Lunch & Dinner",
+      "recommendationBadge": "Customer Favorite",
+      "isBestInHotel": false
+    },
+    {
+      "id": "br3",
+      "name": "Tandoori Roti",
+      "category": "Breads",
+      "price": 35,
+      "compositeScore": 79.5,
+      "avgRating": 4.8,
+      "ordersCount": 540,
+      "avgPrepDelayMin": 1.1,
+      "primarySession": "Lunch & Dinner",
+      "recommendationBadge": "Customer Favorite",
+      "isBestInHotel": false
+    },
+    {
+      "id": "br4",
+      "name": "Laccha Paratha",
+      "category": "Breads",
+      "price": 55,
+      "compositeScore": 79.5,
+      "avgRating": 4.8,
+      "ordersCount": 540,
+      "avgPrepDelayMin": 1.1,
+      "primarySession": "Lunch & Dinner",
+      "recommendationBadge": "Customer Favorite",
+      "isBestInHotel": false
+    },
+    {
+      "id": "br5",
+      "name": "Aloo Kulcha",
+      "category": "Breads",
+      "price": 75,
+      "compositeScore": 79.5,
+      "avgRating": 4.8,
+      "ordersCount": 540,
+      "avgPrepDelayMin": 1.1,
+      "primarySession": "Lunch & Dinner",
+      "recommendationBadge": "Customer Favorite",
+      "isBestInHotel": false
+    },
+    {
+      "id": "d2",
+      "name": "Rasmalai",
+      "category": "Desserts",
+      "price": 110,
+      "compositeScore": 79.5,
+      "avgRating": 4.8,
+      "ordersCount": 540,
+      "avgPrepDelayMin": 1.1,
+      "primarySession": "All Day",
+      "recommendationBadge": "Customer Favorite",
+      "isBestInHotel": false
+    },
+    {
+      "id": "d3",
+      "name": "Gajar Ka Halwa",
+      "category": "Desserts",
+      "price": 120,
+      "compositeScore": 79.5,
+      "avgRating": 4.8,
+      "ordersCount": 540,
+      "avgPrepDelayMin": 1.1,
+      "primarySession": "All Day",
+      "recommendationBadge": "Customer Favorite",
+      "isBestInHotel": false
+    },
+    {
+      "id": "d4",
+      "name": "Kesar Pista Kulfi",
+      "category": "Desserts",
+      "price": 85,
+      "compositeScore": 79.5,
+      "avgRating": 4.8,
+      "ordersCount": 540,
+      "avgPrepDelayMin": 1.1,
+      "primarySession": "All Day",
+      "recommendationBadge": "Customer Favorite",
+      "isBestInHotel": false
+    },
+    {
+      "id": "d5",
+      "name": "Shahi Kheer",
+      "category": "Desserts",
+      "price": 95,
+      "compositeScore": 79.5,
+      "avgRating": 4.8,
+      "ordersCount": 540,
+      "avgPrepDelayMin": 1.1,
+      "primarySession": "All Day",
+      "recommendationBadge": "Customer Favorite",
+      "isBestInHotel": false
+    },
+    {
+      "id": "bv1",
+      "name": "Mango Lassi",
+      "category": "Beverages",
+      "price": 95,
+      "compositeScore": 79.5,
+      "avgRating": 4.8,
+      "ordersCount": 540,
+      "avgPrepDelayMin": 1.1,
+      "primarySession": "All Day",
+      "recommendationBadge": "Customer Favorite",
+      "isBestInHotel": false
+    },
+    {
+      "id": "bv2",
+      "name": "Masala Chai",
+      "category": "Beverages",
+      "price": 40,
+      "compositeScore": 79.5,
+      "avgRating": 4.8,
+      "ordersCount": 540,
+      "avgPrepDelayMin": 1.1,
+      "primarySession": "All Day",
+      "recommendationBadge": "Customer Favorite",
+      "isBestInHotel": false
+    },
+    {
+      "id": "bv3",
+      "name": "South Indian Filter Coffee",
+      "category": "Beverages",
+      "price": 50,
+      "compositeScore": 79.5,
+      "avgRating": 4.8,
+      "ordersCount": 540,
+      "avgPrepDelayMin": 1.1,
+      "primarySession": "All Day",
+      "recommendationBadge": "Customer Favorite",
+      "isBestInHotel": false
+    },
+    {
+      "id": "bv4",
+      "name": "Fresh Lime Soda",
+      "category": "Beverages",
+      "price": 60,
+      "compositeScore": 79.5,
+      "avgRating": 4.8,
+      "ordersCount": 540,
+      "avgPrepDelayMin": 1.1,
+      "primarySession": "All Day",
+      "recommendationBadge": "Customer Favorite",
+      "isBestInHotel": false
+    }
+  ],
+  "dishAffinities": {
+    "Lemon Ice Tea": [
+      {
+        "pairedWith": "Cold Coffee",
+        "confidence": 28.9,
+        "coOrders": 1989
+      },
+      {
+        "pairedWith": "French Fries",
+        "confidence": 21.6,
+        "coOrders": 1492
+      },
+      {
+        "pairedWith": "Cheese Pizza",
+        "confidence": 21.3,
+        "coOrders": 1467
+      },
+      {
+        "pairedWith": "Veg Sandwich",
+        "confidence": 21.3,
+        "coOrders": 1468
+      }
+    ],
+    "Gulab Jamun": [
+      {
+        "pairedWith": "Cold Coffee",
+        "confidence": 24.5,
+        "coOrders": 1225
+      },
+      {
+        "pairedWith": "Lemon Ice Tea",
+        "confidence": 23.7,
+        "coOrders": 1187
+      },
+      {
+        "pairedWith": "Chocolate Brownie",
+        "confidence": 23.1,
+        "coOrders": 1156
+      },
+      {
+        "pairedWith": "Paneer Butter Masala",
+        "confidence": 16.3,
+        "coOrders": 814
+      }
+    ],
+    "Chocolate Brownie": [
+      {
+        "pairedWith": "Lemon Ice Tea",
+        "confidence": 23.4,
+        "coOrders": 1172
+      },
+      {
+        "pairedWith": "Gulab Jamun",
+        "confidence": 23.1,
+        "coOrders": 1156
+      },
+      {
+        "pairedWith": "Cold Coffee",
+        "confidence": 23.1,
+        "coOrders": 1159
+      },
+      {
+        "pairedWith": "Paneer Butter Masala",
+        "confidence": 17.3,
+        "coOrders": 867
+      }
+    ],
+    "Paneer Butter Masala": [
+      {
+        "pairedWith": "Chocolate Brownie",
+        "confidence": 22.7,
+        "coOrders": 867
+      },
+      {
+        "pairedWith": "Chilli Chicken",
+        "confidence": 22.5,
+        "coOrders": 860
+      },
+      {
+        "pairedWith": "Cold Coffee",
+        "confidence": 22.3,
+        "coOrders": 852
+      },
+      {
+        "pairedWith": "Veg Pulao",
+        "confidence": 22.1,
+        "coOrders": 843
+      }
+    ],
+    "French Fries": [
+      {
+        "pairedWith": "Veg Sandwich",
+        "confidence": 31.4,
+        "coOrders": 1548
+      },
+      {
+        "pairedWith": "Cold Coffee",
+        "confidence": 30.6,
+        "coOrders": 1511
+      },
+      {
+        "pairedWith": "Lemon Ice Tea",
+        "confidence": 30.2,
+        "coOrders": 1492
+      },
+      {
+        "pairedWith": "Cheese Pizza",
+        "confidence": 30.2,
+        "coOrders": 1490
+      }
+    ],
+    "Cold Coffee": [
+      {
+        "pairedWith": "Lemon Ice Tea",
+        "confidence": 27.5,
+        "coOrders": 1989
+      },
+      {
+        "pairedWith": "Veg Sandwich",
+        "confidence": 21.2,
+        "coOrders": 1532
+      },
+      {
+        "pairedWith": "Cheese Pizza",
+        "confidence": 21.0,
+        "coOrders": 1517
+      },
+      {
+        "pairedWith": "French Fries",
+        "confidence": 20.9,
+        "coOrders": 1511
+      }
+    ],
+    "Masala Dosa": [
+      {
+        "pairedWith": "Cheese Pizza",
+        "confidence": 30.8,
+        "coOrders": 1493
+      },
+      {
+        "pairedWith": "Cold Coffee",
+        "confidence": 30.6,
+        "coOrders": 1481
+      },
+      {
+        "pairedWith": "Veg Sandwich",
+        "confidence": 30.5,
+        "coOrders": 1476
+      },
+      {
+        "pairedWith": "French Fries",
+        "confidence": 30.1,
+        "coOrders": 1457
+      }
+    ],
+    "Cheese Pizza": [
+      {
+        "pairedWith": "Veg Sandwich",
+        "confidence": 31.3,
+        "coOrders": 1532
+      },
+      {
+        "pairedWith": "Cold Coffee",
+        "confidence": 31.0,
+        "coOrders": 1517
+      },
+      {
+        "pairedWith": "Masala Dosa",
+        "confidence": 30.6,
+        "coOrders": 1493
+      },
+      {
+        "pairedWith": "French Fries",
+        "confidence": 30.5,
+        "coOrders": 1490
+      }
+    ],
+    "Veg Pulao": [
+      {
+        "pairedWith": "Cold Coffee",
+        "confidence": 23.2,
+        "coOrders": 890
+      },
+      {
+        "pairedWith": "Chilli Chicken",
+        "confidence": 22.2,
+        "coOrders": 851
+      },
+      {
+        "pairedWith": "Paneer Butter Masala",
+        "confidence": 22.0,
+        "coOrders": 843
+      },
+      {
+        "pairedWith": "Chicken Biryani",
+        "confidence": 21.8,
+        "coOrders": 838
+      }
+    ],
+    "Chilli Chicken": [
+      {
+        "pairedWith": "Dal Tadka",
+        "confidence": 22.9,
+        "coOrders": 880
+      },
+      {
+        "pairedWith": "Cold Coffee",
+        "confidence": 22.6,
+        "coOrders": 870
+      },
+      {
+        "pairedWith": "Paneer Butter Masala",
+        "confidence": 22.3,
+        "coOrders": 860
+      },
+      {
+        "pairedWith": "Veg Pulao",
+        "confidence": 22.1,
+        "coOrders": 851
+      }
+    ],
+    "Veg Sandwich": [
+      {
+        "pairedWith": "French Fries",
+        "confidence": 30.9,
+        "coOrders": 1548
+      },
+      {
+        "pairedWith": "Cold Coffee",
+        "confidence": 30.6,
+        "coOrders": 1532
+      },
+      {
+        "pairedWith": "Cheese Pizza",
+        "confidence": 30.6,
+        "coOrders": 1532
+      },
+      {
+        "pairedWith": "Masala Dosa",
+        "confidence": 29.5,
+        "coOrders": 1476
+      }
+    ],
+    "Chicken Biryani": [
+      {
+        "pairedWith": "Veg Pulao",
+        "confidence": 22.4,
+        "coOrders": 838
+      },
+      {
+        "pairedWith": "Chilli Chicken",
+        "confidence": 22.2,
+        "coOrders": 829
+      },
+      {
+        "pairedWith": "Dal Tadka",
+        "confidence": 21.9,
+        "coOrders": 818
+      },
+      {
+        "pairedWith": "Lemon Ice Tea",
+        "confidence": 21.2,
+        "coOrders": 791
+      }
+    ],
+    "Fish Curry": [
+      {
+        "pairedWith": "Cold Coffee",
+        "confidence": 22.9,
+        "coOrders": 855
+      },
+      {
+        "pairedWith": "Veg Pulao",
+        "confidence": 22.0,
+        "coOrders": 819
+      },
+      {
+        "pairedWith": "Lemon Ice Tea",
+        "confidence": 21.7,
+        "coOrders": 808
+      },
+      {
+        "pairedWith": "Chocolate Brownie",
+        "confidence": 21.6,
+        "coOrders": 805
+      }
+    ],
+    "Dal Tadka": [
+      {
+        "pairedWith": "Chilli Chicken",
+        "confidence": 23.1,
+        "coOrders": 880
+      },
+      {
+        "pairedWith": "Cold Coffee",
+        "confidence": 22.0,
+        "coOrders": 838
+      },
+      {
+        "pairedWith": "Chicken Biryani",
+        "confidence": 21.5,
+        "coOrders": 818
+      },
+      {
+        "pairedWith": "Fish Curry",
+        "confidence": 21.1,
+        "coOrders": 802
+      }
+    ],
+    "Butter Chicken": [
+      {
+        "pairedWith": "Garlic Naan",
+        "confidence": 74.5,
+        "coOrders": 520
+      },
+      {
+        "pairedWith": "Tandoori Roti",
+        "confidence": 66.3,
+        "coOrders": 460
+      },
+      {
+        "pairedWith": "Cold Coffee",
+        "confidence": 58.1,
+        "coOrders": 400
+      }
+    ],
+    "Dal Makhani": [
+      {
+        "pairedWith": "Garlic Naan",
+        "confidence": 74.5,
+        "coOrders": 520
+      },
+      {
+        "pairedWith": "Tandoori Roti",
+        "confidence": 66.3,
+        "coOrders": 460
+      },
+      {
+        "pairedWith": "Cold Coffee",
+        "confidence": 58.1,
+        "coOrders": 400
+      }
+    ],
+    "Chicken Dum Biryani": [
+      {
+        "pairedWith": "Garlic Naan",
+        "confidence": 74.5,
+        "coOrders": 520
+      },
+      {
+        "pairedWith": "Tandoori Roti",
+        "confidence": 66.3,
+        "coOrders": 460
+      },
+      {
+        "pairedWith": "Cold Coffee",
+        "confidence": 58.1,
+        "coOrders": 400
+      }
+    ],
+    "Mutton Rogan Josh": [
+      {
+        "pairedWith": "Garlic Naan",
+        "confidence": 74.5,
+        "coOrders": 520
+      },
+      {
+        "pairedWith": "Tandoori Roti",
+        "confidence": 66.3,
+        "coOrders": 460
+      },
+      {
+        "pairedWith": "Cold Coffee",
+        "confidence": 58.1,
+        "coOrders": 400
+      }
+    ],
+    "Cold Coffee with Ice Cream": [
+      {
+        "pairedWith": "French Fries",
+        "confidence": 74.5,
+        "coOrders": 520
+      },
+      {
+        "pairedWith": "Chocolate Brownie",
+        "confidence": 66.3,
+        "coOrders": 460
+      },
+      {
+        "pairedWith": "Veg Sandwich",
+        "confidence": 58.1,
+        "coOrders": 400
+      }
+    ],
+    "Paneer Tikka": [
+      {
+        "pairedWith": "Fresh Lime Soda",
+        "confidence": 74.5,
+        "coOrders": 520
+      },
+      {
+        "pairedWith": "Masala Chai",
+        "confidence": 66.3,
+        "coOrders": 460
+      },
+      {
+        "pairedWith": "Chicken Tikka",
+        "confidence": 58.1,
+        "coOrders": 400
+      }
+    ],
+    "Chicken 65": [
+      {
+        "pairedWith": "Fresh Lime Soda",
+        "confidence": 74.5,
+        "coOrders": 520
+      },
+      {
+        "pairedWith": "Masala Chai",
+        "confidence": 66.3,
+        "coOrders": 460
+      },
+      {
+        "pairedWith": "Chicken Tikka",
+        "confidence": 58.1,
+        "coOrders": 400
+      }
+    ],
+    "Tandoori Chicken": [
+      {
+        "pairedWith": "Fresh Lime Soda",
+        "confidence": 74.5,
+        "coOrders": 520
+      },
+      {
+        "pairedWith": "Masala Chai",
+        "confidence": 66.3,
+        "coOrders": 460
+      },
+      {
+        "pairedWith": "Chicken Tikka",
+        "confidence": 58.1,
+        "coOrders": 400
+      }
+    ],
+    "Crispy Corn": [
+      {
+        "pairedWith": "Fresh Lime Soda",
+        "confidence": 74.5,
+        "coOrders": 520
+      },
+      {
+        "pairedWith": "Masala Chai",
+        "confidence": 66.3,
+        "coOrders": 460
+      },
+      {
+        "pairedWith": "Chicken Tikka",
+        "confidence": 58.1,
+        "coOrders": 400
+      }
+    ],
+    "Veg Spring Rolls": [
+      {
+        "pairedWith": "Fresh Lime Soda",
+        "confidence": 74.5,
+        "coOrders": 520
+      },
+      {
+        "pairedWith": "Masala Chai",
+        "confidence": 66.3,
+        "coOrders": 460
+      },
+      {
+        "pairedWith": "Chicken Tikka",
+        "confidence": 58.1,
+        "coOrders": 400
+      }
+    ],
+    "Chicken Biryani Combo": [
+      {
+        "pairedWith": "Cold Coffee",
+        "confidence": 74.5,
+        "coOrders": 520
+      },
+      {
+        "pairedWith": "Fresh Lime Soda",
+        "confidence": 66.3,
+        "coOrders": 460
+      },
+      {
+        "pairedWith": "Brownie with Ice Cream",
+        "confidence": 58.1,
+        "coOrders": 400
+      }
+    ],
+    "Idli Sambar": [
+      {
+        "pairedWith": "Filter Coffee",
+        "confidence": 74.5,
+        "coOrders": 520
+      },
+      {
+        "pairedWith": "Masala Chai",
+        "confidence": 66.3,
+        "coOrders": 460
+      },
+      {
+        "pairedWith": "Orange Juice",
+        "confidence": 58.1,
+        "coOrders": 400
+      }
+    ],
+    "Poori Bhaji": [
+      {
+        "pairedWith": "Filter Coffee",
+        "confidence": 74.5,
+        "coOrders": 520
+      },
+      {
+        "pairedWith": "Masala Chai",
+        "confidence": 66.3,
+        "coOrders": 460
+      },
+      {
+        "pairedWith": "Orange Juice",
+        "confidence": 58.1,
+        "coOrders": 400
+      }
+    ],
+    "Medu Vada": [
+      {
+        "pairedWith": "Filter Coffee",
+        "confidence": 74.5,
+        "coOrders": 520
+      },
+      {
+        "pairedWith": "Masala Chai",
+        "confidence": 66.3,
+        "coOrders": 460
+      },
+      {
+        "pairedWith": "Orange Juice",
+        "confidence": 58.1,
+        "coOrders": 400
+      }
+    ],
+    "Chole Bhature": [
+      {
+        "pairedWith": "Filter Coffee",
+        "confidence": 74.5,
+        "coOrders": 520
+      },
+      {
+        "pairedWith": "Masala Chai",
+        "confidence": 66.3,
+        "coOrders": 460
+      },
+      {
+        "pairedWith": "Orange Juice",
+        "confidence": 58.1,
+        "coOrders": 400
+      }
+    ],
+    "Cream of Tomato Soup": [
+      {
+        "pairedWith": "Garlic Naan",
+        "confidence": 74.5,
+        "coOrders": 520
+      },
+      {
+        "pairedWith": "Crispy Corn",
+        "confidence": 66.3,
+        "coOrders": 460
+      },
+      {
+        "pairedWith": "Paneer Tikka",
+        "confidence": 58.1,
+        "coOrders": 400
+      }
+    ],
+    "Sweet Corn Veg Soup": [
+      {
+        "pairedWith": "Garlic Naan",
+        "confidence": 74.5,
+        "coOrders": 520
+      },
+      {
+        "pairedWith": "Crispy Corn",
+        "confidence": 66.3,
+        "coOrders": 460
+      },
+      {
+        "pairedWith": "Paneer Tikka",
+        "confidence": 58.1,
+        "coOrders": 400
+      }
+    ],
+    "Hot and Sour Soup": [
+      {
+        "pairedWith": "Garlic Naan",
+        "confidence": 74.5,
+        "coOrders": 520
+      },
+      {
+        "pairedWith": "Crispy Corn",
+        "confidence": 66.3,
+        "coOrders": 460
+      },
+      {
+        "pairedWith": "Paneer Tikka",
+        "confidence": 58.1,
+        "coOrders": 400
+      }
+    ],
+    "Chicken Manchow Soup": [
+      {
+        "pairedWith": "Garlic Naan",
+        "confidence": 74.5,
+        "coOrders": 520
+      },
+      {
+        "pairedWith": "Crispy Corn",
+        "confidence": 66.3,
+        "coOrders": 460
+      },
+      {
+        "pairedWith": "Paneer Tikka",
+        "confidence": 58.1,
+        "coOrders": 400
+      }
+    ],
+    "Cream of Mushroom Soup": [
+      {
+        "pairedWith": "Garlic Naan",
+        "confidence": 74.5,
+        "coOrders": 520
+      },
+      {
+        "pairedWith": "Crispy Corn",
+        "confidence": 66.3,
+        "coOrders": 460
+      },
+      {
+        "pairedWith": "Paneer Tikka",
+        "confidence": 58.1,
+        "coOrders": 400
+      }
+    ],
+    "Veg Deluxe Thali": [
+      {
+        "pairedWith": "Cold Coffee",
+        "confidence": 74.5,
+        "coOrders": 520
+      },
+      {
+        "pairedWith": "Fresh Lime Soda",
+        "confidence": 66.3,
+        "coOrders": 460
+      },
+      {
+        "pairedWith": "Brownie with Ice Cream",
+        "confidence": 58.1,
+        "coOrders": 400
+      }
+    ],
+    "South Indian Tiffin Combo": [
+      {
+        "pairedWith": "Cold Coffee",
+        "confidence": 74.5,
+        "coOrders": 520
+      },
+      {
+        "pairedWith": "Fresh Lime Soda",
+        "confidence": 66.3,
+        "coOrders": 460
+      },
+      {
+        "pairedWith": "Brownie with Ice Cream",
+        "confidence": 58.1,
+        "coOrders": 400
+      }
+    ],
+    "Chinese Delight Combo": [
+      {
+        "pairedWith": "Cold Coffee",
+        "confidence": 74.5,
+        "coOrders": 520
+      },
+      {
+        "pairedWith": "Fresh Lime Soda",
+        "confidence": 66.3,
+        "coOrders": 460
+      },
+      {
+        "pairedWith": "Brownie with Ice Cream",
+        "confidence": 58.1,
+        "coOrders": 400
+      }
+    ],
+    "Non-Veg Royal Platter": [
+      {
+        "pairedWith": "Cold Coffee",
+        "confidence": 74.5,
+        "coOrders": 520
+      },
+      {
+        "pairedWith": "Fresh Lime Soda",
+        "confidence": 66.3,
+        "coOrders": 460
+      },
+      {
+        "pairedWith": "Brownie with Ice Cream",
+        "confidence": 58.1,
+        "coOrders": 400
+      }
+    ],
+    "Butter Naan": [
+      {
+        "pairedWith": "Paneer Butter Masala",
+        "confidence": 74.5,
+        "coOrders": 520
+      },
+      {
+        "pairedWith": "Butter Chicken",
+        "confidence": 66.3,
+        "coOrders": 460
+      },
+      {
+        "pairedWith": "Dal Makhani",
+        "confidence": 58.1,
+        "coOrders": 400
+      }
+    ],
+    "Garlic Naan": [
+      {
+        "pairedWith": "Paneer Butter Masala",
+        "confidence": 74.5,
+        "coOrders": 520
+      },
+      {
+        "pairedWith": "Butter Chicken",
+        "confidence": 66.3,
+        "coOrders": 460
+      },
+      {
+        "pairedWith": "Dal Makhani",
+        "confidence": 58.1,
+        "coOrders": 400
+      }
+    ],
+    "Tandoori Roti": [
+      {
+        "pairedWith": "Paneer Butter Masala",
+        "confidence": 74.5,
+        "coOrders": 520
+      },
+      {
+        "pairedWith": "Butter Chicken",
+        "confidence": 66.3,
+        "coOrders": 460
+      },
+      {
+        "pairedWith": "Dal Makhani",
+        "confidence": 58.1,
+        "coOrders": 400
+      }
+    ],
+    "Laccha Paratha": [
+      {
+        "pairedWith": "Paneer Butter Masala",
+        "confidence": 74.5,
+        "coOrders": 520
+      },
+      {
+        "pairedWith": "Butter Chicken",
+        "confidence": 66.3,
+        "coOrders": 460
+      },
+      {
+        "pairedWith": "Dal Makhani",
+        "confidence": 58.1,
+        "coOrders": 400
+      }
+    ],
+    "Aloo Kulcha": [
+      {
+        "pairedWith": "Paneer Butter Masala",
+        "confidence": 74.5,
+        "coOrders": 520
+      },
+      {
+        "pairedWith": "Butter Chicken",
+        "confidence": 66.3,
+        "coOrders": 460
+      },
+      {
+        "pairedWith": "Dal Makhani",
+        "confidence": 58.1,
+        "coOrders": 400
+      }
+    ],
+    "Rasmalai": [
+      {
+        "pairedWith": "Cold Coffee",
+        "confidence": 74.5,
+        "coOrders": 520
+      },
+      {
+        "pairedWith": "Chocolate Brownie",
+        "confidence": 66.3,
+        "coOrders": 460
+      },
+      {
+        "pairedWith": "Gulab Jamun",
+        "confidence": 58.1,
+        "coOrders": 400
+      }
+    ],
+    "Gajar Ka Halwa": [
+      {
+        "pairedWith": "Cold Coffee",
+        "confidence": 74.5,
+        "coOrders": 520
+      },
+      {
+        "pairedWith": "Chocolate Brownie",
+        "confidence": 66.3,
+        "coOrders": 460
+      },
+      {
+        "pairedWith": "Gulab Jamun",
+        "confidence": 58.1,
+        "coOrders": 400
+      }
+    ],
+    "Kesar Pista Kulfi": [
+      {
+        "pairedWith": "Cold Coffee",
+        "confidence": 74.5,
+        "coOrders": 520
+      },
+      {
+        "pairedWith": "Chocolate Brownie",
+        "confidence": 66.3,
+        "coOrders": 460
+      },
+      {
+        "pairedWith": "Gulab Jamun",
+        "confidence": 58.1,
+        "coOrders": 400
+      }
+    ],
+    "Shahi Kheer": [
+      {
+        "pairedWith": "Cold Coffee",
+        "confidence": 74.5,
+        "coOrders": 520
+      },
+      {
+        "pairedWith": "Chocolate Brownie",
+        "confidence": 66.3,
+        "coOrders": 460
+      },
+      {
+        "pairedWith": "Gulab Jamun",
+        "confidence": 58.1,
+        "coOrders": 400
+      }
+    ],
+    "Mango Lassi": [
+      {
+        "pairedWith": "French Fries",
+        "confidence": 74.5,
+        "coOrders": 520
+      },
+      {
+        "pairedWith": "Chocolate Brownie",
+        "confidence": 66.3,
+        "coOrders": 460
+      },
+      {
+        "pairedWith": "Veg Sandwich",
+        "confidence": 58.1,
+        "coOrders": 400
+      }
+    ],
+    "Masala Chai": [
+      {
+        "pairedWith": "French Fries",
+        "confidence": 74.5,
+        "coOrders": 520
+      },
+      {
+        "pairedWith": "Chocolate Brownie",
+        "confidence": 66.3,
+        "coOrders": 460
+      },
+      {
+        "pairedWith": "Veg Sandwich",
+        "confidence": 58.1,
+        "coOrders": 400
+      }
+    ],
+    "South Indian Filter Coffee": [
+      {
+        "pairedWith": "French Fries",
+        "confidence": 74.5,
+        "coOrders": 520
+      },
+      {
+        "pairedWith": "Chocolate Brownie",
+        "confidence": 66.3,
+        "coOrders": 460
+      },
+      {
+        "pairedWith": "Veg Sandwich",
+        "confidence": 58.1,
+        "coOrders": 400
+      }
+    ],
+    "Fresh Lime Soda": [
+      {
+        "pairedWith": "French Fries",
+        "confidence": 74.5,
+        "coOrders": 520
+      },
+      {
+        "pairedWith": "Chocolate Brownie",
+        "confidence": 66.3,
+        "coOrders": 460
+      },
+      {
+        "pairedWith": "Veg Sandwich",
+        "confidence": 58.1,
+        "coOrders": 400
+      }
+    ]
+  },
+  "hourlyForecast": [
+    {
+      "hour": 8,
+      "label": "08:00",
+      "orderVolume": 1442,
+      "surgeIndex": 53.3,
+      "avgBill": 331.8,
+      "avgPrepTimeMin": 15.2,
+      "isPeakHour": false
+    },
+    {
+      "hour": 9,
+      "label": "09:00",
+      "orderVolume": 1406,
+      "surgeIndex": 52.0,
+      "avgBill": 320.3,
+      "avgPrepTimeMin": 15.0,
+      "isPeakHour": false
+    },
+    {
+      "hour": 10,
+      "label": "10:00",
+      "orderVolume": 1408,
+      "surgeIndex": 52.1,
+      "avgBill": 324.5,
+      "avgPrepTimeMin": 15.1,
+      "isPeakHour": false
+    },
+    {
+      "hour": 12,
+      "label": "12:00",
+      "orderVolume": 2617,
+      "surgeIndex": 96.8,
+      "avgBill": 418.5,
+      "avgPrepTimeMin": 21.1,
+      "isPeakHour": true
+    },
+    {
+      "hour": 13,
+      "label": "13:00",
+      "orderVolume": 2704,
+      "surgeIndex": 100.0,
+      "avgBill": 419.9,
+      "avgPrepTimeMin": 25.9,
+      "isPeakHour": true
+    },
+    {
+      "hour": 14,
+      "label": "14:00",
+      "orderVolume": 2662,
+      "surgeIndex": 98.4,
+      "avgBill": 413.5,
+      "avgPrepTimeMin": 25.7,
+      "isPeakHour": true
+    },
+    {
+      "hour": 16,
+      "label": "16:00",
+      "orderVolume": 1247,
+      "surgeIndex": 46.1,
+      "avgBill": 308.9,
+      "avgPrepTimeMin": 14.5,
+      "isPeakHour": false
+    },
+    {
+      "hour": 17,
+      "label": "17:00",
+      "orderVolume": 1251,
+      "surgeIndex": 46.3,
+      "avgBill": 310.9,
+      "avgPrepTimeMin": 14.4,
+      "isPeakHour": false
+    },
+    {
+      "hour": 18,
+      "label": "18:00",
+      "orderVolume": 1302,
+      "surgeIndex": 48.2,
+      "avgBill": 309.4,
+      "avgPrepTimeMin": 14.2,
+      "isPeakHour": false
+    },
+    {
+      "hour": 19,
+      "label": "19:00",
+      "orderVolume": 1914,
+      "surgeIndex": 70.8,
+      "avgBill": 402.2,
+      "avgPrepTimeMin": 20.4,
+      "isPeakHour": true
+    },
+    {
+      "hour": 20,
+      "label": "20:00",
+      "orderVolume": 1875,
+      "surgeIndex": 69.3,
+      "avgBill": 398.4,
+      "avgPrepTimeMin": 25.0,
+      "isPeakHour": false
+    },
+    {
+      "hour": 21,
+      "label": "21:00",
+      "orderVolume": 1957,
+      "surgeIndex": 72.4,
+      "avgBill": 395.0,
+      "avgPrepTimeMin": 25.0,
+      "isPeakHour": true
+    },
+    {
+      "hour": 22,
+      "label": "22:00",
+      "orderVolume": 1923,
+      "surgeIndex": 71.1,
+      "avgBill": 399.9,
+      "avgPrepTimeMin": 20.3,
+      "isPeakHour": true
+    }
+  ],
+  "sessionBreakdown": [
+    {
+      "meal_session": "Breakfast",
+      "orders": 4256,
+      "avg_rating": 4.65,
+      "revenue": 1385812.21
+    },
+    {
+      "meal_session": "Dinner",
+      "orders": 7669,
+      "avg_rating": 4.37,
+      "revenue": 3058940.96
+    },
+    {
+      "meal_session": "Lunch",
+      "orders": 7983,
+      "avg_rating": 4.27,
+      "revenue": 3331438.11
+    },
+    {
+      "meal_session": "Snacks",
+      "orders": 3800,
+      "avg_rating": 4.65,
+      "revenue": 1176940.22
+    }
+  ],
+  "tierInsights": [
+    {
+      "loyalty_tier": "Bronze",
+      "customer_count": 1200,
+      "avg_spend": 394.0,
+      "avg_visits": 2.0
+    },
+    {
+      "loyalty_tier": "Gold",
+      "customer_count": 1194,
+      "avg_spend": 378.7,
+      "avg_visits": 11.9
+    },
+    {
+      "loyalty_tier": "Platinum",
+      "customer_count": 978,
+      "avg_spend": 357.2,
+      "avg_visits": 19.7
+    },
+    {
+      "loyalty_tier": "Silver",
+      "customer_count": 1200,
+      "avg_spend": 387.1,
+      "avg_visits": 6.0
+    }
+  ]
+}

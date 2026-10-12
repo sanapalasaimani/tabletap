@@ -2,7 +2,8 @@ export interface MenuItem {
   id: string;
   name: string;
   price: number;
-  category: 'Breakfast' | 'Main Course' | 'Beverages' | 'Desserts';
+  category: 'Breakfast' | 'Soups' | 'Starters' | 'Main Course' | 'Combos' | 'Breads' | 'Beverages' | 'Desserts' | string;
+  subcategory?: string;
   image: string;
   rating: number;
   reviewsCount: number;

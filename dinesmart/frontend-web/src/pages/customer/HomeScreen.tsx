@@ -4,6 +4,7 @@ import { db } from '../../supabase';
 import { MENU_ITEMS } from '../../data/menu';
 import { MenuItem } from '../../types';
 import { Search, Star, Flame, Sparkles, Bell } from 'lucide-react';
+import { mlService } from '../../services/mlService';
 
 interface HomeScreenProps {
   onSelectDish: (item: MenuItem) => void;
@@ -18,8 +19,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectDish, onNavigate
     db.getMenuItems().then(setMenuItems);
   }, []);
 
-  const specialDish = menuItems.find(item => item.id === 'm1') || MENU_ITEMS[0];
-  const recommendedDishes = menuItems.filter(item => ['m7', 'm2', 'm8'].includes(item.id));
+  const specialDish = menuItems.find(item => item.isSpecial) || menuItems[0] || MENU_ITEMS[0];
+  const recommendedDishes = menuItems.filter(item => item.isSpecial || item.rating >= 4.8).slice(0, 5);
 
   // Determine greeting based on current time
   const getGreeting = () => {
@@ -31,9 +32,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectDish, onNavigate
 
   const categories: { name: MenuItem['category']; label: string; icon: string }[] = [
     { name: 'Breakfast', label: 'Breakfast', icon: '🍳' },
-    { name: 'Main Course', label: 'Main Course', icon: '🍲' },
-    { name: 'Beverages', label: 'Beverages', icon: '🍹' },
+    { name: 'Soups', label: 'Soups', icon: '🥣' },
+    { name: 'Starters', label: 'Starters', icon: '🍢' },
+    { name: 'Main Course', label: 'Mains', icon: '🍲' },
+    { name: 'Combos', label: 'Combos', icon: '🍱' },
+    { name: 'Breads', label: 'Breads', icon: '🫓' },
     { name: 'Desserts', label: 'Desserts', icon: '🍰' },
+    { name: 'Beverages', label: 'Drinks', icon: '🍹' },
   ];
 
   return (
@@ -116,6 +121,69 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectDish, onNavigate
               <span className="text-[10px] font-bold text-gray-500 whitespace-nowrap">{cat.label}</span>
             </button>
           ))}
+        </div>
+      </div>
+
+      {/* 🤖 ML Dynamically Best in Hotel Section (Dynamic Session & Sales Intelligence) */}
+      <div className="px-5 mb-6">
+        <div className="flex justify-between items-center mb-3">
+          <div className="flex items-center gap-2">
+            <span className="w-6 h-6 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center text-xs font-black">
+              ML
+            </span>
+            <div>
+              <h3 className="font-extrabold text-brand-text text-base leading-none flex items-center gap-1.5">
+                Dynamic Best in Hotel
+                <span className="text-[10px] bg-purple-50 text-purple-600 border border-purple-200 px-1.5 py-0.5 rounded-full font-bold">
+                  Live AI Scored
+                </span>
+              </h3>
+              <p className="text-[10px] text-gray-400 mt-0.5">Trained on 23,708 real orders & current dining slot</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Horizontal ML Carousel */}
+        <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
+          {mlService.getBestForCurrentSession().dishes.map((mlDish) => {
+            const matchedItem = menuItems.find(m => m.name.toLowerCase() === mlDish.name.toLowerCase()) || menuItems[0];
+            return (
+              <div
+                key={mlDish.name}
+                onClick={() => onSelectDish(matchedItem)}
+                className="min-w-[200px] max-w-[210px] bg-gradient-to-b from-white to-purple-50/20 border border-purple-100/80 rounded-2xl p-3 shadow-xs hover:shadow-md transition-all cursor-pointer flex-shrink-0 group"
+              >
+                <div className="relative mb-2.5">
+                  <img
+                    src={matchedItem.image}
+                    alt={mlDish.name}
+                    className="w-full h-24 rounded-xl object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                  <span className="absolute top-2 left-2 bg-purple-600/90 backdrop-blur-xs text-white text-[9px] font-black px-2 py-0.5 rounded-md shadow-xs">
+                    ★ {mlDish.compositeScore}/100 Match
+                  </span>
+                  <span className="absolute bottom-2 right-2 bg-black/70 backdrop-blur-xs text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md">
+                    ⏱️ {mlDish.avgPrepDelayMin}m prep
+                  </span>
+                </div>
+                <h4 className="font-bold text-xs text-brand-text truncate group-hover:text-purple-700 transition-colors">
+                  {mlDish.name}
+                </h4>
+                <div className="flex items-center justify-between mt-2 pt-2 border-t border-purple-100/50">
+                  <span className="text-xs font-black text-brand-text">₹{matchedItem.price}</span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSelectDish(matchedItem);
+                    }}
+                    className="text-[10px] font-extrabold bg-purple-600 text-white px-2.5 py-1 rounded-lg hover:bg-purple-700 transition-colors"
+                  >
+                    Add +
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 

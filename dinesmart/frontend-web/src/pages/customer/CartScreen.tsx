@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Trash2, Tag, Percent, ArrowRight, Check } from 'lucide-react';
+import { Trash2, Tag, Percent, ArrowRight, Check, Sparkles, Plus } from 'lucide-react';
+import { mlService } from '../../services/mlService';
+import { MENU_ITEMS } from '../../data/menu';
+import { MenuItem } from '../../types';
 
 interface CartScreenProps {
   onOrderPlaced: () => void;
@@ -14,7 +17,8 @@ export const CartScreen: React.FC<CartScreenProps> = ({ onOrderPlaced, onNavigat
     removeFromCart, 
     getCartTotal, 
     placeOrder, 
-    profile 
+    profile,
+    addToCart
   } = useApp();
 
   const [couponCode, setCouponCode] = useState('');
@@ -187,6 +191,58 @@ export const CartScreen: React.FC<CartScreenProps> = ({ onOrderPlaced, onNavigat
           );
         })}
       </div>
+
+      {/* 🤖 ML Frequently Ordered Together (Market Basket Analysis) */}
+      {(() => {
+        const cartDishNames = cart.map(c => c.menuItem.name);
+        const recommendedPairNames = Array.from(new Set(
+          cart.flatMap(item => mlService.getPairingsForDish(item.menuItem.name).map(a => a.pairedWith))
+        )).filter(name => !cartDishNames.includes(name));
+
+        const recommendedPairItems = recommendedPairNames
+          .map(name => MENU_ITEMS.find(m => m.name.toLowerCase() === name.toLowerCase()))
+          .filter((item): item is MenuItem => Boolean(item))
+          .slice(0, 4);
+
+        if (recommendedPairItems.length === 0) return null;
+
+        return (
+          <div className="p-4 bg-purple-50/40 border-b border-purple-100/60">
+            <div className="flex items-center gap-1.5 mb-2.5">
+              <span className="w-5 h-5 rounded-md bg-purple-600 text-white flex items-center justify-center text-[10px] font-black">
+                ML
+              </span>
+              <h4 className="font-extrabold text-xs text-brand-text">
+                Frequently Ordered Together
+              </h4>
+              <span className="text-[9px] text-purple-700 bg-purple-100/80 font-bold px-1.5 py-0.5 rounded-full ml-auto">
+                Market Basket AI
+              </span>
+            </div>
+
+            <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-1">
+              {recommendedPairItems.map(pair => (
+                <div 
+                  key={pair.id} 
+                  className="min-w-[170px] max-w-[180px] bg-white border border-purple-100 rounded-xl p-2.5 flex items-center gap-2.5 shadow-xs flex-shrink-0"
+                >
+                  <img src={pair.image} alt={pair.name} className="w-12 h-12 rounded-lg object-cover flex-shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <h5 className="font-bold text-[11px] text-brand-text truncate">{pair.name}</h5>
+                    <p className="text-[11px] font-black text-purple-700">₹{pair.price}</p>
+                    <button
+                      onClick={() => addToCart(pair, 1, [], '')}
+                      className="mt-1 text-[9px] font-bold bg-purple-600 hover:bg-purple-700 text-white px-2 py-0.5 rounded-md flex items-center gap-0.5"
+                    >
+                      <Plus size={10} /> Add
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Coupon section */}
       <div className="p-5 bg-white border-b border-gray-50">

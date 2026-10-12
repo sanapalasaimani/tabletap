@@ -31,7 +31,9 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({ initialCategory, onS
     }
   }, [initialCategory]);
 
-  const categories: ('All' | MenuItem['category'])[] = ['All', 'Breakfast', 'Main Course', 'Beverages', 'Desserts'];
+  const categories: ('All' | MenuItem['category'])[] = [
+    'All', 'Breakfast', 'Soups', 'Starters', 'Main Course', 'Combos', 'Breads', 'Desserts', 'Beverages'
+  ];
   const dietFilters: { name: DietFilter; label: string }[] = [
     { name: 'All', label: 'All Dishes' },
     { name: 'Veg', label: 'Veg Only' },
