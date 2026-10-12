@@ -611,7 +611,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
     }
 
     try {
-      const qrDataUrl = `http://localhost:5173/table/${tableId}?token=${qrToken}`;
+      const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+      const qrDataUrl = `${baseUrl}/table/${tableId}?token=${qrToken}`;
       const apiEndpoint = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrDataUrl)}`;
       
       const response = await fetch(apiEndpoint);
@@ -2929,8 +2930,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
 
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 text-xs font-semibold">
                 {tables.map(num => {
+                  const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
                   const secureUrl = num.qr_token 
-                    ? `http://localhost:5173/table/${num.id}?token=${num.qr_token}` 
+                    ? `${baseUrl}/table/${num.id}?token=${num.qr_token}` 
                     : `No Token Session Configured`;
                   return (
                     <div key={num.id} className={`p-4 rounded-3xl border text-center shadow-sm ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-50'}`}>

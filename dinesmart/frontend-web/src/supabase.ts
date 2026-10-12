@@ -635,18 +635,7 @@ export const db = {
       }
     }
     if (local) return local;
-
-    // Auto-create table entry if it didn't exist so user is never locked out
-    const fallbackTable = {
-      id: tableNum,
-      name: `Table ${tableNum}`,
-      status: 'Available',
-      capacity: 4,
-      qr_token: `qr_table_${tableNum}_session`
-    };
-    tables.push(fallbackTable);
-    saveMockData('tables', tables);
-    return fallbackTable;
+    return null;
   },
 
   saveTable: async (table: any): Promise<any> => {

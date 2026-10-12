@@ -40,47 +40,34 @@ export const MainContainer: React.FC = () => {
 
   useEffect(() => {
     const verifyTableSession = async () => {
-      if (!routeTableId) {
+      if (!routeTableId || !token) {
         setVerificationStatus('invalid');
         return;
       }
-      
-      // Update tableId in context
-      setTableId(routeTableId);
 
       try {
-        const tableNum = parseInt(routeTableId);
-        const resolvedId = isNaN(tableNum) ? 1 : tableNum;
-        const tableObj = await db.getTable(resolvedId);
+        const tableNum = parseInt(routeTableId, 10);
+        if (isNaN(tableNum) || tableNum <= 0) {
+          setVerificationStatus('invalid');
+          return;
+        }
 
-        if (tableObj) {
-          // If token was provided from the scanned QR code, sync token to active table session
-          if (token && (!tableObj.qr_token || tableObj.qr_token !== token)) {
-            tableObj.qr_token = token;
-            await db.saveTable(tableObj);
-          }
+        const tableObj = await db.getTable(tableNum);
+        // Table must exist in database AND token must match the registered table's qr_token
+        if (tableObj && tableObj.qr_token && tableObj.qr_token === token) {
+          setTableId(String(tableNum));
           setVerificationStatus('valid');
         } else {
-          // Auto-register table session so diner is never locked out
-          const newTable = {
-            id: resolvedId,
-            name: `Table ${resolvedId}`,
-            status: 'Available',
-            capacity: 4,
-            qr_token: token || `qr_table_${resolvedId}_session`
-          };
-          await db.saveTable(newTable);
-          setVerificationStatus('valid');
+          setVerificationStatus('invalid');
         }
       } catch (e) {
         console.error('Error verifying table session:', e);
-        // Fail-safe: Always allow dining access
-        setVerificationStatus('valid');
+        setVerificationStatus('invalid');
       }
     };
 
     verifyTableSession();
-  }, [routeTableId, token]);
+  }, [routeTableId, token, setTableId]);
 
   const handleNavigateToSearch = (category?: MenuItem['category']) => {
     setInitialSearchCategory(category);
@@ -97,7 +84,7 @@ export const MainContainer: React.FC = () => {
       <div className="flex h-screen items-center justify-center bg-brand-bg text-brand-text font-sans">
         <div className="text-center space-y-3">
           <RefreshCw className="animate-spin text-primary mx-auto" size={32} />
-          <p className="text-sm font-bold">Verifying Table QR Session...</p>
+          <p className="text-sm font-bold">Verifying Secure Table QR Token...</p>
         </div>
       </div>
     );
@@ -105,21 +92,23 @@ export const MainContainer: React.FC = () => {
 
   if (verificationStatus === 'invalid') {
     return (
-      <div className="flex h-screen items-center justify-center bg-brand-bg text-brand-text font-sans p-6">
+      <div className="flex h-screen items-center justify-center bg-gray-50 text-slate-800 font-sans p-6">
         <div className="max-w-md w-full bg-white rounded-3xl p-8 border border-red-100 shadow-xl text-center space-y-4">
-          <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto">
+          <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto shadow-sm">
             <AlertTriangle size={32} />
           </div>
-          <h2 className="text-lg font-black text-brand-text">Access Denied</h2>
-          <p className="text-xs text-gray-500 leading-relaxed font-semibold">
-            Invalid Table QR Session. Please scan the QR code located on your table or click below to start your dining session.
+          <h2 className="text-xl font-extrabold text-slate-900">Invalid Table QR Code</h2>
+          <p className="text-xs text-slate-500 leading-relaxed font-medium">
+            Access is restricted to diners with an authenticated QR code. Please scan the genuine QR code sticker located on your dining table.
           </p>
-          <button
-            onClick={() => setVerificationStatus('valid')}
-            className="w-full bg-primary text-white font-bold py-3 rounded-2xl text-xs hover:bg-primary/90 transition-colors shadow-sm cursor-pointer"
-          >
-            Start Dining at Table {routeTableId || '5'}
-          </button>
+          <div className="pt-2">
+            <a
+              href="/"
+              className="inline-block w-full bg-slate-900 hover:bg-black text-white font-bold py-3.5 rounded-2xl text-xs transition-colors shadow-sm"
+            >
+              Scan Table QR Code
+            </a>
+          </div>
         </div>
       </div>
     );

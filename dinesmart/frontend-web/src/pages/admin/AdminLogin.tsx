@@ -3,9 +3,10 @@ import { ChefHat, Lock, User, Eye, EyeOff } from 'lucide-react';
 
 interface AdminLoginProps {
   onLoginSuccess: (role: string) => void;
+  sessionExpiredNotice?: string;
 }
 
-export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess }) => {
+export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, sessionExpiredNotice }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -56,6 +57,13 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess }) => {
           </h2>
           <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mt-1">Admin Workspace</p>
         </div>
+
+        {sessionExpiredNotice && (
+          <div className="mb-4 p-3.5 bg-amber-50 border-l-4 border-amber-500 text-amber-800 text-xs font-semibold rounded-r-xl flex items-center gap-2">
+            <span>⏱️</span>
+            <span>{sessionExpiredNotice}</span>
+          </div>
+        )}
 
         {error && (
           <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 text-xs font-semibold rounded-r-xl flex items-center gap-2">

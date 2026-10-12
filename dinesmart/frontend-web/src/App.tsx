@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
 import { AppProvider } from './context/AppContext';
 import { MainContainer } from './pages/customer/MainContainer';
+import { ScanQrLanding } from './pages/customer/ScanQrLanding';
 import { KitchenModule } from './pages/kitchen/KitchenModule';
 import { AdminModule } from './pages/admin/AdminModule';
 import { WaiterModule } from './pages/waiter/WaiterModule';
@@ -23,11 +24,14 @@ function App() {
     <AppProvider>
       <BrowserRouter>
         <Routes>
+          {/* Landing / Scan QR Requirement: No default table */}
+          <Route path="/" element={<ScanQrLanding />} />
+
           {/* Waiter App Route */}
           <Route path="/waiter" element={<WaiterModule />} />
           <Route path="/waiter/*" element={<WaiterModule />} />
 
-          {/* Main Customer QR Entry Route */}
+          {/* Authenticated Customer Table QR Entry Route */}
           <Route path="/table/:tableId" element={<MainContainer />} />
           
           {/* Kitchen Dashboard Route */}
@@ -36,11 +40,11 @@ function App() {
           {/* Admin Dashboard Route */}
           <Route path="/admin/*" element={<AdminModule />} />
           
-          {/* Default Table fallback for demo purposes */}
-          <Route path="/table" element={<Navigate to="/table/05" replace />} />
+          {/* Missing table redirect to Scan QR page */}
+          <Route path="/table" element={<Navigate to="/" replace />} />
           
-          {/* Catch-all redirects: Native APK defaults to /waiter, browser defaults to /table/05 */}
-          <Route path="*" element={<Navigate to={isNative ? "/waiter" : "/table/05"} replace />} />
+          {/* Catch-all redirects */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
     </AppProvider>
