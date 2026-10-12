@@ -2,65 +2,157 @@ const SUPABASE_URL = "https://rxwllokulbjrkbrcnikf.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_TosgUWCBgC5bvX171JYGEw_8Q7IP9Ce";
 
 /**
- * Google Apps Script attached directly to your Google Form.
- * Trigger: On form submit (from Form or linked Google Sheet).
+ * Google Apps Script attached directly to Google Form OR linked Google Sheet.
+ * Set trigger: Edit -> Current project's triggers -> Add Trigger
+ * Function: onFormSubmit
+ * Event source: From form / From spreadsheet
+ * Event type: On form submit
  */
 function onFormSubmit(e) {
-  // Read responses using item responses
-  const itemResponses = e.response.getItemResponses();
-  
-  // 1. Full Name
-  const fullName = itemResponses[0] ? itemResponses[0].getResponse() : "New Waiter";
-  // 2. Mobile Number
-  const mobileNumber = itemResponses[1] ? itemResponses[1].getResponse() : "";
-  // 3. WhatsApp Number
-  const whatsappNumber = itemResponses[2] ? itemResponses[2].getResponse() : mobileNumber;
-  // 4. Email ID
-  const emailId = itemResponses[3] ? itemResponses[3].getResponse() : "";
-
-  // 5. Waiter Photo (Drive file upload or Direct Image URL)
+  let name = "";
+  let mobile = "";
+  let whatsapp = "";
+  let email = "";
   let photoUrl = "";
-  if (itemResponses.length > 4 && itemResponses[4]) {
-    const rawPhoto = itemResponses[4].getResponse();
-    // If it's a Google Drive file ID or array of IDs from File Upload question
-    if (Array.isArray(rawPhoto) && rawPhoto.length > 0) {
-      photoUrl = `https://drive.google.com/uc?export=view&id=${rawPhoto[0]}`;
-    } else if (typeof rawPhoto === 'string' && rawPhoto.includes('id=')) {
-      const match = rawPhoto.match(/id=([a-zA-Z0-9_-]+)/);
-      photoUrl = match ? `https://drive.google.com/uc?export=view&id=${match[1]}` : rawPhoto;
-    } else {
-      photoUrl = String(rawPhoto || '');
+
+  // 1. Check if event is from Google Form (e.response exists)
+  if (e && e.response && typeof e.response.getItemResponses === 'function') {
+    const itemResponses = e.response.getItemResponses();
+    for (let i = 0; i < itemResponses.length; i++) {
+      const item = itemResponses[i];
+      const title = item.getItem().getTitle().toLowerCase().trim();
+      const rawVal = item.getResponse();
+
+      if (title.includes('name')) {
+        name = String(rawVal || "");
+      } else if (title.includes('whatsapp')) {
+        whatsapp = String(rawVal || "");
+      } else if (title.includes('mobile') || title.includes('phone') || title.includes('contact')) {
+        mobile = String(rawVal || "");
+      } else if (title.includes('email') || title.includes('mail')) {
+        email = String(rawVal || "");
+      } else if (title.includes('photo') || title.includes('image') || title.includes('picture') || title.includes('file')) {
+        if (Array.isArray(rawVal) && rawVal.length > 0) {
+          photoUrl = "https://drive.google.com/uc?export=view&id=" + rawVal[0];
+        } else if (typeof rawVal === 'string' && rawVal.includes('id=')) {
+          const match = rawVal.match(/id=([a-zA-Z0-9_-]+)/);
+          photoUrl = match ? "https://drive.google.com/uc?export=view&id=" + match[1] : rawVal;
+        } else {
+          photoUrl = String(rawVal || "");
+        }
+      }
+    }
+
+    // Fallbacks by index if titles didn't match
+    if (!name && itemResponses[0]) name = String(itemResponses[0].getResponse() || "");
+    if (!mobile && itemResponses[1]) mobile = String(itemResponses[1].getResponse() || "");
+    if (!whatsapp && itemResponses[2]) whatsapp = String(itemResponses[2].getResponse() || mobile);
+    if (!email && itemResponses[3]) email = String(itemResponses[3].getResponse() || "");
+    if (!photoUrl && itemResponses[4]) {
+      const r = itemResponses[4].getResponse();
+      photoUrl = Array.isArray(r) ? "https://drive.google.com/uc?export=view&id=" + r[0] : String(r || "");
+    }
+  } 
+  // 2. Check if event is from linked Google Sheet (e.namedValues exists)
+  else if (e && e.namedValues) {
+    for (const key in e.namedValues) {
+      const title = key.toLowerCase().trim();
+      const valArr = e.namedValues[key];
+      const val = Array.isArray(valArr) ? valArr[0] : valArr;
+
+      if (title.includes('name')) name = String(val || "");
+      else if (title.includes('whatsapp')) whatsapp = String(val || "");
+      else if (title.includes('mobile') || title.includes('phone') || title.includes('contact')) mobile = String(val || "");
+      else if (title.includes('email') || title.includes('mail')) email = String(val || "");
+      else if (title.includes('photo') || title.includes('image') || title.includes('file')) photoUrl = String(val || "");
     }
   }
+  // 3. Fallback for spreadsheet row values (e.values array)
+  else if (e && e.values && Array.isArray(e.values)) {
+    // e.values[0] is typically Timestamp
+    name = String(e.values[1] || "");
+    mobile = String(e.values[2] || "");
+    whatsapp = String(e.values[3] || mobile);
+    email = String(e.values[4] || "");
+    photoUrl = String(e.values[5] || "");
+  }
 
-  // The endpoint to insert data into the 'pending_staff' table
+  // Safety fallbacks
+  name = name.trim() || "New Waiter";
+  mobile = mobile.trim();
+  whatsapp = whatsapp.trim() || mobile;
+  email = email.trim();
+
+  // Send to Supabase
+  sendToSupabase(name, mobile, whatsapp, email, photoUrl);
+}
+
+/**
+ * Handles sending to Supabase with automatic schema detection and fallback.
+ */
+function sendToSupabase(name, mobile, whatsapp, email, photoUrl) {
   const url = `${SUPABASE_URL}/rest/v1/pending_staff`;
 
-  // Format the data payload matching Supabase pending_staff table
-  const payload = {
-    name: fullName,
-    mobile: mobileNumber,
-    whatsapp: whatsappNumber,
-    email: emailId,
-    photo: photoUrl || null,
+  // Base payload that matches original schema
+  const basePayload = {
+    name: name,
+    mobile: mobile,
+    whatsapp: whatsapp || mobile,
+    email: email,
     status: 'Pending'
   };
+
+  // If photo is present, try with photo first
+  let payloadToSend = Object.assign({}, basePayload);
+  if (photoUrl) {
+    payloadToSend.photo = photoUrl;
+  }
 
   const options = {
     method: 'post',
     contentType: 'application/json',
     headers: {
       'apikey': SUPABASE_ANON_KEY,
-      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
       'Prefer': 'return=minimal'
     },
-    payload: JSON.stringify(payload)
+    payload: JSON.stringify(payloadToSend),
+    muteHttpExceptions: true
   };
 
   try {
-    const response = UrlFetchApp.fetch(url, options);
-    Logger.log("Application successfully pushed to Supabase: " + response.getResponseCode());
+    let response = UrlFetchApp.fetch(url, options);
+    let code = response.getResponseCode();
+    let body = response.getContentText();
+
+    Logger.log("Initial response code: " + code + ", body: " + body);
+
+    // If 400 Bad Request (commonly because 'photo' column is missing in pending_staff table)
+    if (code >= 400 && payloadToSend.photo) {
+      Logger.log("Column 'photo' might be missing in Supabase. Retrying without photo column...");
+      options.payload = JSON.stringify(basePayload);
+      response = UrlFetchApp.fetch(url, options);
+      code = response.getResponseCode();
+      body = response.getContentText();
+      Logger.log("Retry response code: " + code + ", body: " + body);
+    }
+
+    if (code >= 200 && code < 300) {
+      Logger.log("SUCCESS: Waiter application successfully pushed to Supabase!");
+    } else {
+      Logger.log("FAILED: Supabase returned error code " + code + ": " + body);
+    }
   } catch (error) {
-    Logger.log("Error sending application to Supabase: " + error.toString());
+    Logger.log("Error during Supabase request: " + error.toString());
   }
+}
+
+/**
+ * TEST FUNCTION:
+ * Click 'testFormSubmit' in the Apps Script toolbar and click 'Run'.
+ * Check the Execution log (View -> Execution log) to immediately verify that data reaches Supabase!
+ */
+function testFormSubmit() {
+  Logger.log("Running manual test submission...");
+  sendToSupabase("Test Applicant", "9876543210", "9876543210", "test@dinesmart.com", "https://via.placeholder.com/150");
 }

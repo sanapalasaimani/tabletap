@@ -2402,7 +2402,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
 
                   {/* PENDING APPLICATIONS SECTION */}
                   <div className={`mt-2 rounded-3xl shadow p-5 ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
-                    <h4 className="font-extrabold text-sm mb-3">Pending Applications</h4>
+                    <div className="flex justify-between items-center mb-3">
+                      <h4 className="font-extrabold text-sm">Pending Applications</h4>
+                      <button
+                        onClick={fetchData}
+                        className="text-[11px] font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
+                        title="Refresh applications from database"
+                      >
+                        <RefreshCw size={12} /> Refresh List
+                      </button>
+                    </div>
                     {pendingStaffList.length === 0 ? (
                       <p className="text-xs text-gray-400">No pending applications.</p>
                     ) : (
@@ -2420,7 +2429,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                           <tbody className="font-semibold">
                             {pendingStaffList.map((app) => (
                               <tr key={app.id} className={`border-b last:border-0 ${isDarkMode ? 'hover:bg-gray-700/50' : 'hover:bg-gray-50'}`}>
-                                <td className="py-3">{app.name}</td>
+                                <td className="py-3">
+                                  <div className="flex items-center gap-2">
+                                    {app.photo ? (
+                                      <img
+                                        src={app.photo}
+                                        alt={app.name}
+                                        className="w-7 h-7 rounded-full object-cover border border-gray-200"
+                                        onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                                      />
+                                    ) : (
+                                      <div className="w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-[10px]">
+                                        {app.name ? app.name.charAt(0).toUpperCase() : 'W'}
+                                      </div>
+                                    )}
+                                    <span>{app.name}</span>
+                                  </div>
+                                </td>
                                 <td className="py-3">{app.mobile}</td>
                                 <td className="py-3">{app.whatsapp}</td>
                                 <td className="py-3">{app.email}</td>
