@@ -496,6 +496,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
       salary: 18000,
       empid: newEmpId,
       password: newPassword,
+      photo: app.photo || '',
+      assignedTables: [],
       attendance: 100,
       performance: { score: 90, ordersDelivered: 0, avgServingTime: 'N/A', ratings: 5.0, tips: 0 }
     };
@@ -2263,20 +2265,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                       
                       {staffFormState.role === 'Waiter' && (
                         <div>
-                          <label className="block text-gray-400 mb-2 text-[10px] uppercase">Assign Tables</label>
+                          <div className="flex justify-between items-center mb-2">
+                            <label className="block text-gray-400 text-[10px] uppercase font-bold">Table Routing & Assignment</label>
+                            <button
+                              type="button"
+                              onClick={() => setStaffFormState(prev => ({
+                                ...prev,
+                                assignedTables: prev.assignedTables.length === tables.length ? [] : tables.map(t => t.id)
+                              }))}
+                              className="text-[10px] text-orange-500 font-bold hover:underline cursor-pointer"
+                            >
+                              {staffFormState.assignedTables.length === tables.length ? 'Clear All' : 'Select All Tables (Full Floor)'}
+                            </button>
+                          </div>
                           <div className="grid grid-cols-4 gap-2">
                             {tables.map(table => {
-                              const isAssignedToOther = staff
-                                .filter(s => s.role === 'Waiter' && s.id !== (editingStaff?.id || ''))
-                                .some(s => s.assignedTables?.includes(table.id));
-
                               const isSelected = staffFormState.assignedTables.includes(table.id);
-
                               return (
                                 <button
                                   type="button"
                                   key={table.id}
-                                  disabled={isAssignedToOther}
                                   onClick={() => {
                                     setStaffFormState(prev => ({
                                       ...prev,
@@ -2285,20 +2293,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                                         : [...prev.assignedTables, table.id]
                                     }));
                                   }}
-                                  className={`p-2 rounded-xl text-[10px] font-bold border transition-colors ${
-                                    isAssignedToOther 
-                                      ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed opacity-50' 
-                                      : isSelected
-                                        ? 'bg-orange-500 text-white border-orange-500 cursor-pointer'
-                                        : 'bg-white text-gray-600 border-gray-300 hover:border-orange-500 cursor-pointer'
+                                  className={`p-2 rounded-xl text-[10px] font-bold border transition-all cursor-pointer ${
+                                    isSelected
+                                      ? 'bg-orange-500 text-white border-orange-500 shadow-sm'
+                                      : 'bg-white text-gray-600 border-gray-300 hover:border-orange-500'
                                   }`}
-                                  title={isAssignedToOther ? 'Locked by another waiter' : 'Assign to this waiter'}
                                 >
-                                  T{table.id}
+                                  Table #{table.id}
                                 </button>
                               );
                             })}
                           </div>
+                          <p className="text-[10px] text-gray-500 mt-2 font-medium">
+                            {staffFormState.assignedTables.length === 0 || staffFormState.assignedTables.length === tables.length
+                              ? '⚡ Waiter serves ALL tables across the restaurant'
+                              : `Specific tables: ${staffFormState.assignedTables.map(t => `T#${t}`).join(', ')}`}
+                          </p>
                         </div>
                       )}
 

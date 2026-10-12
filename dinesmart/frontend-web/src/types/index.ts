@@ -69,6 +69,7 @@ export interface PendingStaff {
   mobile: string;
   whatsapp: string;
   email: string;
+  photo?: string;
   status: 'Pending' | 'Approved' | 'Rejected';
   createdAt?: string;
 }

@@ -257,47 +257,6 @@ export const ScanQrLanding: React.FC = () => {
                 <span>Upload QR Image from Gallery</span>
               </button>
             </div>
-
-            {/* Quick Testing Table Sessions */}
-            {tables.length > 0 && (
-              <div className="mt-8 w-full max-w-md bg-slate-900/60 border border-white/10 rounded-3xl p-5 text-left">
-                <div className="flex items-center justify-between border-b border-white/10 pb-2.5 mb-3">
-                  <div>
-                    <h3 className="text-xs font-bold text-white uppercase tracking-wider">Testing Tables</h3>
-                    <p className="text-[10px] text-slate-400">Direct links for authorized testing:</p>
-                  </div>
-                  <span className="text-[9px] font-bold bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-lg border border-emerald-500/30">
-                    Active Tables
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  {tables.slice(0, 6).map(tbl => (
-                    <a
-                      key={tbl.id}
-                      href={`/table/${tbl.id}?token=${tbl.qr_token}`}
-                      className="group bg-white/5 hover:bg-orange-500/20 border border-white/10 hover:border-orange-500/50 rounded-xl p-2.5 transition-all flex items-center justify-between"
-                    >
-                      <span className="text-xs font-black text-white group-hover:text-orange-400">Table #{tbl.id}</span>
-                      <ArrowRight size={12} className="text-slate-500 group-hover:text-orange-400 group-hover:translate-x-0.5 transition-all" />
-                    </a>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Waiter App Download Prompt */}
-            <div className="mt-6 flex items-center justify-center gap-2 text-xs text-slate-400">
-              <Smartphone size={14} className="text-orange-400" />
-              <span>Waiter?</span>
-              <a
-                href="/waiter-app.apk"
-                download="WaiterApp.apk"
-                className="text-orange-400 hover:text-orange-300 font-bold underline"
-              >
-                Download Waiter APK
-              </a>
-            </div>
           </>
         )}
       </main>

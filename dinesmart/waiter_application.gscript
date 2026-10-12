@@ -1,27 +1,48 @@
 const SUPABASE_URL = "https://rxwllokulbjrkbrcnikf.supabase.co"; 
 const SUPABASE_ANON_KEY = "sb_publishable_TosgUWCBgC5bvX171JYGEw_8Q7IP9Ce";
 
+/**
+ * Google Apps Script attached directly to your Google Form.
+ * Trigger: On form submit (from Form or linked Google Sheet).
+ */
 function onFormSubmit(e) {
-  // Since this script is attached directly to the Google Form (not the Sheet),
-  // we must read the responses using e.response.getItemResponses()
-  
+  // Read responses using item responses
   const itemResponses = e.response.getItemResponses();
   
-  // The responses are in the same order as the questions on your form
-  const fullName = itemResponses[0].getResponse();
-  const mobileNumber = itemResponses[1].getResponse();
-  const whatsappNumber = itemResponses[2].getResponse();
-  const emailId = itemResponses[3].getResponse();
+  // 1. Full Name
+  const fullName = itemResponses[0] ? itemResponses[0].getResponse() : "New Waiter";
+  // 2. Mobile Number
+  const mobileNumber = itemResponses[1] ? itemResponses[1].getResponse() : "";
+  // 3. WhatsApp Number
+  const whatsappNumber = itemResponses[2] ? itemResponses[2].getResponse() : mobileNumber;
+  // 4. Email ID
+  const emailId = itemResponses[3] ? itemResponses[3].getResponse() : "";
+
+  // 5. Waiter Photo (Drive file upload or Direct Image URL)
+  let photoUrl = "";
+  if (itemResponses.length > 4 && itemResponses[4]) {
+    const rawPhoto = itemResponses[4].getResponse();
+    // If it's a Google Drive file ID or array of IDs from File Upload question
+    if (Array.isArray(rawPhoto) && rawPhoto.length > 0) {
+      photoUrl = `https://drive.google.com/uc?export=view&id=${rawPhoto[0]}`;
+    } else if (typeof rawPhoto === 'string' && rawPhoto.includes('id=')) {
+      const match = rawPhoto.match(/id=([a-zA-Z0-9_-]+)/);
+      photoUrl = match ? `https://drive.google.com/uc?export=view&id=${match[1]}` : rawPhoto;
+    } else {
+      photoUrl = String(rawPhoto || '');
+    }
+  }
 
   // The endpoint to insert data into the 'pending_staff' table
   const url = `${SUPABASE_URL}/rest/v1/pending_staff`;
 
-  // Format the data payload exactly matching your Supabase columns
+  // Format the data payload matching Supabase pending_staff table
   const payload = {
     name: fullName,
     mobile: mobileNumber,
     whatsapp: whatsappNumber,
     email: emailId,
+    photo: photoUrl || null,
     status: 'Pending'
   };
 
@@ -37,9 +58,9 @@ function onFormSubmit(e) {
   };
 
   try {
-    UrlFetchApp.fetch(url, options);
-    Logger.log("Application successfully sent to Supabase.");
+    const response = UrlFetchApp.fetch(url, options);
+    Logger.log("Application successfully pushed to Supabase: " + response.getResponseCode());
   } catch (error) {
-    Logger.log("Error sending to Supabase: " + error.toString());
+    Logger.log("Error sending application to Supabase: " + error.toString());
   }
 }

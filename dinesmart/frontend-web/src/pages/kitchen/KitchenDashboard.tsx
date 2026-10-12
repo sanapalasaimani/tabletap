@@ -505,28 +505,6 @@ export const KitchenDashboard: React.FC<KitchenDashboardProps> = ({ onLogout }) 
           </div>
 
           <div className="flex items-center gap-2.5 text-xs">
-            {/* Download Link for Waiter Mobile App */}
-            <a 
-              href="/waiter-app.apk" 
-              download="WaiterApp.apk" 
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-2 px-3.5 rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all active:scale-95 cursor-pointer"
-              title="Download Waiter App APK for Android staff devices"
-            >
-              <Download size={13} className="stroke-[2.5px]" />
-              <span>Download Waiter APK</span>
-            </a>
-
-            {/* Quick Link to Waiter Web App */}
-            <a 
-              href="/waiter" 
-              target="_blank" 
-              rel="noreferrer"
-              className="bg-orange-500 hover:bg-orange-600 text-white font-extrabold py-2 px-3 rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all active:scale-95 cursor-pointer"
-              title="Open Waiter App in new window"
-            >
-              <ExternalLink size={13} className="stroke-[2.5px]" />
-              <span>Open Waiter App</span>
-            </a>
 
 
             <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl text-slate-600 font-medium">

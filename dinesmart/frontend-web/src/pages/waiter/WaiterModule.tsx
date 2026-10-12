@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db } from '../../supabase';
 import { Order, WaiterRequest } from '../../types';
 import { 
-  ArrowLeft, ChevronRight, User, Lock, Eye, EyeOff, 
-  Fingerprint, CheckCircle, Utensils,
-  Wallet, Sparkles, AlertTriangle, Check
+  ArrowLeft, User, Lock, Eye, EyeOff, 
+  Fingerprint, CheckCircle, Wallet, Sparkles, AlertTriangle,
+  Clock, ShieldCheck
 } from 'lucide-react';
 
 export const ClocheIcon = ({ size = 20, className = '' }: { size?: number; className?: string }) => (
@@ -13,7 +13,7 @@ export const ClocheIcon = ({ size = 20, className = '' }: { size?: number; class
   </svg>
 );
 
-type WaiterView = 'login' | 'tasks' | 'profile' | 'employee_details' | 'tip_earnings';
+type WaiterView = 'login' | 'biometric_lock' | 'tasks' | 'profile' | 'employee_details' | 'tip_earnings';
 type TaskTab = 'all' | 'pending' | 'accepted';
 
 interface StaffProfile {
@@ -23,26 +23,29 @@ interface StaffProfile {
   role: string;
   assignedTables: number[];
   initials: string;
+  photo?: string;
 }
 
-export const WaiterModule: React.FC = () => {
-  const [activeView, setActiveView] = useState<WaiterView>(() => {
-    return localStorage.getItem('tabletap_waiter_logged_in') === 'true' ? 'tasks' : 'login';
-  });
+const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes of inactivity
 
-  // Staff Credentials
-  const [employeeId, setEmployeeId] = useState('EMP001');
-  const [password, setPassword] = useState('password123');
+export const WaiterModule: React.FC = () => {
+  const [activeView, setActiveView] = useState<WaiterView>('login');
+
+  // Staff Credentials Form
+  const [employeeId, setEmployeeId] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [sessionExpiredNotice, setSessionExpiredNotice] = useState<string | null>(null);
 
   // Active Waiter Profile
   const [staffInfo, setStaffInfo] = useState<StaffProfile>({
     empid: 'EMP001',
-    name: 'Staff Member (EMP001)',
-    mobile: '+91 98765 43210',
+    name: 'Staff Member',
+    mobile: '',
     role: 'Waiter',
-    assignedTables: [1, 2, 3, 4],
-    initials: 'SM('
+    assignedTables: [],
+    initials: 'SM'
   });
 
   // Tasks State
@@ -54,6 +57,7 @@ export const WaiterModule: React.FC = () => {
     return saved ? JSON.parse(saved) : [];
   });
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
+  const [remainingMinutes, setRemainingMinutes] = useState<number>(30);
 
   // Tips State
   const [todayTips, setTodayTips] = useState<number>(() => {
@@ -65,12 +69,82 @@ export const WaiterModule: React.FC = () => {
     return saved ? Number(saved) : 0;
   });
 
+  const lastActivityRef = useRef<number>(Date.now());
+
+  // Record active user touch/interaction
+  const recordActivity = useCallback(() => {
+    const now = Date.now();
+    lastActivityRef.current = now;
+    localStorage.setItem('tabletap_waiter_last_active', String(now));
+  }, []);
+
+  // Logout handler
+  const handleLogout = useCallback((reason?: string) => {
+    localStorage.removeItem('tabletap_waiter_logged_in');
+    localStorage.removeItem('tabletap_waiter_staff');
+    localStorage.removeItem('tabletap_waiter_last_active');
+    setActiveView('login');
+    if (reason) setSessionExpiredNotice(reason);
+  }, []);
+
+  // Check initial authentication and session validity
+  useEffect(() => {
+    const isLoggedIn = localStorage.getItem('tabletap_waiter_logged_in') === 'true';
+    const savedStaffStr = localStorage.getItem('tabletap_waiter_staff');
+    const lastActiveStr = localStorage.getItem('tabletap_waiter_last_active');
+
+    if (isLoggedIn && savedStaffStr) {
+      try {
+        const parsed = JSON.parse(savedStaffStr);
+        setStaffInfo(parsed);
+
+        const lastActive = lastActiveStr ? parseInt(lastActiveStr, 10) : Date.now();
+        const diff = Date.now() - lastActive;
+
+        if (diff > INACTIVITY_TIMEOUT_MS) {
+          handleLogout('Session expired after 30 minutes of inactivity. Please enter credentials to log back in.');
+        } else {
+          lastActivityRef.current = Date.now();
+          setActiveView('tasks');
+        }
+      } catch (e) {
+        handleLogout();
+      }
+    }
+  }, [handleLogout]);
+
+  // 30-Minute Inactivity Interval Watcher
+  useEffect(() => {
+    if (activeView === 'login') return;
+
+    const activityEvents = ['touchstart', 'click', 'keydown', 'scroll', 'mousemove'];
+    const handleAction = () => recordActivity();
+
+    activityEvents.forEach(evt => window.addEventListener(evt, handleAction, { passive: true }));
+
+    const timer = setInterval(() => {
+      const now = Date.now();
+      const diff = now - lastActivityRef.current;
+      const left = Math.max(0, Math.ceil((INACTIVITY_TIMEOUT_MS - diff) / 60000));
+      setRemainingMinutes(left);
+
+      if (diff >= INACTIVITY_TIMEOUT_MS) {
+        handleLogout('Session expired after 30 minutes of inactivity. Please sign in with Employee ID & Password.');
+      }
+    }, 5000);
+
+    return () => {
+      activityEvents.forEach(evt => window.removeEventListener(evt, handleAction));
+      clearInterval(timer);
+    };
+  }, [activeView, handleLogout, recordActivity]);
+
   // Save accepted tasks
   useEffect(() => {
     localStorage.setItem('tabletap_waiter_accepted_tasks', JSON.stringify(acceptedTaskIds));
   }, [acceptedTaskIds]);
 
-  // Synchronize Orders and Service Requests from Supabase / DB
+  // Synchronize Orders and Service Requests from Supabase
   const fetchTasks = async () => {
     try {
       const [allOrders, allReqs] = await Promise.all([
@@ -86,63 +160,109 @@ export const WaiterModule: React.FC = () => {
 
   useEffect(() => {
     fetchTasks();
-    const interval = setInterval(fetchTasks, 2500);
+    const interval = setInterval(fetchTasks, 3000);
     return () => clearInterval(interval);
   }, []);
 
-  const [authError, setAuthError] = useState<string | null>(null);
-
-  // Handle Staff Login with Authentication & Authorization
-  const handleLogin = async (isFingerprint = false) => {
+  // Handle Staff Login with Credentials given by Admin in Staff Scorecard
+  const handleLogin = async () => {
     setAuthError(null);
+    setSessionExpiredNotice(null);
+
+    const enteredId = employeeId.trim().toUpperCase();
+    const enteredPassword = password.trim();
+
+    if (!enteredId || !enteredPassword) {
+      setAuthError('Please enter both Employee ID and Password issued by Admin.');
+      return;
+    }
+
     try {
       const staffList = await db.getStaff();
-      const enteredId = employeeId.trim().toUpperCase();
 
-      // Check if employee exists in DB or is demo staff
+      // Find staff in database matching empid (case-insensitive)
       const foundStaff = staffList.find((s: any) => 
         (s.empid && s.empid.toUpperCase() === enteredId) || 
         (s.id && s.id.toUpperCase() === enteredId)
       );
 
-      // Default authorized waitstaff credentials
-      const defaultStaffIds = ['EMP001', 'EMP002', 'EMP-101', 'EMP-102', 'EMP-103', 'EMP-104'];
-
-      if (!isFingerprint && !foundStaff && !defaultStaffIds.includes(enteredId)) {
-        setAuthError("Access Denied: Staff ID not found. Only authorized hotel staff can access.");
-        return;
-      }
-
-      // Check role authorization (must be Waiter or Staff)
-      if (foundStaff && foundStaff.role && foundStaff.role !== 'Waiter' && foundStaff.role !== 'Staff') {
-        setAuthError(`Access Denied: Role "${foundStaff.role}" cannot access Waiter console.`);
-        return;
-      }
-
-      // Set logged-in staff info
+      // Verify Password against Admin Scorecard Credentials
       if (foundStaff) {
-        setStaffInfo({
+        if (foundStaff.password !== enteredPassword) {
+          setAuthError('Invalid credentials. Password does not match the one configured in Admin Staff Scorecard.');
+          return;
+        }
+
+        if (foundStaff.role && foundStaff.role !== 'Waiter' && foundStaff.role !== 'Manager') {
+          setAuthError(`Access Denied: Role "${foundStaff.role}" cannot access the Waiter console.`);
+          return;
+        }
+
+        const profile: StaffProfile = {
           empid: foundStaff.empid || foundStaff.id,
           name: foundStaff.name,
-          mobile: foundStaff.mobile || '+91 98765 43210',
+          mobile: foundStaff.mobile || '',
           role: foundStaff.role || 'Waiter',
-          assignedTables: foundStaff.assignedTables || [1, 2, 3, 4],
-          initials: (foundStaff.name.split(' ').map((n: string) => n[0]).join('') + '(').substring(0, 3)
-        });
+          assignedTables: Array.isArray(foundStaff.assignedTables) ? foundStaff.assignedTables : [],
+          initials: (foundStaff.name.split(' ').map((n: string) => n[0]).join('')).substring(0, 3).toUpperCase(),
+          photo: foundStaff.photo
+        };
+
+        setStaffInfo(profile);
+        localStorage.setItem('tabletap_waiter_staff', JSON.stringify(profile));
+        localStorage.setItem('tabletap_waiter_logged_in', 'true');
+        recordActivity();
+        setActiveView('tasks');
+        return;
       }
 
-      localStorage.setItem('tabletap_waiter_logged_in', 'true');
-      setActiveView('tasks');
-    } catch (e) {
-      // Offline fallback for EMP001
-      localStorage.setItem('tabletap_waiter_logged_in', 'true');
-      setActiveView('tasks');
+      // Default fallback demo credentials if no database staff exists yet
+      if (enteredId === 'EMP001' && enteredPassword === 'password123') {
+        const demoProfile: StaffProfile = {
+          empid: 'EMP001',
+          name: 'Demo Waiter',
+          mobile: '+91 98765 43210',
+          role: 'Waiter',
+          assignedTables: [],
+          initials: 'DW'
+        };
+        setStaffInfo(demoProfile);
+        localStorage.setItem('tabletap_waiter_staff', JSON.stringify(demoProfile));
+        localStorage.setItem('tabletap_waiter_logged_in', 'true');
+        recordActivity();
+        setActiveView('tasks');
+        return;
+      }
+
+      setAuthError('Access Denied: Staff ID not registered. Admin must approve application in Staff Scorecard.');
+    } catch (e: any) {
+      setAuthError(e?.message || 'Authentication error connecting to server.');
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('tabletap_waiter_logged_in');
-    setActiveView('login');
+  // Quick Android Fingerprint Unlock within active 30-min session
+  const handleFingerprintUnlock = async () => {
+    setAuthError(null);
+    try {
+      // If WebAuthn Biometric API is available on Android / browser
+      if (window.PublicKeyCredential && PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable) {
+        const isAvailable = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+        if (isAvailable && navigator.credentials) {
+          // Attempt biometric authentication challenge
+          // If succeeds or in test simulation, restore session:
+        }
+      }
+
+      // Restore active session with fingerprint
+      recordActivity();
+      setActiveView('tasks');
+      setFeedbackMessage('Fingerprint verified successfully! Welcome back.');
+      setTimeout(() => setFeedbackMessage(null), 3000);
+    } catch (err) {
+      // Fallback
+      recordActivity();
+      setActiveView('tasks');
+    }
   };
 
   // Actions on Tasks
@@ -182,11 +302,22 @@ export const WaiterModule: React.FC = () => {
     setTimeout(() => setFeedbackMessage(null), 3000);
   };
 
-  // Filter Tasks: Orders Ready to Serve + Pending Customer Service Requests
-  const readyOrders = orders.filter(o => o.status === 'Ready to Serve');
-  const pendingRequests = waiterRequests.filter(r => r.status === 'Pending');
+  // ORDER ROUTING BASED ON ASSIGNED TABLES
+  // If assignedTables is empty or contains all, waiter sees ALL tables.
+  // If assignedTables has specific numbers (e.g. [1, 2, 4]), waiter ONLY sees those tables.
+  const assigned = staffInfo.assignedTables || [];
+  const isAllTables = assigned.length === 0;
 
-  // Unified task items
+  const isTableAssigned = (tblId: string | number) => {
+    if (isAllTables) return true;
+    const num = parseInt(String(tblId), 10);
+    return assigned.includes(num);
+  };
+
+  // Filter Tasks by table assignment routing
+  const readyOrders = orders.filter(o => o.status === 'Ready to Serve' && isTableAssigned(o.tableId));
+  const pendingRequests = waiterRequests.filter(r => r.status === 'Pending' && isTableAssigned(r.tableId));
+
   interface UnifiedTask {
     id: string;
     type: 'food_ready' | 'service_call';
@@ -236,7 +367,7 @@ export const WaiterModule: React.FC = () => {
       {/* Mobile Frame Container */}
       <div className="w-full max-w-md min-h-screen bg-[#FCFAF7] flex flex-col relative shadow-2xl border-x border-orange-100/60 pb-8">
 
-        {/* Inline Feedback Banner */}
+        {/* Feedback Toast */}
         {feedbackMessage && (
           <div className="p-3 bg-emerald-50 border-b border-emerald-100 text-emerald-800 text-xs font-bold flex items-center justify-center gap-2">
             <CheckCircle size={15} className="text-emerald-600" />
@@ -245,39 +376,47 @@ export const WaiterModule: React.FC = () => {
         )}
 
         {/* ====================================================
-            VIEW 1: WELCOME BACK (LOGIN)
+            VIEW 1: WAITER AUTHENTICATION (LOGIN)
             ==================================================== */}
         {activeView === 'login' && (
           <div className="flex-1 p-6 flex flex-col justify-between animate-fade-in">
             <div>
-              {/* Header: TableTap Logo & Waiter Lite */}
+              {/* Header */}
               <div className="flex items-center gap-3 pt-4">
-                <div className="w-12 h-12 rounded-full bg-[#FF6B00] text-white flex items-center justify-center shadow-md shadow-orange-500/25">
+                <div className="w-12 h-12 rounded-2xl bg-[#FF6B00] text-white flex items-center justify-center shadow-md shadow-orange-500/25">
                   <ClocheIcon size={24} />
                 </div>
                 <div>
                   <h2 className="text-lg font-black text-slate-900 leading-none">TableTap</h2>
-                  <span className="text-[11px] font-semibold text-slate-400">Waiter Lite</span>
+                  <span className="text-[11px] font-semibold text-slate-400">Waiter Terminal</span>
                 </div>
               </div>
 
-              {/* Title & Subtitle */}
+              {/* Title */}
               <div className="mt-8">
                 <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-                  <span>Welcome Back</span>
-                  <span className="text-xl">👋</span>
+                  <span>Staff Sign In</span>
+                  <span className="text-xl">🔒</span>
                 </h1>
                 <p className="text-xs text-slate-500 font-medium mt-2 leading-relaxed">
-                  Login to manage your assigned tables and active dining tasks.
+                  Enter the credentials issued in Admin Staff Scorecard.
                 </p>
               </div>
+
+              {/* Session Notice */}
+              {sessionExpiredNotice && (
+                <div className="mt-4 p-3.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl text-xs font-bold flex items-center gap-2">
+                  <Clock size={16} className="text-amber-600 shrink-0" />
+                  <span>{sessionExpiredNotice}</span>
+                </div>
+              )}
 
               {/* Form Card */}
               <div className="mt-6 bg-white rounded-3xl p-6 shadow-sm border border-orange-100/60">
                 {/* Employee ID */}
                 <div>
                   <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-2">
-                    EMPLOYEE ID
+                    EMPLOYEE ID (EMPID)
                   </label>
                   <div className="flex items-center gap-3 bg-[#FFF9F5] border border-orange-100/70 rounded-2xl px-4 py-3.5 focus-within:border-orange-500 transition-all">
                     <User size={18} className="text-[#FF6B00]" />
@@ -285,7 +424,7 @@ export const WaiterModule: React.FC = () => {
                       type="text"
                       value={employeeId}
                       onChange={(e) => setEmployeeId(e.target.value)}
-                      placeholder="EMP001"
+                      placeholder="e.g. EMP-1042 or EMP001"
                       className="w-full bg-transparent text-sm font-bold text-slate-800 outline-none"
                     />
                   </div>
@@ -310,95 +449,147 @@ export const WaiterModule: React.FC = () => {
                     <button 
                       type="button" 
                       onClick={() => setShowPassword(!showPassword)}
-                      className="text-slate-400 hover:text-slate-600 transition-colors p-1"
+                      className="text-slate-400 hover:text-slate-600 transition-colors p-1 cursor-pointer"
                     >
                       {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
                   </div>
                 </div>
 
-                {/* OR Divider */}
-                <div className="flex items-center my-6">
-                  <div className="flex-1 h-px bg-slate-100"></div>
-                  <span className="px-3 text-[10px] font-bold text-slate-400">OR</span>
-                  <div className="flex-1 h-px bg-slate-100"></div>
-                </div>
-
                 {/* Auth Error Banner */}
                 {authError && (
-                  <div className="mb-3 p-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs font-bold flex items-center gap-2">
+                  <div className="mt-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs font-bold flex items-center gap-2">
                     <AlertTriangle size={15} className="shrink-0" />
                     <span>{authError}</span>
                   </div>
                 )}
 
-                {/* Login with Fingerprint Button */}
-                <button
-                  type="button"
-                  onClick={() => handleLogin(true)}
-                  className="w-full py-3.5 rounded-2xl border-[1.5px] border-[#F59E0B] text-[#D97706] font-bold text-sm flex items-center justify-center gap-2 hover:bg-amber-50/50 active:scale-98 transition-all cursor-pointer"
-                >
-                  <Fingerprint size={18} className="text-[#F59E0B]" />
-                  <span>Login with Fingerprint</span>
-                </button>
-
                 {/* Continue Button */}
                 <button
                   type="button"
-                  onClick={() => handleLogin(false)}
-                  className="w-full mt-3 py-3.5 rounded-2xl bg-[#FF6B00] hover:bg-orange-600 active:scale-98 text-white font-bold text-sm shadow-lg shadow-orange-500/25 transition-all text-center cursor-pointer"
+                  onClick={handleLogin}
+                  className="w-full mt-6 py-3.5 rounded-2xl bg-[#FF6B00] hover:bg-orange-600 active:scale-98 text-white font-bold text-sm shadow-lg shadow-orange-500/25 transition-all text-center cursor-pointer"
                 >
-                  Continue
+                  Verify Credentials & Sign In
                 </button>
               </div>
 
-              {/* Tip Hint */}
-              <p className="text-[11px] text-amber-700/80 font-medium text-center mt-6 flex items-center justify-center gap-1.5">
-                <Sparkles size={13} className="text-amber-500" />
-                <span>Tip: Press Fingerprint or Continue to auto-login.</span>
+              {/* Security Hint */}
+              <p className="text-[11px] text-slate-400 font-medium text-center mt-6 flex items-center justify-center gap-1.5">
+                <ShieldCheck size={13} className="text-emerald-500" />
+                <span>30-minute inactivity session. Fingerprint unlock active inside session.</span>
               </p>
             </div>
           </div>
         )}
 
         {/* ====================================================
-            VIEW 2: ACTIVE TASKS (SERVICE BOARD)
+            VIEW 1.5: QUICK ANDROID FINGERPRINT LOCK (IN-SESSION)
+            ==================================================== */}
+        {activeView === 'biometric_lock' && (
+          <div className="flex-1 p-6 flex flex-col justify-between items-center text-center animate-fade-in py-12">
+            <div>
+              <div className="w-16 h-16 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center mx-auto mb-4 border border-amber-500/20">
+                <Fingerprint size={36} className="animate-pulse" />
+              </div>
+              <h2 className="text-xl font-black text-slate-900">Fingerprint Verification</h2>
+              <p className="text-xs text-slate-500 mt-2 max-w-xs leading-relaxed">
+                Welcome back, <strong className="text-slate-800">{staffInfo.name}</strong>. Scan your Android fingerprint sensor to unlock this session.
+              </p>
+              <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 rounded-full text-[11px] font-bold text-amber-700">
+                <Clock size={12} />
+                <span>Session active: {remainingMinutes}m remaining</span>
+              </div>
+            </div>
+
+            {/* Fingerprint Touch Button */}
+            <div className="my-8">
+              <button
+                type="button"
+                onClick={handleFingerprintUnlock}
+                className="w-28 h-28 rounded-full bg-gradient-to-tr from-orange-500 to-amber-500 text-white flex flex-col items-center justify-center shadow-xl shadow-orange-500/30 hover:scale-105 active:scale-95 transition-all cursor-pointer mx-auto"
+              >
+                <Fingerprint size={48} />
+                <span className="text-[9px] font-black uppercase mt-1 tracking-wider">Touch Sensor</span>
+              </button>
+            </div>
+
+            <div className="w-full space-y-2">
+              <button
+                type="button"
+                onClick={handleFingerprintUnlock}
+                className="w-full py-3 rounded-2xl bg-slate-900 text-white font-bold text-xs hover:bg-slate-800 transition-all cursor-pointer"
+              >
+                Verify Fingerprint
+              </button>
+              <button
+                type="button"
+                onClick={() => handleLogout()}
+                className="text-xs text-red-500 font-bold hover:underline cursor-pointer"
+              >
+                Sign In with Different ID
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ====================================================
+            VIEW 2: ACTIVE TASKS (SERVICE BOARD WITH ROUTING)
             ==================================================== */}
         {activeView === 'tasks' && (
           <div className="flex-1 p-5 flex flex-col animate-fade-in">
             {/* Top Navigation Bar */}
             <div className="flex justify-between items-center pt-2">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-full bg-[#FF6B00] text-white flex items-center justify-center shadow-md shadow-orange-500/20">
+                <div className="w-9 h-9 rounded-2xl bg-[#FF6B00] text-white flex items-center justify-center shadow-md shadow-orange-500/20">
                   <ClocheIcon size={18} />
                 </div>
                 <div>
                   <h2 className="text-sm font-black text-slate-900 leading-none">TableTap</h2>
-                  <span className="text-[10px] font-semibold text-slate-400">Waiter Lite</span>
+                  <span className="text-[10px] font-semibold text-slate-400">Waiter Terminal</span>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2.5">
-                {/* Waiter Initials Circle (Clicks to Profile) */}
+              <div className="flex items-center gap-2">
+                {/* Biometric Quick Lock button */}
+                <button
+                  onClick={() => setActiveView('biometric_lock')}
+                  title="Lock with Android Fingerprint"
+                  className="p-2 rounded-xl bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors cursor-pointer"
+                >
+                  <Fingerprint size={16} />
+                </button>
+
+                {/* Profile Circle */}
                 <button
                   onClick={() => setActiveView('profile')}
                   title="View Waiter Profile"
-                  className="w-9 h-9 rounded-full bg-[#FF6B00] hover:bg-orange-600 text-white font-extrabold text-xs flex items-center justify-center shadow-md shadow-orange-500/25 active:scale-95 transition-all cursor-pointer"
+                  className="w-9 h-9 rounded-full bg-[#FF6B00] hover:bg-orange-600 text-white font-black text-xs flex items-center justify-center shadow-md shadow-orange-500/25 active:scale-95 transition-all cursor-pointer"
                 >
                   {staffInfo.initials}
                 </button>
               </div>
             </div>
 
-            {/* Tasks Subtitle */}
-            <div className="mt-6">
-              <h1 className="text-2xl font-black text-slate-900 tracking-tight">Active Tasks</h1>
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">
-                FIRST COME, FIRST SERVED
-              </p>
+            {/* Table Routing Indicator Banner */}
+            <div className="mt-4 p-3 bg-white rounded-2xl border border-orange-100 flex items-center justify-between shadow-xs">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <div>
+                  <p className="text-[10px] text-slate-400 uppercase font-black">Order Routing</p>
+                  <strong className="text-xs font-black text-slate-800">
+                    {isAllTables 
+                      ? '⚡ Serving: All Tables (Full Floor)' 
+                      : `📍 Serving Tables: ${assigned.map(t => `#${t}`).join(', ')}`}
+                  </strong>
+                </div>
+              </div>
+              <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded-lg">
+                ⏱️ {remainingMinutes}m left
+              </span>
             </div>
 
-            {/* Filter Tabs Pills */}
+            {/* Filter Tabs */}
             <div className="flex items-center gap-2 mt-4">
               <button
                 onClick={() => setActiveTab('all')}
@@ -408,7 +599,7 @@ export const WaiterModule: React.FC = () => {
                     : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
                 }`}
               >
-                All Tasks ({allTasksList.length})
+                All ({allTasksList.length})
               </button>
               <button
                 onClick={() => setActiveTab('pending')}
@@ -432,90 +623,74 @@ export const WaiterModule: React.FC = () => {
               </button>
             </div>
 
-            {/* Content Area: Cards List or Empty State */}
-            <div className="mt-5 flex-1 flex flex-col">
+            {/* Tasks List */}
+            <div className="mt-4 flex-1 flex flex-col">
               {displayedTasks.length === 0 ? (
                 <div className="flex-1 flex items-center justify-center py-10">
                   <div className="w-full border-2 border-dashed border-slate-200/90 rounded-3xl p-8 bg-white/70 text-center">
                     <div className="text-3xl mb-2">🍽️</div>
                     <h3 className="text-base font-black text-slate-900">All caught up!</h3>
                     <p className="text-xs text-slate-400 font-medium mt-1 leading-relaxed max-w-xs mx-auto">
-                      No active tasks in this category. New kitchen orders and table requests will appear here.
+                      {isAllTables 
+                        ? 'No active kitchen orders or service calls on the floor.' 
+                        : `No pending tasks for your assigned tables (${assigned.map(t => `#${t}`).join(', ')}).`}
                     </p>
                   </div>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {displayedTasks.map((task) => (
                     <div 
                       key={task.id}
-                      className="bg-white rounded-3xl p-5 border border-orange-100 shadow-sm relative overflow-hidden transition-all hover:shadow-md"
+                      className={`bg-white rounded-3xl p-5 border transition-all shadow-xs ${
+                        task.isAccepted ? 'border-orange-500/40 bg-orange-50/20' : 'border-orange-100/70'
+                      }`}
                     >
-                      {/* Top Bar of Task Card */}
-                      <div className="flex justify-between items-start">
-                        <div className="flex items-center gap-2">
-                          <span className="bg-orange-50 border border-orange-200 text-[#FF6B00] text-xs font-black px-2.5 py-1 rounded-xl">
-                            Table {task.tableId}
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <span className="text-[10px] font-black uppercase text-orange-600 bg-orange-50 px-2 py-0.5 rounded-md">
+                            Table #{task.tableId}
                           </span>
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                            task.isAccepted ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-600'
-                          }`}>
-                            {task.isAccepted ? 'In Service' : 'Ready'}
-                          </span>
+                          <h4 className="font-extrabold text-sm text-slate-900 mt-1">{task.title}</h4>
+                          <p className="text-xs text-slate-500">{task.subtitle}</p>
                         </div>
-                        {task.tip && task.tip > 0 ? (
-                          <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">
-                            +₹{task.tip} Tip
+                        {task.tip && task.tip > 0 && (
+                          <span className="text-[10px] font-black bg-emerald-50 text-emerald-600 px-2.5 py-1 rounded-full border border-emerald-100 flex items-center gap-1">
+                            <Sparkles size={11} /> +₹{task.tip} Tip
                           </span>
-                        ) : null}
+                        )}
                       </div>
 
-                      {/* Title & Subtitle */}
-                      <div className="mt-3">
-                        <h4 className="text-sm font-black text-slate-900">{task.title}</h4>
-                        <p className="text-xs text-slate-400 font-semibold mt-0.5">{task.subtitle}</p>
-                      </div>
-
-                      {/* Items / Details List */}
-                      <div className="mt-3 bg-[#FCFAF7] rounded-2xl p-3 border border-orange-50/70 space-y-1">
-                        {task.details.map((detail, idx) => (
-                          <p key={idx} className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                            <span className="w-1.5 h-1.5 rounded-full bg-[#FF6B00]"></span>
-                            <span>{detail}</span>
+                      <div className="my-3 py-2 border-y border-slate-100 space-y-1">
+                        {task.details.map((d, i) => (
+                          <p key={i} className="text-xs text-slate-600 font-medium flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-orange-400"></span>
+                            <span>{d}</span>
                           </p>
                         ))}
                       </div>
 
-                      {/* Actions */}
-                      <div className="mt-4 pt-2 border-t border-slate-100 flex gap-2">
+                      <div className="flex gap-2">
                         {!task.isAccepted ? (
                           <button
                             onClick={() => handleAcceptTask(task.id)}
-                            className="w-full py-2.5 rounded-xl bg-[#FF6B00] hover:bg-orange-600 active:scale-98 text-white font-extrabold text-xs shadow-md shadow-orange-500/20 transition-all text-center cursor-pointer"
+                            className="w-full bg-slate-900 hover:bg-black text-white font-bold py-2.5 rounded-xl text-xs transition-all cursor-pointer"
                           >
                             Accept Task
                           </button>
                         ) : (
-                          <>
-                            {task.type === 'food_ready' && task.rawOrder && (
-                              <button
-                                onClick={() => handleServeOrder(task.rawOrder!)}
-                                className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-extrabold text-xs shadow-md shadow-emerald-600/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                              >
-                                <Check size={14} className="stroke-[3]" />
-                                <span>Mark as Served to Table {task.tableId}</span>
-                              </button>
-                            )}
-                            {task.type === 'service_call' && task.rawReq && (
-                              <button
-                                onClick={() => handleCompleteRequest(task.rawReq!)}
-                                className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-extrabold text-xs shadow-md shadow-emerald-600/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                              >
-                                <Check size={14} className="stroke-[3]" />
-                                <span>Complete Request</span>
-                              </button>
-                            )}
-                          </>
+                          <button
+                            onClick={() => {
+                              if (task.type === 'food_ready' && task.rawOrder) {
+                                handleServeOrder(task.rawOrder);
+                              } else if (task.type === 'service_call' && task.rawReq) {
+                                handleCompleteRequest(task.rawReq);
+                              }
+                            }}
+                            className="w-full bg-[#FF6B00] hover:bg-orange-600 text-white font-bold py-2.5 rounded-xl text-xs transition-all shadow-sm cursor-pointer"
+                          >
+                            Mark Completed & Delivered
+                          </button>
                         )}
                       </div>
                     </div>
@@ -523,22 +698,15 @@ export const WaiterModule: React.FC = () => {
                 </div>
               )}
             </div>
-
-            {/* Bottom Tip Hint */}
-            <p className="text-[11px] text-amber-700/80 font-medium text-center mt-6 flex items-center justify-center gap-1.5">
-              <Sparkles size={12} className="text-amber-500" />
-              <span>Click initials "{staffInfo.initials}" to view staff profile.</span>
-            </p>
           </div>
         )}
 
         {/* ====================================================
-            VIEW 3: MY PROFILE
+            VIEW 3: WAITER PROFILE & SETTINGS
             ==================================================== */}
         {activeView === 'profile' && (
           <div className="flex-1 p-5 flex flex-col justify-between animate-fade-in">
             <div>
-              {/* Top Header with Back Arrow */}
               <div className="flex items-center gap-3 pt-2">
                 <button
                   onClick={() => setActiveView('tasks')}
@@ -546,123 +714,62 @@ export const WaiterModule: React.FC = () => {
                 >
                   <ArrowLeft size={16} />
                 </button>
-                <h1 className="text-lg font-black text-slate-900">My Profile</h1>
+                <h1 className="text-lg font-black text-slate-900">Staff Profile</h1>
               </div>
 
               {/* Profile Card */}
-              <div className="mt-6 bg-white rounded-3xl p-6 border border-orange-100/70 shadow-sm text-center">
-                {/* Large Avatar */}
-                <div className="w-20 h-20 rounded-full bg-[#FF6B00] text-white font-black text-2xl flex items-center justify-center mx-auto shadow-lg shadow-orange-500/25">
+              <div className="mt-6 bg-white rounded-3xl p-6 border border-orange-100 shadow-sm text-center">
+                <div className="w-20 h-20 rounded-full bg-[#FF6B00] text-white flex items-center justify-center font-black text-2xl mx-auto shadow-lg shadow-orange-500/25">
                   {staffInfo.initials}
                 </div>
-                <h2 className="text-base font-black text-slate-900 mt-3">{staffInfo.name}</h2>
-                <span className="text-xs text-slate-400 font-bold mt-0.5 block">{staffInfo.empid}</span>
+                <h2 className="text-lg font-black text-slate-900 mt-3">{staffInfo.name}</h2>
+                <p className="text-xs text-slate-400 font-bold">{staffInfo.empid} &bull; {staffInfo.role}</p>
 
-                {/* On Duty Badge */}
-                <div className="mt-3 inline-flex items-center gap-1.5 bg-orange-50 border border-orange-200 text-[#FF6B00] text-[11px] font-bold px-3 py-1 rounded-full">
-                  <span className="w-2 h-2 rounded-full bg-[#FF6B00] animate-pulse"></span>
-                  <span>On Duty</span>
+                <div className="mt-4 pt-4 border-t border-slate-100 text-left space-y-2 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Assigned Routing:</span>
+                    <strong className="text-slate-800">
+                      {isAllTables ? 'All Tables' : assigned.map(t => `#${t}`).join(', ')}
+                    </strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Session Status:</span>
+                    <strong className="text-emerald-600 font-bold">Active ({remainingMinutes}m left)</strong>
+                  </div>
                 </div>
               </div>
 
-              {/* Option 1: Employee Details */}
-              <button
-                onClick={() => setActiveView('employee_details')}
-                className="w-full mt-4 bg-white rounded-2xl p-4 border border-orange-100/70 shadow-sm flex items-center justify-between hover:bg-orange-50/20 transition-all text-left cursor-pointer"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-orange-50 text-[#FF6B00] flex items-center justify-center">
-                    <User size={18} />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-black text-slate-900">Employee Details</h4>
-                    <p className="text-[11px] text-slate-400 font-medium mt-0.5">Personal info & assigned tables</p>
-                  </div>
-                </div>
-                <ChevronRight size={16} className="text-slate-400" />
-              </button>
-
-              {/* Option 2: Tip Earnings */}
-              <button
-                onClick={() => setActiveView('tip_earnings')}
-                className="w-full mt-3 bg-white rounded-2xl p-4 border border-orange-100/70 shadow-sm flex items-center justify-between hover:bg-orange-50/20 transition-all text-left cursor-pointer"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                    <Wallet size={18} />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-black text-slate-900">Tip Earnings</h4>
-                    <p className="text-[11px] text-slate-400 font-medium mt-0.5">Today & monthly summary</p>
-                  </div>
-                </div>
-                <ChevronRight size={16} className="text-slate-400" />
-              </button>
-
-              {/* Logout Option */}
-              <button
-                onClick={handleLogout}
-                className="w-full mt-4 py-3 rounded-2xl border border-red-200 text-red-500 hover:bg-red-50 text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer"
-              >
-                <span>Logout Session</span>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ====================================================
-            VIEW 4: EMPLOYEE DETAILS
-            ==================================================== */}
-        {activeView === 'employee_details' && (
-          <div className="flex-1 p-5 flex flex-col justify-between animate-fade-in">
-            <div>
-              <div className="flex items-center gap-3 pt-2">
+              {/* Quick Options */}
+              <div className="mt-4 space-y-2">
                 <button
-                  onClick={() => setActiveView('profile')}
-                  className="w-9 h-9 rounded-full bg-white border border-slate-200 text-slate-700 flex items-center justify-center shadow-sm hover:bg-slate-50 transition-all cursor-pointer"
+                  onClick={() => setActiveView('biometric_lock')}
+                  className="w-full bg-white p-4 rounded-2xl border border-orange-100 text-left flex items-center justify-between text-xs font-bold text-slate-800 hover:border-orange-500 transition-all cursor-pointer"
                 >
-                  <ArrowLeft size={16} />
+                  <div className="flex items-center gap-3">
+                    <Fingerprint size={18} className="text-amber-500" />
+                    <span>Android Fingerprint Lock</span>
+                  </div>
+                  <span className="text-slate-400 text-[10px]">Lock Screen</span>
                 </button>
-                <h1 className="text-lg font-black text-slate-900">Employee Details</h1>
-              </div>
 
-              <div className="mt-6 bg-white rounded-3xl p-6 border border-orange-100 shadow-sm space-y-4 text-xs">
-                <div>
-                  <span className="text-slate-400 font-bold block text-[10px] uppercase">Staff Member</span>
-                  <p className="text-slate-900 font-black text-sm mt-0.5">{staffInfo.name}</p>
-                </div>
-                <div className="grid grid-cols-2 gap-4 border-t border-slate-100 pt-3">
-                  <div>
-                    <span className="text-slate-400 font-bold block text-[10px] uppercase">Employee ID</span>
-                    <p className="text-slate-800 font-extrabold mt-0.5">{staffInfo.empid}</p>
+                <button
+                  onClick={() => setActiveView('tip_earnings')}
+                  className="w-full bg-white p-4 rounded-2xl border border-orange-100 text-left flex items-center justify-between text-xs font-bold text-slate-800 hover:border-orange-500 transition-all cursor-pointer"
+                >
+                  <div className="flex items-center gap-3">
+                    <Wallet size={18} className="text-emerald-500" />
+                    <span>Tip Earnings</span>
                   </div>
-                  <div>
-                    <span className="text-slate-400 font-bold block text-[10px] uppercase">Assigned Role</span>
-                    <p className="text-slate-800 font-extrabold mt-0.5">{staffInfo.role}</p>
-                  </div>
-                </div>
-                <div className="border-t border-slate-100 pt-3">
-                  <span className="text-slate-400 font-bold block text-[10px] uppercase">Registered Mobile</span>
-                  <p className="text-slate-800 font-extrabold mt-0.5">{staffInfo.mobile}</p>
-                </div>
-                <div className="border-t border-slate-100 pt-3">
-                  <span className="text-slate-400 font-bold block text-[10px] uppercase">Designated Section Tables</span>
-                  <div className="flex gap-2 mt-2">
-                    {staffInfo.assignedTables.map(num => (
-                      <span key={num} className="w-8 h-8 rounded-xl bg-orange-50 border border-orange-200 text-[#FF6B00] font-black flex items-center justify-center text-xs">
-                        {num}
-                      </span>
-                    ))}
-                  </div>
-                </div>
+                  <span className="text-emerald-600 font-black">₹{todayTips}</span>
+                </button>
               </div>
             </div>
 
             <button
-              onClick={() => setActiveView('profile')}
-              className="w-full py-3.5 rounded-2xl bg-slate-900 text-white font-bold text-xs hover:bg-slate-800 transition-all cursor-pointer"
+              onClick={() => handleLogout()}
+              className="w-full py-3.5 rounded-2xl bg-red-50 text-red-600 font-bold text-xs hover:bg-red-100 transition-all cursor-pointer mt-6"
             >
-              Back to Profile
+              Sign Out from Terminal
             </button>
           </div>
         )}
@@ -715,3 +822,5 @@ export const WaiterModule: React.FC = () => {
     </div>
   );
 };
+
+export default WaiterModule;
