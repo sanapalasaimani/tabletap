@@ -9,7 +9,7 @@ import {
   Edit3, Plus, X, ChevronRight, Download, Sparkles, Filter, Check, 
   AlertTriangle, Moon, Sun, RefreshCw, FileText, Mail, MessageCircle, 
   CornerDownRight, UserPlus, Heart, TrendingUp, DollarSign, Calendar,
-  TrendingDown, ArrowUpRight, ArrowDownRight, Clock, Star, Eye, FileSpreadsheet, ChevronDown, ExternalLink
+  TrendingDown, ArrowUpRight, ArrowDownRight, Clock, Star, Eye, EyeOff, Phone, Copy, FileSpreadsheet, ChevronDown, ExternalLink
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, CartesianGrid } from 'recharts';
 import { 
@@ -36,6 +36,8 @@ interface Employee {
   id: string;
   name: string;
   mobile: string;
+  email?: string;
+  photo?: string;
   role: 'Manager' | 'Chef' | 'Waiter' | 'Cashier' | 'Cleaner' | 'Delivery Staff';
   shift: 'Morning' | 'Evening' | 'Night';
   salary: number;
@@ -162,9 +164,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
     isSpecial: false,
   });
 
+  const [revealedPasswords, setRevealedPasswords] = useState<Record<string, boolean>>({});
+
   const [staffFormState, setStaffFormState] = useState({
     name: '',
     mobile: '',
+    email: '',
+    photo: '',
     role: 'Waiter' as Employee['role'],
     shift: 'Morning' as Employee['shift'],
     salary: 18000,
@@ -525,10 +531,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
     }
 
     try {
-      const newEmp = {
+      const newEmp: Employee = {
         id: editingStaff ? editingStaff.id : `s_${Date.now()}`,
         name: staffFormState.name,
         mobile: staffFormState.mobile,
+        email: staffFormState.email || editingStaff?.email || '',
+        photo: staffFormState.photo || editingStaff?.photo || '',
         role: staffFormState.role,
         shift: staffFormState.shift,
         salary: staffFormState.salary,
@@ -544,7 +552,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
       logActivity(editingStaff ? `Updated staff member: ${newEmp.name}` : `Added new staff member: ${newEmp.name}`);
       setNewStaffForm(false);
       setEditingStaff(null);
-      setStaffFormState({ name: '', mobile: '', role: 'Waiter', shift: 'Morning', salary: 18000, empid: '', password: '', assignedTables: [] });
+      setStaffFormState({ name: '', mobile: '', email: '', photo: '', role: 'Waiter', shift: 'Morning', salary: 18000, empid: '', password: '', assignedTables: [] });
     } catch (e) {
       alert('Failed to register employee. Employee ID must be unique.');
     }
@@ -571,6 +579,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
         setStaffFormState({
           name: pendingEditStaff.name,
           mobile: pendingEditStaff.mobile || '',
+          email: pendingEditStaff.email || '',
+          photo: pendingEditStaff.photo || '',
           role: pendingEditStaff.role,
           shift: pendingEditStaff.shift,
           salary: pendingEditStaff.salary,
@@ -2217,6 +2227,46 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <div>
+                          <label className="block text-gray-400 mb-1 text-[10px] uppercase">Phone / Mobile</label>
+                          <input
+                            type="text"
+                            value={staffFormState.mobile}
+                            onChange={(e) => setStaffFormState({...staffFormState, mobile: e.target.value})}
+                            className="w-full p-2.5 border rounded-xl"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-gray-400 mb-1 text-[10px] uppercase">Email</label>
+                          <input
+                            type="email"
+                            value={staffFormState.email}
+                            onChange={(e) => setStaffFormState({...staffFormState, email: e.target.value})}
+                            className="w-full p-2.5 border rounded-xl"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-gray-400 mb-1 text-[10px] uppercase">Photo URL</label>
+                        <div className="flex gap-2 items-center">
+                          {staffFormState.photo && (
+                            <img
+                              src={staffFormState.photo}
+                              alt="Staff"
+                              className="w-9 h-9 rounded-xl object-cover border"
+                              onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                            />
+                          )}
+                          <input
+                            type="text"
+                            value={staffFormState.photo}
+                            onChange={(e) => setStaffFormState({...staffFormState, photo: e.target.value})}
+                            placeholder="https://drive.google.com/... or image URL"
+                            className="w-full p-2.5 border rounded-xl"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
                           <label className="block text-gray-400 mb-1 text-[10px] uppercase">Employee ID (EmpID)</label>
                           <input
                             type="text"
@@ -2485,54 +2535,193 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                 <div className="space-y-6 animate-fade-in">
                   <div>
                     <div className="flex justify-between items-center mb-3">
-                      <h4 className="font-bold text-xs flex items-center gap-1.5"><UserCheck size={14} /> Active Staff</h4>
+                      <h4 className="font-bold text-xs flex items-center gap-1.5"><UserCheck size={14} /> Active Staff ({staff.length})</h4>
+                      <button
+                        onClick={fetchData}
+                        className="text-[11px] font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
+                        title="Refresh active staff"
+                      >
+                        <RefreshCw size={12} /> Refresh
+                      </button>
                     </div>
                     {staff.length === 0 ? (
                       <div className="text-center p-10 bg-gray-50 rounded-3xl border border-dashed border-gray-200">
                         <p className="text-xs text-gray-500 font-bold mb-2">No Active Staff Members.</p>
-                        <p className="text-[10px] text-gray-400">Share your Google Form link in the Pending Apps tab to register new waiters.</p>
+                        <p className="text-[10px] text-gray-400">Approve pending applications or register staff members to view them here.</p>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-xs font-semibold">
-                        {staff.map(emp => (
-                          <div key={emp.id} className={`p-4 rounded-3xl border shadow-sm flex flex-col justify-between ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-50'}`}>
-                            <div>
-                              <div className="flex justify-between border-b pb-2 mb-3">
-                                <div>
-                                  <h4 className="font-extrabold text-sm">{emp.name}</h4>
-                                  <span className="text-[9px] text-gray-400 font-bold uppercase">{emp.role} • EmpID: {emp.empid}</span>
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 text-xs font-semibold">
+                        {staff.map(emp => {
+                          const showPw = revealedPasswords[emp.id];
+                          return (
+                            <div key={emp.id} className={`p-5 rounded-3xl border shadow-sm flex flex-col justify-between transition-all ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100'}`}>
+                              <div>
+                                {/* Header with Staff Photo, Name, and Role */}
+                                <div className="flex items-start justify-between border-b pb-3 mb-3 gap-3">
+                                  <div className="flex items-center gap-3">
+                                    {emp.photo ? (
+                                      <img
+                                        src={emp.photo}
+                                        alt={emp.name}
+                                        className="w-14 h-14 rounded-2xl object-cover border-2 border-orange-500/20 shadow-sm"
+                                        onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                                      />
+                                    ) : (
+                                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-orange-400 to-amber-500 text-white flex items-center justify-center font-extrabold text-xl shadow-sm">
+                                        {emp.name ? emp.name.charAt(0).toUpperCase() : 'S'}
+                                      </div>
+                                    )}
+                                    <div>
+                                      <div className="flex items-center gap-2">
+                                        <h4 className="font-extrabold text-base">{emp.name}</h4>
+                                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                                          emp.role === 'Waiter' ? 'bg-orange-100 text-orange-700' :
+                                          emp.role === 'Chef' ? 'bg-purple-100 text-purple-700' :
+                                          emp.role === 'Manager' ? 'bg-emerald-100 text-emerald-700' :
+                                          'bg-blue-100 text-blue-700'
+                                        }`}>
+                                          {emp.role}
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-2 mt-1">
+                                        <span className="text-[10px] bg-gray-100 text-gray-700 px-2 py-0.5 rounded font-mono font-bold">
+                                          ID: {emp.empid}
+                                        </span>
+                                        <span className="text-[10px] bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full font-bold">
+                                          Shift: {emp.shift}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <span className="text-[10px] text-gray-400 block font-normal">Monthly Salary</span>
+                                    <strong className="text-sm text-brand-text font-black">{formatPrice(emp.salary)}</strong>
+                                  </div>
                                 </div>
-                                <span className="text-[10px] bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full font-bold">Shift: {emp.shift}</span>
+
+                                {/* Credentials & Contact Info */}
+                                <div className="grid grid-cols-2 gap-2 p-2.5 rounded-2xl bg-gray-50/80 mb-3 text-[11px]">
+                                  <div>
+                                    <span className="text-[10px] text-gray-400 block font-medium">Terminal Password</span>
+                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                      <span className="font-mono font-bold">
+                                        {showPw ? (emp.password || '••••••') : '••••••••'}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => setRevealedPasswords(prev => ({ ...prev, [emp.id]: !prev[emp.id] }))}
+                                        className="text-gray-400 hover:text-gray-700 cursor-pointer"
+                                        title={showPw ? "Hide Password" : "Show Password"}
+                                      >
+                                        {showPw ? <EyeOff size={13} /> : <Eye size={13} />}
+                                      </button>
+                                      {emp.password && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            navigator.clipboard.writeText(emp.password || '');
+                                            alert(`Copied password for ${emp.name}`);
+                                          }}
+                                          className="text-gray-400 hover:text-gray-700 cursor-pointer"
+                                          title="Copy Password"
+                                        >
+                                          <Copy size={13} />
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  <div>
+                                    <span className="text-[10px] text-gray-400 block font-medium">Phone / WhatsApp</span>
+                                    {emp.mobile ? (
+                                      <a
+                                        href={`tel:${emp.mobile}`}
+                                        className="font-bold text-blue-600 hover:underline flex items-center gap-1 mt-0.5"
+                                      >
+                                        <Phone size={11} /> {emp.mobile}
+                                      </a>
+                                    ) : (
+                                      <span className="text-gray-400 italic">Not set</span>
+                                    )}
+                                  </div>
+
+                                  {emp.email && (
+                                    <div className="col-span-2 border-t pt-1.5 mt-0.5">
+                                      <span className="text-[10px] text-gray-400 block font-medium">Email Address</span>
+                                      <a href={`mailto:${emp.email}`} className="text-blue-600 hover:underline flex items-center gap-1 font-bold">
+                                        <Mail size={11} /> {emp.email}
+                                      </a>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Table Routing & Assignments */}
+                                {emp.role === 'Waiter' && (
+                                  <div className="mb-3">
+                                    <div className="flex justify-between items-center mb-1">
+                                      <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Assigned Tables / Routing</span>
+                                    </div>
+                                    {(!emp.assignedTables || emp.assignedTables.length === 0 || emp.assignedTables.length === tables.length) ? (
+                                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-green-50 text-green-700 text-[10px] font-bold border border-green-200">
+                                        ⚡ Serves All Tables (Full Restaurant Floor)
+                                      </span>
+                                    ) : (
+                                      <div className="flex flex-wrap gap-1.5">
+                                        {emp.assignedTables.map(tId => (
+                                          <span key={tId} className="px-2 py-0.5 rounded-lg bg-orange-100 text-orange-800 text-[10px] font-bold">
+                                            Table #{tId}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Performance Badges */}
+                                <div className="grid grid-cols-3 gap-2 py-2 border-t border-b text-center text-[10px]">
+                                  <div>
+                                    <span className="text-gray-400 block">Rating</span>
+                                    <strong className="text-amber-500 font-bold">★ {emp.performance?.ratings || '5.0'}</strong>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-400 block">Attendance</span>
+                                    <strong className="text-emerald-600 font-bold">{emp.attendance || 100}%</strong>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-400 block">Delivered</span>
+                                    <strong className="font-bold">{emp.performance?.ordersDelivered || 0} orders</strong>
+                                  </div>
+                                </div>
                               </div>
-                              <p className="text-gray-400">Salary: <strong className="text-brand-text">{formatPrice(emp.salary)}</strong></p>
-                              {emp.role === 'Waiter' && (
-                                <p className="text-gray-400 text-[10px] mt-1">Assigned Tables: <strong className="text-brand-text">{emp.assignedTables?.length ? emp.assignedTables.join(', ') : 'None'}</strong></p>
-                              )}
+
+                              {/* Footer Actions */}
+                              <div className="pt-3 mt-2 flex justify-between items-center text-[11px]">
+                                <span className="text-[10px] text-gray-400">
+                                  Avg Serving: {emp.performance?.avgServingTime || 'N/A'}
+                                </span>
+                                {role === 'Hotel Manager' && (
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() => {
+                                        setPendingEditStaff(emp);
+                                        setOtpModal(true);
+                                      }}
+                                      className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-bold cursor-pointer flex items-center gap-1"
+                                    >
+                                      <Edit3 size={12} /> Edit
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteStaffMember(emp.id, emp.name)}
+                                      className="px-3 py-1 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg font-bold cursor-pointer flex items-center gap-1"
+                                    >
+                                      <Trash2 size={12} /> Delete
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                            <div className="border-t pt-3 mt-3 flex justify-between items-center text-[10px]">
-                              <span>Ratings: ★ {emp.performance?.ratings || '5.0'}</span>
-                              {role === 'Hotel Manager' && (
-                                <div className="flex gap-2">
-                                  <button
-                                    onClick={() => {
-                                      setPendingEditStaff(emp);
-                                      setOtpModal(true);
-                                    }}
-                                    className="text-gray-400 hover:text-gray-600 cursor-pointer"
-                                  >
-                                    Edit
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteStaffMember(emp.id, emp.name)}
-                                    className="text-red-500 hover:text-red-700 cursor-pointer"
-                                  >
-                                    Delete
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>

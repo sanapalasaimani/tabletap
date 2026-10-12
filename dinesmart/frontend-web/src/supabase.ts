@@ -553,19 +553,58 @@ export const db = {
         .from('staff')
         .select('*')
         .order('name');
-      if (!error && data) return data;
+      if (!error && data) {
+        return data.map((emp: any) => ({
+          ...emp,
+          photo: emp.photo || emp.performance?.photo || '',
+          email: emp.email || emp.performance?.email || '',
+          assignedTables: emp.assignedTables || emp.performance?.assignedTables || []
+        }));
+      }
     }
     return getMockData<any[]>('staff', []);
   },
 
   saveStaffMember: async (member: any): Promise<any> => {
+    const perf = {
+      ...(member.performance || { score: 90, ordersDelivered: 0, avgServingTime: 'N/A', ratings: 5.0, tips: 0 }),
+      photo: member.photo || member.performance?.photo || '',
+      email: member.email || member.performance?.email || '',
+      assignedTables: member.assignedTables || member.performance?.assignedTables || []
+    };
+
+    const dbPayload: any = {
+      id: member.id,
+      name: member.name,
+      mobile: member.mobile || '',
+      role: member.role,
+      shift: member.shift || 'Morning',
+      salary: member.salary || 0,
+      attendance: member.attendance || 100,
+      empid: member.empid,
+      password: member.password,
+      performance: perf
+    };
+
     if (isRealSupabase) {
       const { data, error } = await supabaseClient
         .from('staff')
-        .upsert(member)
+        .upsert(dbPayload)
         .select()
         .single();
-      if (!error && data) return data;
+      if (!error && data) {
+        const enriched = {
+          ...data,
+          photo: data.photo || data.performance?.photo || member.photo || '',
+          email: data.email || data.performance?.email || member.email || '',
+          assignedTables: data.assignedTables || data.performance?.assignedTables || member.assignedTables || []
+        };
+        const staff = getMockData<any[]>('staff', []);
+        const idx = staff.findIndex(s => s.id === member.id);
+        if (idx !== -1) staff[idx] = enriched; else staff.push(enriched);
+        saveMockData('staff', staff);
+        return enriched;
+      }
     }
     const staff = getMockData<any[]>('staff', []);
     const idx = staff.findIndex(s => s.id === member.id);
