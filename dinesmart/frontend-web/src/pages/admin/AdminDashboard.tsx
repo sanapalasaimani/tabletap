@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { db } from '../../supabase';
-import { MenuItem, Order, UserProfile, WaiterRequest, PendingStaff } from '../../types';
+import { MenuItem, Order, UserProfile, WaiterRequest } from '../../types';
 import { MENU_ITEMS } from '../../data/menu';
 import { 
   LayoutDashboard, ShoppingBag, ChefHat, Utensils, Layers, Users, 
@@ -41,7 +41,7 @@ interface Employee {
   mobile: string;
   email?: string;
   photo?: string;
-  role: 'Manager' | 'Chef' | 'Waiter' | 'Cashier' | 'Cleaner' | 'Delivery Staff';
+  role: 'Waiter';
   shift: 'Morning' | 'Evening' | 'Night';
   salary: number;
   attendance: number;
@@ -126,7 +126,6 @@ interface ActivityLog {
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }) => {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
-  const [staffSubTab, setStaffSubTab] = useState<'roster' | 'pending'>('roster');
   
   // Real-time Database States
   const [orders, setOrders] = useState<Order[]>([]);
@@ -135,18 +134,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
   const [menuSearchQuery, setMenuSearchQuery] = useState<string>('');
   const [waiterRequests, setWaiterRequests] = useState<WaiterRequest[]>([]);
   const [staff, setStaff] = useState<Employee[]>([]);
-  const [pendingStaffList, setPendingStaffList] = useState<PendingStaff[]>([]);
   const [tables, setTables] = useState<TableStatus[]>([]);
   const [coupons, setCoupons] = useState<any[]>([]);
   const [reviews, setReviews] = useState<any[]>([]);
-  const [waiterFormLink, setWaiterFormLink] = useState(() => localStorage.getItem('waiterFormLink') || 'https://forms.gle/dinesmart-waiter-apply');
-  const [isEditingFormLink, setIsEditingFormLink] = useState(false);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
   
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  // Strictly enforce clean white mode
+  useEffect(() => {
+    document.documentElement.classList.remove('dark');
+    localStorage.removeItem('theme');
+  }, []);
   const [syncTime, setSyncTime] = useState('');
   const [alertSettings, setAlertSettings] = useState<any>({ tax: 5, currency: '₹', gstNo: '27AAAAA1111A1Z1', mapsLocation: '' });
 
@@ -237,36 +238,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
   const [otpInput, setOtpInput] = useState('');
   const [pendingEditStaff, setPendingEditStaff] = useState<Employee | null>(null);
 
-  const [editPendingStaffModal, setEditPendingStaffModal] = useState<PendingStaff | null>(null);
 
-  // Approval Modal State
-  const [approveModalStaff, setApproveModalStaff] = useState<PendingStaff | null>(null);
-  const [approvalForm, setApprovalForm] = useState({
-    role: 'Waiter' as Employee['role'],
-    shift: 'Morning' as Employee['shift'],
-    salary: 18000,
-    empid: '',
-    password: '',
-    assignedTables: [] as number[],
-    stationOrCounter: ''
-  });
-
-  // Admin Manual Register to Pending Queue Modal
-  const [newPendingStaffModal, setNewPendingStaffModal] = useState(false);
-  const [newPendingStaffForm, setNewPendingStaffForm] = useState({
-    name: '',
-    mobile: '',
-    whatsapp: '',
-    email: '',
-    photo: '',
-    role: 'Waiter' as 'Waiter' | 'Chef' | 'Manager' | 'Cashier' | 'Cleaner' | 'Delivery Staff',
-    shift: 'Morning' as 'Morning' | 'Evening' | 'Night',
-    notes: ''
-  });
-
-  // Role Filtering for Staff Roster and Pending Applications
-  const [staffRoleFilter, setStaffRoleFilter] = useState<string>('All');
-  const [pendingRoleFilter, setPendingRoleFilter] = useState<string>('All');
 
   // Form Fields State
   const [menuFormState, setMenuFormState] = useState({
@@ -288,8 +260,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
     mobile: '',
     email: '',
     photo: '',
-    role: 'Waiter' as Employee['role'],
-    shift: 'Morning' as Employee['shift'],
+    role: 'Waiter' as const,
+    shift: 'Morning' as 'Morning' | 'Evening' | 'Night',
     salary: 18000,
     empid: '',
     password: '',
@@ -327,7 +299,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
         dbSettings,
         dbMenu,
         dbStaff,
-        dbPendingStaff,
         dbTables,
         dbRules,
         dbPromotions,
@@ -339,7 +310,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
         db.getSettings(),
         db.getMenuItems(),
         db.getStaff(),
-        db.getPendingStaff(),
         db.getTables(),
         db.getLoyaltyRules(),
         db.getPromotions(),
@@ -352,7 +322,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
       if (dbSettings) setAlertSettings(dbSettings);
       setMenuItems(dbMenu && dbMenu.length > 0 ? dbMenu : MENU_ITEMS);
       setStaff(dbStaff || []);
-      setPendingStaffList(dbPendingStaff || []);
       setTables(dbTables || []);
       if (dbRules) setLoyaltyRules(dbRules);
       setCoupons(dbPromotions || []);
@@ -579,25 +548,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
     logActivity('Updated Loyalty Conversion Rules');
   };
 
-  // Pending Staff Management
-  const handleSavePendingStaff = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (editPendingStaffModal) {
-      await db.updatePendingStaff(editPendingStaffModal);
-      await fetchData();
-      setEditPendingStaffModal(null);
-      logActivity(`Updated pending application for: ${editPendingStaffModal.name}`);
-    }
-  };
-
-  const handleDeletePendingStaff = async (id: string, name: string) => {
-    if (confirm(`WARNING: Are you sure you want to permanently delete the application from "${name}"?`)) {
-      await db.deletePendingStaff(id);
-      await fetchData();
-      logActivity(`Removed pending application: ${name}`);
-    }
-  };
-
   const generateRandomString = (length: number) => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
     let result = '';
@@ -605,91 +555,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
       result += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     return result;
-  };
-
-  // Open Approval Confirmation Modal with Role and Credential Configuration
-  const handleOpenApproveModal = (app: PendingStaff) => {
-    const newEmpId = `EMP-${Math.floor(1000 + Math.random() * 9000)}`;
-    const newPassword = generateRandomString(Math.floor(Math.random() * 3) + 8);
-    setApproveModalStaff(app);
-    setApprovalForm({
-      role: (app.role as Employee['role']) || 'Waiter',
-      shift: (app.shift as Employee['shift']) || 'Morning',
-      salary: 18000,
-      empid: newEmpId,
-      password: newPassword,
-      assignedTables: [],
-      stationOrCounter: ''
-    });
-  };
-
-  // Confirm Approval & Add to Staff
-  const handleConfirmApproval = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!approveModalStaff) return;
-
-    const newEmp: Employee = {
-      id: `s_${Date.now()}`,
-      name: approveModalStaff.name,
-      mobile: approveModalStaff.mobile,
-      email: approveModalStaff.email,
-      photo: approveModalStaff.photo || '',
-      role: approvalForm.role,
-      shift: approvalForm.shift,
-      salary: Number(approvalForm.salary) || 18000,
-      empid: approvalForm.empid,
-      password: approvalForm.password,
-      attendance: 100,
-      performance: { score: 90, ordersDelivered: 0, avgServingTime: 'N/A', ratings: 5.0, tips: 0 },
-      assignedTables: approvalForm.role === 'Waiter' ? approvalForm.assignedTables : [],
-      stationOrCounter: approvalForm.stationOrCounter || ''
-    };
-
-    try {
-      await db.saveStaffMember(newEmp as any);
-      await db.deletePendingStaff(approveModalStaff.id);
-      await fetchData();
-      logActivity(`Approved pending application for ${approveModalStaff.name} as ${approvalForm.role}. Assigned EMP ID: ${approvalForm.empid}`);
-      
-      const subject = encodeURIComponent(`Your DineSmart ${approvalForm.role} Application is Approved!`);
-      const body = encodeURIComponent(`Hello ${approveModalStaff.name},\n\nCongratulations! Your application for ${approvalForm.role} has been approved.\n\nHere are your login credentials for the DineSmart terminal:\nEMP ID: ${approvalForm.empid}\nPassword: ${approvalForm.password}\nRole: ${approvalForm.role}\nShift: ${approvalForm.shift}\n\nWelcome to the DineSmart team!\n\nDineSmart Administration`);
-      window.location.href = `mailto:${approveModalStaff.email}?subject=${subject}&body=${body}`;
-      setApproveModalStaff(null);
-    } catch (e) {
-      alert('Failed to approve application.');
-    }
-  };
-
-  // Direct manual addition to Pending Applications by Admin
-  const handleCreatePendingStaff = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await db.submitPendingStaff({
-        name: newPendingStaffForm.name,
-        mobile: newPendingStaffForm.mobile,
-        whatsapp: newPendingStaffForm.whatsapp || newPendingStaffForm.mobile,
-        email: newPendingStaffForm.email,
-        photo: newPendingStaffForm.photo,
-        role: newPendingStaffForm.role,
-        shift: newPendingStaffForm.shift,
-        notes: newPendingStaffForm.notes
-      });
-      await fetchData();
-      setNewPendingStaffModal(false);
-      setNewPendingStaffForm({
-        name: '',
-        mobile: '',
-        whatsapp: '',
-        email: '',
-        photo: '',
-        role: 'Waiter',
-        shift: 'Morning',
-        notes: ''
-      });
-      logActivity(`Registered applicant to pending queue: ${newPendingStaffForm.name}`);
-    } catch (err) {
-      alert('Failed to register applicant to pending queue.');
-    }
   };
 
   // Staff Management (EmpID & Password checks)
@@ -707,14 +572,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
         mobile: staffFormState.mobile,
         email: staffFormState.email || editingStaff?.email || '',
         photo: staffFormState.photo || editingStaff?.photo || '',
-        role: staffFormState.role,
+        role: 'Waiter',
         shift: staffFormState.shift,
         salary: staffFormState.salary,
         empid: staffFormState.empid,
         password: staffFormState.password,
         attendance: editingStaff ? editingStaff.attendance : 100,
         performance: editingStaff ? editingStaff.performance : { score: 90, ordersDelivered: 0, avgServingTime: 'N/A', ratings: 5.0, tips: 0 },
-        assignedTables: staffFormState.role === 'Waiter' ? staffFormState.assignedTables : [],
+        assignedTables: staffFormState.assignedTables,
         stationOrCounter: staffFormState.stationOrCounter
       };
 
@@ -770,7 +635,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
       role: 'Waiter',
       shift: 'Morning',
       salary: 18000,
-      empid: `EMP${randNum}`,
+      empid: `EMP-${randNum}`,
       password: `pass${Math.floor(1000 + Math.random() * 9000)}`,
       assignedTables: [],
       stationOrCounter: ''
@@ -1071,13 +936,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
   const formatPrice = (amount: number) => `₹${amount.toLocaleString('en-IN')}`;
 
   return (
-    <div className={`flex h-screen overflow-hidden font-sans ${isDarkMode ? 'bg-gray-950 text-gray-100' : 'bg-orange-50/20 text-brand-text'}`}>
+    <div className="flex h-screen overflow-hidden font-sans bg-slate-50 text-brand-text">
       
       {/* 1. SIDEBAR NAVIGATION */}
-      <aside className={`w-64 flex flex-col justify-between flex-shrink-0 z-20 border-r ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-brand-text text-white border-gray-200'}`}>
+      <aside className="w-64 flex flex-col justify-between flex-shrink-0 z-20 border-r bg-brand-text text-white border-slate-200">
         <div>
           {/* Logo Header */}
-          <div className={`p-5 border-b flex items-center gap-3 ${isDarkMode ? 'border-gray-800' : 'border-gray-800/80'}`}>
+          <div className="p-5 border-b flex items-center gap-3 border-gray-800/80">
             <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center text-white shadow-lg shadow-primary/25">
               <ChefHat size={22} />
             </div>
@@ -1138,7 +1003,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                   }`}
                 >
                   <UserCheck size={14} />
-                  <span>Staff Scorecard</span>
+                  <span>Waiter Management</span>
                 </button>
               </nav>
             </div>
@@ -1202,7 +1067,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                   }`}
                 >
                   <Settings size={14} />
-                  <span>Settings & Themes</span>
+                  <span>Restaurant Settings</span>
                 </button>
                 <button
                   onClick={() => setActiveTab('security')}
@@ -1219,7 +1084,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
         </div>
 
         {/* Sidebar Footer Logout */}
-        <div className={`p-4 border-t ${isDarkMode ? 'border-gray-800' : 'border-gray-800/80'}`}>
+        <div className="p-4 border-t border-gray-800/80">
           <div className="flex items-center gap-2 mb-3 px-2">
             <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
             <span className="text-[10px] text-gray-400 font-bold">Role: {role}</span>
@@ -1238,25 +1103,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
       <div className="flex-1 flex flex-col overflow-hidden">
         
         {/* Top Header */}
-        <header className={`border-b p-5 flex justify-between items-center z-10 flex-shrink-0 ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100'}`}>
+        <header className="border-b p-5 flex justify-between items-center z-10 flex-shrink-0 bg-white border-slate-200/80 shadow-xs">
           <div className="flex items-center gap-4">
             <h1 className="text-lg font-black tracking-tight flex items-center gap-2">
               <span>Admin Dashboard</span>
               {loading && <RefreshCw size={14} className="text-primary animate-spin" />}
             </h1>
-            <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider ${isDarkMode ? 'bg-gray-800 text-gray-400' : 'bg-gray-100 text-gray-500'}`}>
+            <span className="text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider bg-slate-100 text-slate-500">
               Sync: {syncTime || 'Just now'}
             </span>
           </div>
 
           <div className="flex items-center gap-4">
-            {/* Dark Mode toggle */}
-            <button
-              onClick={() => setIsDarkMode(!isDarkMode)}
-              className={`p-2 rounded-xl border transition-all ${isDarkMode ? 'bg-gray-800 border-gray-700 text-yellow-400 hover:bg-gray-700' : 'bg-gray-50 border-gray-100 text-gray-600 hover:bg-gray-100'}`}
-            >
-              {isDarkMode ? <Sun size={15} /> : <Moon size={15} />}
-            </button>
+
 
             {/* Logged in User Badge */}
             <div className="flex items-center gap-2 border-l pl-4 border-gray-200">
@@ -1284,7 +1143,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
               
               {/* Primary KPI Cards */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className={`p-4 rounded-3xl border shadow-sm flex items-center justify-between ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-50'}`}>
+                <div className={`p-4 rounded-3xl border shadow-sm flex items-center justify-between bg-white border-gray-50`}>
                   <div>
                     <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Today's Revenue</span>
                     <strong className="text-xl font-black mt-1 block">{formatPrice(getTodayRevenue())}</strong>
@@ -1296,7 +1155,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                   <div className="w-10 h-10 bg-green-50 text-green-500 rounded-2xl flex items-center justify-center"><DollarSign size={18} /></div>
                 </div>
 
-                <div className={`p-4 rounded-3xl border shadow-sm flex items-center justify-between ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-50'}`}>
+                <div className={`p-4 rounded-3xl border shadow-sm flex items-center justify-between bg-white border-gray-50`}>
                   <div>
                     <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Total Orders</span>
                     <strong className="text-xl font-black mt-1 block">{orders.length}</strong>
@@ -1307,7 +1166,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                   <div className="w-10 h-10 bg-blue-50 text-blue-500 rounded-2xl flex items-center justify-center"><ShoppingBag size={18} /></div>
                 </div>
 
-                <div className={`p-4 rounded-3xl border shadow-sm flex items-center justify-between ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-50'}`}>
+                <div className={`p-4 rounded-3xl border shadow-sm flex items-center justify-between bg-white border-gray-50`}>
                   <div>
                     <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Repeat Customers</span>
                     <strong className="text-xl font-black mt-1 block">0%</strong>
@@ -1318,7 +1177,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                   <div className="w-10 h-10 bg-orange-50 text-orange-500 rounded-2xl flex items-center justify-center"><Users size={18} /></div>
                 </div>
 
-                <div className={`p-4 rounded-3xl border shadow-sm flex items-center justify-between ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-50'}`}>
+                <div className={`p-4 rounded-3xl border shadow-sm flex items-center justify-between bg-white border-gray-50`}>
                   <div>
                     <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Avg Spend / Visit</span>
                     <strong className="text-xl font-black mt-1 block">{formatPrice(getAverageOrderValue())}</strong>
@@ -1332,7 +1191,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
 
               {/* Secondary KPI Cards */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className={`p-4 rounded-3xl border shadow-sm flex items-center justify-between ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-50'}`}>
+                <div className={`p-4 rounded-3xl border shadow-sm flex items-center justify-between bg-white border-gray-50`}>
                   <div>
                     <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">New Customers</span>
                     <strong className="text-xl font-black mt-1 block">{orders.length > 0 ? '100%' : '0%'}</strong>
@@ -1343,7 +1202,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                   <div className="w-10 h-10 bg-indigo-50 text-indigo-500 rounded-2xl flex items-center justify-center"><UserPlus size={18} /></div>
                 </div>
                 
-                <div className={`p-4 rounded-3xl border shadow-sm flex items-center justify-between ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-50'}`}>
+                <div className={`p-4 rounded-3xl border shadow-sm flex items-center justify-between bg-white border-gray-50`}>
                   <div>
                     <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Satisfaction Score</span>
                     <strong className="text-xl font-black mt-1 block flex items-center gap-1">
@@ -1357,7 +1216,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                   <div className="w-10 h-10 bg-yellow-50 text-yellow-500 rounded-2xl flex items-center justify-center"><Star size={18} /></div>
                 </div>
 
-                <div className={`p-4 rounded-3xl border shadow-sm flex items-center justify-between ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-50'}`}>
+                <div className={`p-4 rounded-3xl border shadow-sm flex items-center justify-between bg-white border-gray-50`}>
                   <div>
                     <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Kitchen Queue</span>
                     <strong className="text-xl font-black mt-1 block">
@@ -1370,7 +1229,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                   <div className="w-10 h-10 bg-orange-50 text-orange-500 rounded-2xl flex items-center justify-center"><ChefHat size={18} /></div>
                 </div>
                 
-                <div className={`p-4 rounded-3xl border shadow-sm flex items-center justify-between ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-50'}`}>
+                <div className={`p-4 rounded-3xl border shadow-sm flex items-center justify-between bg-white border-gray-50`}>
                   <div>
                     <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Live Floor</span>
                     <strong className="text-xl font-black mt-1 block">
@@ -1386,7 +1245,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
 
               {/* Data Visualization Row 1 */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className={`col-span-2 p-6 rounded-3xl border shadow-sm ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-50'}`}>
+                <div className={`col-span-2 p-6 rounded-3xl border shadow-sm bg-white border-gray-50`}>
                   <div className="flex justify-between items-start mb-6">
                     <div>
                       <h3 className="font-extrabold text-brand-text">Weekly Revenue</h3>
@@ -1408,7 +1267,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                       <BarChart data={weeklyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                         <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9ca3af' }} dy={10} />
                         <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9ca3af' }} tickFormatter={(val) => `₹${val}`} />
-                        <Tooltip cursor={{ fill: isDarkMode ? '#1f2937' : '#f3f4f6' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }} />
+                        <Tooltip cursor={{ fill: '#f3f4f6' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }} />
                         <Bar dataKey="revenue" fill="#f97316" radius={[6, 6, 6, 6]} barSize={24} />
                       </BarChart>
                     </ResponsiveContainer>
@@ -1423,7 +1282,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                   </div>
                 </div>
 
-                <div className={`p-6 rounded-3xl border shadow-sm flex flex-col ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-50'}`}>
+                <div className={`p-6 rounded-3xl border shadow-sm flex flex-col bg-white border-gray-50`}>
                   <div className="flex justify-between items-start mb-6">
                     <div>
                       <h3 className="font-extrabold text-brand-text">Revenue by Category</h3>
@@ -1473,7 +1332,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
 
               {/* Data Visualization Row 2 */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className={`p-6 rounded-3xl border shadow-sm ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-50'}`}>
+                <div className={`p-6 rounded-3xl border shadow-sm bg-white border-gray-50`}>
                   <div className="flex justify-between items-start mb-6">
                     <div>
                       <h3 className="font-extrabold text-brand-text">Top Selling Dishes</h3>
@@ -1505,7 +1364,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                   </div>
                 </div>
 
-                <div className={`p-6 rounded-3xl border shadow-sm ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-50'}`}>
+                <div className={`p-6 rounded-3xl border shadow-sm bg-white border-gray-50`}>
                   <div className="flex justify-between items-start mb-6">
                     <div>
                       <h3 className="font-extrabold text-brand-text">Peak Business Hours</h3>
@@ -1517,7 +1376,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                       <BarChart data={hourlyData} layout="vertical" margin={{ top: 0, right: 10, left: 10, bottom: 0 }}>
                         <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9ca3af' }} />
                         <YAxis dataKey="hour" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9ca3af' }} />
-                        <Tooltip cursor={{ fill: isDarkMode ? '#1f2937' : '#f3f4f6' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }} />
+                        <Tooltip cursor={{ fill: '#f3f4f6' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }} />
                         <Bar dataKey="orders" fill="#f97316" radius={[0, 4, 4, 0]} barSize={16} />
                       </BarChart>
                     </ResponsiveContainer>
@@ -1526,7 +1385,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
               </div>
 
               {/* Data Visualization Row 3 */}
-              <div className={`p-6 rounded-3xl border shadow-sm ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-50'}`}>
+              <div className={`p-6 rounded-3xl border shadow-sm bg-white border-gray-50`}>
                 <div className="flex justify-between items-start mb-6">
                   <div>
                     <h3 className="font-extrabold text-brand-text">Revenue Overview</h3>
@@ -1552,7 +1411,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
               </div>
 
               {/* AI Business Insights Integrated */}
-              <div className={`p-6 rounded-3xl border shadow-sm ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-orange-50/30 border-orange-100'}`}>
+              <div className={`p-6 rounded-3xl border shadow-sm bg-orange-50/30 border-orange-100`}>
                 <div className="flex items-center gap-3 mb-6">
                   <div className="w-10 h-10 bg-orange-500 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/20">
                     <Sparkles size={20} />
@@ -1564,25 +1423,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                  <div className={`p-4 rounded-2xl ${isDarkMode ? 'bg-green-900/20 text-green-100' : 'bg-green-50 border border-green-100 text-green-900'}`}>
+                  <div className={`p-4 rounded-2xl bg-green-50 border border-green-100 text-green-900`}>
                     <TrendingUp size={16} className="mb-2 text-green-500" />
                     <p className="text-xs font-semibold leading-relaxed">Revenue increased by 12.4% compared to yesterday — driven by high Biryani orders.</p>
                   </div>
-                  <div className={`p-4 rounded-2xl ${isDarkMode ? 'bg-orange-900/20 text-orange-100' : 'bg-orange-50 border border-orange-100 text-orange-900'}`}>
+                  <div className={`p-4 rounded-2xl bg-orange-50 border border-orange-100 text-orange-900`}>
                     <Star size={16} className="mb-2 text-orange-500" />
                     <p className="text-xs font-semibold leading-relaxed">Chicken Dum Biryani generated the highest revenue today with ₹35,400.</p>
                   </div>
-                  <div className={`p-4 rounded-2xl ${isDarkMode ? 'bg-blue-900/20 text-blue-100' : 'bg-blue-50 border border-blue-100 text-blue-900'}`}>
+                  <div className={`p-4 rounded-2xl bg-blue-50 border border-blue-100 text-blue-900`}>
                     <Clock size={16} className="mb-2 text-blue-500" />
                     <p className="text-xs font-semibold leading-relaxed">Friday evening (7-9 PM) is the busiest business period with 310 orders.</p>
                   </div>
-                  <div className={`p-4 rounded-2xl ${isDarkMode ? 'bg-purple-900/20 text-purple-100' : 'bg-purple-50 border border-purple-100 text-purple-900'}`}>
+                  <div className={`p-4 rounded-2xl bg-purple-50 border border-purple-100 text-purple-900`}>
                     <CreditCard size={16} className="mb-2 text-purple-500" />
                     <p className="text-xs font-semibold leading-relaxed">UPI is the most preferred payment method — 48% of all transactions today.</p>
                   </div>
                 </div>
 
-                <div className={`p-5 rounded-2xl border flex items-center justify-between mb-4 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-orange-100/50 border-orange-200'}`}>
+                <div className={`p-5 rounded-2xl border flex items-center justify-between mb-4 bg-orange-100/50 border-orange-200`}>
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 bg-orange-500 text-white rounded-xl flex items-center justify-center"><TrendingUp size={24} /></div>
                     <div>
@@ -1598,23 +1457,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                 <div>
                   <h4 className="text-xs font-extrabold text-gray-500 uppercase tracking-wider mb-3">AI Recommendations</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div className={`p-4 rounded-xl border text-xs font-semibold flex items-center gap-3 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
+                    <div className={`p-4 rounded-xl border text-xs font-semibold flex items-center gap-3 bg-white border-gray-100`}>
                       <span className="text-lg">📦</span> Increase Chicken stock before evening rush
                     </div>
-                    <div className={`p-4 rounded-xl border text-xs font-semibold flex items-center gap-3 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
+                    <div className={`p-4 rounded-xl border text-xs font-semibold flex items-center gap-3 bg-white border-gray-100`}>
                       <span className="text-lg">🧃</span> Launch beverage combo to boost drink sales
                     </div>
-                    <div className={`p-4 rounded-xl border text-xs font-semibold flex items-center gap-3 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
+                    <div className={`p-4 rounded-xl border text-xs font-semibold flex items-center gap-3 bg-white border-gray-100`}>
                       <span className="text-lg">🍮</span> Promote desserts after 7 PM via QR table menu
                     </div>
-                    <div className={`p-4 rounded-xl border text-xs font-semibold flex items-center gap-3 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
+                    <div className={`p-4 rounded-xl border text-xs font-semibold flex items-center gap-3 bg-white border-gray-100`}>
                       <span className="text-lg">⚡</span> Optimize kitchen efficiency during 1 PM & 8 PM peak
                     </div>
                   </div>
                 </div>
 
                 {/* 🤖 MACHINE LEARNING MODEL INTELLIGENCE (TRAINED ON 23,708 ORDERS) */}
-                <div className={`mt-6 pt-6 border-t ${isDarkMode ? 'border-gray-800' : 'border-gray-100'}`}>
+                <div className={`mt-6 pt-6 border-t border-gray-100`}>
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-4">
                     <div>
                       <div className="flex items-center gap-2">
@@ -1644,9 +1503,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                   </div>
 
                   {/* Best in Hotel ML Table */}
-                  <div className="overflow-x-auto no-scrollbar rounded-2xl border border-gray-100 dark:border-gray-800">
+                  <div className="overflow-x-auto no-scrollbar rounded-2xl border border-gray-100 ">
                     <table className="w-full text-left text-xs">
-                      <thead className={`text-[10px] uppercase font-extrabold tracking-wider ${isDarkMode ? 'bg-gray-800 text-gray-400' : 'bg-gray-50 text-gray-500'}`}>
+                      <thead className={`text-[10px] uppercase font-extrabold tracking-wider bg-gray-50 text-gray-500`}>
                         <tr>
                           <th className="py-2.5 px-3">Rank & Dish</th>
                           <th className="py-2.5 px-3">Category</th>
@@ -1702,8 +1561,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
               {/* ----------------------------------------------------
                   LIVE KITCHEN MONITORING & DISH QUEUE (INTEGRATED IN OVERVIEW)
                   ---------------------------------------------------- */}
-              <div className={`p-6 rounded-3xl border shadow-sm space-y-6 ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-50'}`}>
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-gray-100 dark:border-gray-800 pb-4">
+              <div className={`p-6 rounded-3xl border shadow-sm space-y-6 bg-white border-gray-50`}>
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-gray-100  pb-4">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-orange-500/10 text-orange-500 rounded-2xl flex items-center justify-center font-bold">
                       <ChefHat size={20} />
@@ -1730,7 +1589,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
 
                 {/* Live Kitchen Metric Counters */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div className={`p-3.5 rounded-2xl border ${isDarkMode ? 'bg-gray-800/60 border-gray-700' : 'bg-orange-50/50 border-orange-100'}`}>
+                  <div className={`p-3.5 rounded-2xl border bg-orange-50/50 border-orange-100`}>
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Active Cooking</span>
                     <div className="flex items-baseline gap-1 mt-1">
                       <span className="text-xl font-black text-orange-500">
@@ -1739,7 +1598,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                       <span className="text-[10px] text-gray-400 font-semibold">orders</span>
                     </div>
                   </div>
-                  <div className={`p-3.5 rounded-2xl border ${isDarkMode ? 'bg-gray-800/60 border-gray-700' : 'bg-blue-50/50 border-blue-100'}`}>
+                  <div className={`p-3.5 rounded-2xl border bg-blue-50/50 border-blue-100`}>
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Ready to Serve</span>
                     <div className="flex items-baseline gap-1 mt-1">
                       <span className="text-xl font-black text-blue-500">
@@ -1748,28 +1607,28 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                       <span className="text-[10px] text-gray-400 font-semibold">dishes</span>
                     </div>
                   </div>
-                  <div className={`p-3.5 rounded-2xl border ${isDarkMode ? 'bg-gray-800/60 border-gray-700' : 'bg-green-50/50 border-green-100'}`}>
+                  <div className={`p-3.5 rounded-2xl border bg-green-50/50 border-green-100`}>
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Avg Prep Time</span>
                     <div className="flex items-baseline gap-1 mt-1">
                       <span className="text-xl font-black text-green-500">14.2</span>
                       <span className="text-[10px] text-gray-400 font-semibold">mins (Target: &lt;18m)</span>
                     </div>
                   </div>
-                  <div className={`p-3.5 rounded-2xl border ${isDarkMode ? 'bg-gray-800/60 border-gray-700' : 'bg-purple-50/50 border-purple-100'}`}>
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Chefs On Duty</span>
+                  <div className="p-3.5 rounded-2xl border bg-purple-50/50 border-purple-100">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Kitchen Stations</span>
                     <div className="flex items-baseline gap-1 mt-1">
                       <span className="text-xl font-black text-purple-500">
-                        {staff.filter(s => s.role === 'Chef').length || 3}
+                        3
                       </span>
                       <span className="text-[10px] text-gray-400 font-semibold">active stations</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Dual Column: Active Cooking Orders Queue + Chef Staff Assignments */}
+                {/* Dual Column: Active Cooking Orders Queue + Kitchen Station Status */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                   {/* Left: Active Kitchen Order Tickets */}
-                  <div className={`p-4 rounded-2xl border ${isDarkMode ? 'bg-gray-800/40 border-gray-700' : 'bg-gray-50/70 border-gray-200'}`}>
+                  <div className="p-4 rounded-2xl border bg-gray-50/70 border-gray-200">
                     <div className="flex items-center justify-between mb-3">
                       <h4 className="font-extrabold text-xs text-brand-text flex items-center gap-2">
                         <span>🍳 Live Ticket Queue</span>
@@ -1794,9 +1653,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                           .map(order => (
                             <div
                               key={order.id}
-                              className={`p-3 rounded-xl border transition-all ${
-                                isDarkMode ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200 shadow-sm'
-                              }`}
+                              className="p-3 rounded-xl border transition-all bg-white border-gray-200 shadow-sm"
                             >
                               <div className="flex items-center justify-between mb-1.5">
                                 <div className="flex items-center gap-2">
@@ -1808,16 +1665,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                                 <span
                                   className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
                                     order.status === 'Ready to Serve'
-                                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
+                                      ? 'bg-blue-100 text-blue-700'
                                       : order.status === 'Cooking'
-                                      ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300 animate-pulse'
-                                      : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300'
+                                      ? 'bg-orange-100 text-orange-700 animate-pulse'
+                                      : 'bg-yellow-100 text-yellow-700'
                                   }`}
                                 >
                                   {order.status}
                                 </span>
                               </div>
-                              <div className="text-[11px] font-semibold text-gray-700 dark:text-gray-300 space-y-0.5">
+                              <div className="text-[11px] font-semibold text-gray-700 space-y-0.5">
                                 {order.items.map((it, idx) => (
                                   <div key={idx} className="flex justify-between">
                                     <span>{it.quantity}x {it.name}</span>
@@ -1835,55 +1692,36 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                     </div>
                   </div>
 
-                  {/* Right: Kitchen Staff Assignments & Performance */}
-                  <div className={`p-4 rounded-2xl border ${isDarkMode ? 'bg-gray-800/40 border-gray-700' : 'bg-gray-50/70 border-gray-200'}`}>
+                  {/* Right: Kitchen Station Status */}
+                  <div className="p-4 rounded-2xl border bg-gray-50/70 border-gray-200">
                     <div className="flex items-center justify-between mb-3">
                       <h4 className="font-extrabold text-xs text-brand-text flex items-center gap-2">
-                        <span>👨‍🍳 Kitchen Staff Assignments</span>
+                        <span>👨‍🍳 Active Kitchen Stations</span>
                         <span className="bg-blue-500 text-white text-[9px] px-1.5 py-0.5 rounded-full font-black">
-                          {staff.filter(s => s.role === 'Chef').length}
+                          3
                         </span>
                       </h4>
                       <span className="text-[10px] text-gray-400 font-medium">Station Workloads</span>
                     </div>
 
                     <div className="space-y-2.5 max-h-72 overflow-y-auto no-scrollbar pr-1">
-                      {staff.filter(s => s.role === 'Chef').length === 0 ? (
-                        <div className="space-y-2">
-                          {[
-                            { name: 'Chef Suresh Rao', station: 'Main Course & Biryani', shift: 'Morning', orders: 42 },
-                            { name: 'Chef Priya Sen', station: 'Starters & Tandoor', shift: 'Morning', orders: 38 },
-                            { name: 'Chef Rajesh Nair', station: 'Breads & Desserts', shift: 'Evening', orders: 29 },
-                          ].map((mockChef, i) => (
-                            <div key={i} className={`p-2.5 rounded-xl border flex justify-between items-center ${isDarkMode ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'}`}>
-                              <div>
-                                <p className="font-bold text-xs">{mockChef.name}</p>
-                                <p className="text-[9px] text-gray-400">{mockChef.station} • {mockChef.shift} Shift</p>
-                              </div>
-                              <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 font-bold text-[9px] dark:bg-blue-900/30 dark:text-blue-300">
-                                {mockChef.orders} Orders
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        staff.filter(s => s.role === 'Chef').map(chef => (
-                          <div
-                            key={chef.id}
-                            className={`p-2.5 rounded-xl border flex justify-between items-center ${
-                              isDarkMode ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200 shadow-sm'
-                            }`}
-                          >
+                      <div className="space-y-2">
+                        {[
+                          { name: 'Station 1: Curry & Gravies', station: 'Main Course & Biryani', shift: 'Morning', orders: 42 },
+                          { name: 'Station 2: Starters & Tandoor', station: 'Kebabs, Grills & Appetizers', shift: 'Morning', orders: 38 },
+                          { name: 'Station 3: Breads & Beverages', station: 'Naan, Rotis, Desserts', shift: 'Evening', orders: 29 },
+                        ].map((mockStation, i) => (
+                          <div key={i} className="p-2.5 rounded-xl border flex justify-between items-center bg-white border-gray-200 shadow-xs">
                             <div>
-                              <p className="font-bold text-xs">{chef.name}</p>
-                              <p className="text-[9px] text-gray-400">Prep Station • {chef.shift} Shift</p>
+                              <p className="font-bold text-xs">{mockStation.name}</p>
+                              <p className="text-[9px] text-gray-400">{mockStation.station} • {mockStation.shift} Shift</p>
                             </div>
-                            <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 font-bold text-[9px] dark:bg-blue-900/30 dark:text-blue-300">
-                              {chef.performance.ordersDelivered} Orders
+                            <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 font-bold text-[9px]">
+                              {mockStation.orders} Orders
                             </span>
                           </div>
-                        ))
-                      )}
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1982,7 +1820,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                         className={`text-xs px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
                           menuFilterCategory === cat 
                             ? 'bg-primary text-white shadow-sm' 
-                            : 'bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-black dark:hover:text-white'
+                            : 'bg-gray-100  text-gray-500 hover:text-black dark:hover:text-white'
                         }`}
                       >
                         {cat}
@@ -2013,7 +1851,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                 {/* Form Modal with Direct Image URL Open Link */}
                 {newMenuItemForm && createPortal(
                   <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
-                    <div className={`relative my-auto w-full max-w-lg rounded-3xl p-6 shadow-2xl ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'} max-h-[90vh] overflow-y-auto`}>
+                    <div className={`relative my-auto w-full max-w-lg rounded-3xl p-6 shadow-2xl bg-white text-gray-900 max-h-[90vh] overflow-y-auto`}>
                       <div className="flex justify-between items-center mb-4 pb-3 border-b">
                         <h4 className="font-extrabold text-sm">{editingMenuItem ? 'Edit Menu Item' : 'Create New Menu Item'}</h4>
                         <button onClick={() => setNewMenuItemForm(false)} className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer">
@@ -2071,7 +1909,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                             )}
                           </div>
                           {menuFormState.image && (
-                            <div className="mt-2.5 flex items-center gap-3 p-2 border rounded-xl bg-gray-50 dark:bg-gray-800/50">
+                            <div className="mt-2.5 flex items-center gap-3 p-2 border rounded-xl bg-gray-50 /50">
                               <img 
                                 src={menuFormState.image} 
                                 alt="Preview" 
@@ -2081,7 +1919,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                                 }}
                               />
                               <div className="text-[11px] overflow-hidden">
-                                <p className="font-bold text-gray-600 dark:text-gray-300">Live Preview Thumbnail</p>
+                                <p className="font-bold text-gray-600 ">Live Preview Thumbnail</p>
                                 <a 
                                   href={menuFormState.image} 
                                   target="_blank" 
@@ -2182,7 +2020,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
 
                 {/* Menu Grid with Direct Openable Image Links */}
                 {filteredDishes.length === 0 ? (
-                  <div className="text-center py-16 border rounded-3xl bg-gray-50/50 dark:bg-gray-800/30">
+                  <div className="text-center py-16 border rounded-3xl bg-gray-50/50 /30">
                     <p className="text-sm font-bold text-gray-400">No dishes found matching your search filter.</p>
                     <button 
                       onClick={() => { setMenuFilterCategory('All'); setMenuSearchQuery(''); }}
@@ -2197,12 +2035,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                       <div 
                         key={item.id}
                         className={`p-4 rounded-3xl border shadow-sm flex flex-col justify-between transition-all hover:shadow-md ${
-                          isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100'
+                          'bg-white border-gray-100'
                         }`}
                       >
                         <div>
                           {/* Image Container with Direct Link Overlay and Badge */}
-                          <div className="relative group overflow-hidden rounded-2xl mb-3 bg-gray-100 dark:bg-gray-800 h-36">
+                          <div className="relative group overflow-hidden rounded-2xl mb-3 bg-gray-100  h-36">
                             <img 
                               src={item.image} 
                               alt={item.name} 
@@ -2254,12 +2092,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
 
                           {/* Item Details */}
                           <div className="flex justify-between items-start mb-1">
-                            <h4 className="font-extrabold text-xs text-gray-900 dark:text-white line-clamp-1">{item.name}</h4>
+                            <h4 className="font-extrabold text-xs text-gray-900  line-clamp-1">{item.name}</h4>
                             <span className="font-extrabold text-primary text-xs whitespace-nowrap ml-2">{formatPrice(item.price)}</span>
                           </div>
 
                           <div className="flex items-center gap-2 mb-2 text-[10px] text-gray-400 font-semibold">
-                            <span className="bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-md">{item.category}</span>
+                            <span className="bg-gray-100  px-2 py-0.5 rounded-md">{item.category}</span>
                             {item.prepTime && <span>⏳ {item.prepTime}</span>}
                             {item.calories && <span>🔥 {item.calories} kcal</span>}
                           </div>
@@ -2327,599 +2165,258 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
 
 
           {/* ----------------------------------------------------
-              VIEW 6: STAFF SCORECARD
-              ---------------------------------------------------- */}
-          {/* ----------------------------------------------------
-              VIEW 6: STAFF MANAGEMENT & ONBOARDING
+              VIEW 6: WAITER STAFF MANAGEMENT
               ---------------------------------------------------- */}
           {activeTab === 'staff' && (
-            <div className="space-y-6 animate-fade-in">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b pb-4">
+            <div className="space-y-6 animate-fade-in font-sans">
+              {/* Header Action Bar */}
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs">
                 <div>
-                  <h3 className="font-extrabold text-base flex items-center gap-2">
-                    <UserCheck size={18} className="text-primary" />
-                    <span>Staff Management & Operations</span>
-                  </h3>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    Manage active staff roster, credentials, routing, and pending candidate applications.
-                  </p>
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-10 h-10 rounded-2xl bg-orange-50 text-primary flex items-center justify-center font-bold">
+                      <Users size={20} />
+                    </div>
+                    <div>
+                      <h3 className="font-black text-lg text-slate-900 tracking-tight">
+                        Waiter Staff Management
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Manage waiter accounts, terminal login credentials, and table assignments. Direct manual entries only.
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                
-                {/* SUB-TABS */}
-                <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-2xl shrink-0">
-                  <button 
-                    onClick={() => setStaffSubTab('roster')} 
-                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                      staffSubTab === 'roster' 
-                        ? 'bg-white dark:bg-gray-900 shadow-sm text-primary dark:text-orange-400 font-extrabold' 
-                        : 'text-gray-500 hover:text-gray-900 dark:hover:text-gray-200'
-                    }`}
-                  >
-                    <Users size={14} />
-                    <span>Active Roster</span>
-                    <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold">
-                      {staff.length}
-                    </span>
-                  </button>
 
-                  <button 
-                    onClick={() => setStaffSubTab('pending')} 
-                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                      staffSubTab === 'pending' 
-                        ? 'bg-white dark:bg-gray-900 shadow-sm text-primary dark:text-orange-400 font-extrabold' 
-                        : 'text-gray-500 hover:text-gray-900 dark:hover:text-gray-200'
-                    }`}
+                <div className="flex items-center gap-2.5 shrink-0">
+                  <button
+                    onClick={fetchData}
+                    className="p-2.5 border border-slate-200 text-slate-600 hover:text-primary hover:border-orange-300 rounded-2xl cursor-pointer bg-slate-50/70 hover:bg-white transition-all shadow-xs"
+                    title="Refresh Waiters from database"
                   >
-                    <Clock size={14} />
-                    <span>Pending Applications</span>
-                    {pendingStaffList.length > 0 ? (
-                      <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.2 rounded-full font-black animate-pulse">
-                        {pendingStaffList.length}
-                      </span>
-                    ) : (
-                      <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold">0</span>
-                    )}
+                    <RefreshCw size={15} />
+                  </button>
+                  
+                  <button
+                    onClick={handleOpenAddStaff}
+                    className="bg-primary hover:bg-orange-600 text-white text-xs font-black px-5 py-2.5 rounded-2xl transition-all flex items-center gap-2 cursor-pointer shadow-sm hover:shadow-md"
+                  >
+                    <Plus size={16} />
+                    <span>+ Add Waiter</span>
                   </button>
                 </div>
               </div>
 
-              {/* ATTENTION BANNER WHEN PENDING APPLICATIONS EXIST */}
-              {pendingStaffList.length > 0 && staffSubTab === 'roster' && (
-                <div className="p-3.5 bg-gradient-to-r from-orange-500/10 via-amber-500/10 to-transparent border border-orange-200 dark:border-orange-900/50 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
-                  <div className="flex items-center gap-3">
-                    <span className="relative flex h-3 w-3">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-3 w-3 bg-orange-500"></span>
-                    </span>
-                    <div>
-                      <p className="text-xs font-bold text-orange-950 dark:text-orange-200">
-                        {pendingStaffList.length} New Candidate Application{pendingStaffList.length > 1 ? 's' : ''} Awaiting Review
-                      </p>
-                      <p className="text-[10px] text-orange-800/80 dark:text-orange-300/70">
-                        Candidates have applied for Waiter, Kitchen, or Staff roles. Click to review, assign credentials, or approve.
-                      </p>
-                    </div>
+              {/* Roster Quick KPI Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="bg-white p-4 rounded-3xl border border-slate-200/80 shadow-xs">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Total Waiters</span>
+                  <strong className="text-2xl font-black text-slate-900 mt-1 block">{staff.length}</strong>
+                  <span className="text-[10px] text-emerald-600 font-bold mt-1 inline-block">● Active on Floor</span>
+                </div>
+
+                <div className="bg-white p-4 rounded-3xl border border-slate-200/80 shadow-xs">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Morning Shift</span>
+                  <strong className="text-2xl font-black text-slate-900 mt-1 block">
+                    {staff.filter(s => s.shift === 'Morning').length}
+                  </strong>
+                  <span className="text-[10px] text-amber-600 font-bold mt-1 inline-block">☀️ 08:00 AM - 04:00 PM</span>
+                </div>
+
+                <div className="bg-white p-4 rounded-3xl border border-slate-200/80 shadow-xs">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Evening Shift</span>
+                  <strong className="text-2xl font-black text-slate-900 mt-1 block">
+                    {staff.filter(s => s.shift === 'Evening').length}
+                  </strong>
+                  <span className="text-[10px] text-orange-600 font-bold mt-1 inline-block">🌆 04:00 PM - 11:00 PM</span>
+                </div>
+
+                <div className="bg-white p-4 rounded-3xl border border-slate-200/80 shadow-xs">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Night Shift</span>
+                  <strong className="text-2xl font-black text-slate-900 mt-1 block">
+                    {staff.filter(s => s.shift === 'Night').length}
+                  </strong>
+                  <span className="text-[10px] text-purple-600 font-bold mt-1 inline-block">🌙 11:00 PM - Close</span>
+                </div>
+              </div>
+
+              {/* Waiter Roster Cards Grid */}
+              {staff.length === 0 ? (
+                <div className="text-center py-16 px-6 bg-white rounded-3xl border border-dashed border-slate-200">
+                  <div className="w-16 h-16 rounded-3xl bg-orange-50 text-primary mx-auto flex items-center justify-center mb-4 shadow-xs">
+                    <Users size={28} />
                   </div>
+                  <h4 className="font-black text-base text-slate-900">No Waiters Registered</h4>
+                  <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+                    There are currently no waiters on the roster. Add your waiters manually with direct terminal login credentials.
+                  </p>
                   <button
-                    onClick={() => setStaffSubTab('pending')}
-                    className="px-3.5 py-1.5 bg-primary hover:bg-orange-600 text-white text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer shrink-0"
+                    onClick={handleOpenAddStaff}
+                    className="mt-5 inline-flex items-center gap-2 px-5 py-2.5 bg-primary text-white text-xs font-black rounded-2xl hover:bg-orange-600 transition-all cursor-pointer shadow-sm"
                   >
-                    Review Pending Apps →
+                    <Plus size={15} />
+                    <span>Add First Waiter</span>
                   </button>
                 </div>
-              )}
-
-              {/* ---------------- SUB-TAB 1: PENDING APPLICATIONS ---------------- */}
-              {staffSubTab === 'pending' && (
-                <div className="space-y-4">
-                  {/* Action Bar */}
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white dark:bg-gray-900 p-4 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-xs">
-                    <div>
-                      <h4 className="font-extrabold text-sm flex items-center gap-2">
-                        <span>Candidate Applications</span>
-                        <span className="bg-orange-100 dark:bg-orange-950 text-orange-700 dark:text-orange-300 text-[10px] px-2 py-0.5 rounded-full font-bold">
-                          {pendingStaffList.length} Pending
-                        </span>
-                      </h4>
-                      <p className="text-[10px] text-gray-400 mt-0.5">
-                        Submitted directly from Waiter login portal or Google Form. Approving generates login credentials.
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setNewPendingStaffModal(true)}
-                        className="bg-primary hover:bg-orange-600 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {staff.map(emp => {
+                    const showPw = revealedPasswords[emp.id];
+                    return (
+                      <div 
+                        key={emp.id} 
+                        className="p-5 rounded-3xl border border-slate-200/80 bg-white shadow-xs hover:shadow-md transition-all flex flex-col justify-between"
                       >
-                        <UserPlus size={14} />
-                        <span>+ Add Applicant</span>
-                      </button>
-
-                      <button
-                        onClick={fetchData}
-                        className="p-2 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:text-primary rounded-xl cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                        title="Refresh applications from database"
-                      >
-                        <RefreshCw size={14} />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Role Filter Pills */}
-                  <div className="flex gap-1.5 overflow-x-auto pb-1 items-center">
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mr-1">Filter Role:</span>
-                    {['All', 'Waiter', 'Chef', 'Manager', 'Cashier', 'Cleaner', 'Delivery Staff'].map((r) => {
-                      const count = r === 'All' 
-                        ? pendingStaffList.length 
-                        : pendingStaffList.filter(s => (s.role || 'Waiter') === r).length;
-                      return (
-                        <button
-                          key={r}
-                          onClick={() => setPendingRoleFilter(r)}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
-                            pendingRoleFilter === r
-                              ? 'bg-primary text-white shadow-xs'
-                              : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:border-orange-300'
-                          }`}
-                        >
-                          {r} ({count})
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* Applications List */}
-                  {pendingStaffList.length === 0 ? (
-                    <div className="text-center py-12 px-4 bg-white dark:bg-gray-900 rounded-3xl border border-dashed border-gray-200 dark:border-gray-800">
-                      <div className="w-12 h-12 rounded-full bg-orange-50 dark:bg-orange-950/40 text-orange-500 mx-auto flex items-center justify-center mb-3">
-                        <Clock size={22} />
-                      </div>
-                      <h4 className="font-extrabold text-sm text-gray-800 dark:text-gray-200">No Pending Applications</h4>
-                      <p className="text-xs text-gray-400 mt-1 max-w-sm mx-auto">
-                        There are currently no staff candidates waiting for approval. New applicants who apply via the Waiter portal or walk-in candidates added via "+ Add Applicant" will appear here.
-                      </p>
-                      <button
-                        onClick={() => setNewPendingStaffModal(true)}
-                        className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-white text-xs font-bold rounded-xl hover:bg-orange-600 transition-all cursor-pointer shadow-xs"
-                      >
-                        <UserPlus size={13} />
-                        <span>Register Walk-in Candidate</span>
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="bg-white dark:bg-gray-900 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs">
-                          <thead>
-                            <tr className="text-gray-400 border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/40">
-                              <th className="py-3 px-4 font-bold">Candidate</th>
-                              <th className="py-3 px-3 font-bold">Applied Role</th>
-                              <th className="py-3 px-3 font-bold">Shift Preference</th>
-                              <th className="py-3 px-3 font-bold">Contact (Phone / WhatsApp)</th>
-                              <th className="py-3 px-3 font-bold">Email</th>
-                              <th className="py-3 px-3 font-bold">Notes</th>
-                              <th className="py-3 px-4 font-bold text-right">Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-100 dark:divide-gray-800 font-semibold">
-                            {pendingStaffList
-                              .filter(app => pendingRoleFilter === 'All' || (app.role || 'Waiter') === pendingRoleFilter)
-                              .map((app) => (
-                                <tr key={app.id} className="hover:bg-gray-50/80 dark:hover:bg-gray-800/50 transition-colors">
-                                  {/* Candidate */}
-                                  <td className="py-3.5 px-4">
-                                    <div className="flex items-center gap-3">
-                                      <StaffAvatar photo={app.photo} name={app.name || 'Candidate'} size="sm" />
-                                      <div>
-                                        <p className="font-extrabold text-sm text-gray-900 dark:text-white">{app.name}</p>
-                                        <span className="text-[10px] text-gray-400">ID: {app.id.substring(0, 8)}...</span>
-                                      </div>
-                                    </div>
-                                  </td>
-
-                                  {/* Role */}
-                                  <td className="py-3.5 px-3">
-                                    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold ${
-                                      (app.role || 'Waiter') === 'Waiter' ? 'bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-300' :
-                                      (app.role || 'Waiter') === 'Chef' ? 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300' :
-                                      (app.role || 'Waiter') === 'Manager' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' :
-                                      (app.role || 'Waiter') === 'Cashier' ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300' :
-                                      (app.role || 'Waiter') === 'Cleaner' ? 'bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300' :
-                                      'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-                                    }`}>
-                                      {app.role || 'Waiter'}
-                                    </span>
-                                  </td>
-
-                                  {/* Shift */}
-                                  <td className="py-3.5 px-3">
-                                    <span className="text-[11px] font-bold text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-lg">
-                                      {app.shift || 'Morning'}
-                                    </span>
-                                  </td>
-
-                                  {/* Contact */}
-                                  <td className="py-3.5 px-3">
-                                    <div className="space-y-0.5">
-                                      <a href={`tel:${app.mobile}`} className="text-gray-900 dark:text-white hover:text-primary font-bold flex items-center gap-1">
-                                        <Phone size={11} className="text-gray-400" />
-                                        <span>{app.mobile}</span>
-                                      </a>
-                                      {app.whatsapp && (
-                                        <a 
-                                          href={`https://wa.me/${app.whatsapp.replace(/[^0-9]/g, '')}`} 
-                                          target="_blank" 
-                                          rel="noopener noreferrer" 
-                                          className="text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 text-[10px] font-bold"
-                                        >
-                                          <MessageCircle size={10} />
-                                          <span>WhatsApp</span>
-                                        </a>
-                                      )}
-                                    </div>
-                                  </td>
-
-                                  {/* Email */}
-                                  <td className="py-3.5 px-3">
-                                    <a href={`mailto:${app.email}`} className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1">
-                                      <Mail size={11} />
-                                      <span className="truncate max-w-[130px]">{app.email}</span>
-                                    </a>
-                                  </td>
-
-                                  {/* Notes */}
-                                  <td className="py-3.5 px-3 max-w-[150px]">
-                                    <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate" title={app.notes || 'No notes'}>
-                                      {app.notes || '—'}
-                                    </p>
-                                  </td>
-
-                                  {/* Actions */}
-                                  <td className="py-3.5 px-4 text-right">
-                                    <div className="flex items-center justify-end gap-1.5">
-                                      <button
-                                        onClick={() => handleOpenApproveModal(app)}
-                                        className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1 cursor-pointer"
-                                        title="Approve & Set Role/Credentials"
-                                      >
-                                        <Check size={13} />
-                                        <span>Approve</span>
-                                      </button>
-                                      
-                                      <button
-                                        onClick={() => setEditPendingStaffModal(app)}
-                                        className="p-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl transition-all cursor-pointer"
-                                        title="Edit Application"
-                                      >
-                                        <Edit3 size={13} />
-                                      </button>
-
-                                      <button
-                                        onClick={() => handleDeletePendingStaff(app.id, app.name)}
-                                        className="p-1.5 bg-red-50 hover:bg-red-100 dark:bg-red-950/40 text-red-600 rounded-xl transition-all cursor-pointer"
-                                        title="Reject / Remove Application"
-                                      >
-                                        <Trash2 size={13} />
-                                      </button>
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* ---------------- SUB-TAB 2: STAFF ROSTER ---------------- */}
-              {staffSubTab === 'roster' && (
-                <div className="space-y-4">
-                  {/* Top Action Bar */}
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white dark:bg-gray-900 p-4 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-xs">
-                    <div>
-                      <h4 className="font-extrabold text-sm flex items-center gap-2">
-                        <span>Active Team Members</span>
-                        <span className="bg-primary/10 text-primary text-[10px] px-2 py-0.5 rounded-full font-bold">
-                          {staff.length} Active
-                        </span>
-                      </h4>
-                      <p className="text-[10px] text-gray-400 mt-0.5">
-                        Registered employees across Waiter, Kitchen, Cashier, and Operations roles.
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={handleOpenAddStaff}
-                        className="bg-primary hover:bg-orange-600 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
-                      >
-                        <Plus size={14} />
-                        <span>+ Add Staff</span>
-                      </button>
-
-                      <button
-                        onClick={fetchData}
-                        className="p-2 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:text-primary rounded-xl cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                        title="Refresh active staff"
-                      >
-                        <RefreshCw size={14} />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Role Filter Pills */}
-                  <div className="flex gap-1.5 overflow-x-auto pb-1 items-center">
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mr-1">Filter Role:</span>
-                    {['All', 'Waiter', 'Chef', 'Manager', 'Cashier', 'Cleaner', 'Delivery Staff'].map((r) => {
-                      const count = r === 'All' ? staff.length : staff.filter(s => s.role === r).length;
-                      return (
-                        <button
-                          key={r}
-                          onClick={() => setStaffRoleFilter(r)}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
-                            staffRoleFilter === r
-                              ? 'bg-primary text-white shadow-xs'
-                              : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:border-orange-300'
-                          }`}
-                        >
-                          {r} ({count})
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* Staff Cards Grid */}
-                  {staff.length === 0 ? (
-                    <div className="text-center py-12 px-4 bg-white dark:bg-gray-900 rounded-3xl border border-dashed border-gray-200 dark:border-gray-800">
-                      <div className="w-12 h-12 rounded-full bg-orange-50 dark:bg-orange-950/40 text-orange-500 mx-auto flex items-center justify-center mb-3">
-                        <Users size={22} />
-                      </div>
-                      <h4 className="font-extrabold text-sm text-gray-800 dark:text-gray-200">No Active Staff Members</h4>
-                      <p className="text-xs text-gray-400 mt-1 max-w-sm mx-auto">
-                        Click "+ Add Staff" to directly register a team member, or review Pending Applications to approve candidates.
-                      </p>
-                      <button
-                        onClick={handleOpenAddStaff}
-                        className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-white text-xs font-bold rounded-xl hover:bg-orange-600 transition-all cursor-pointer shadow-xs"
-                      >
-                        <Plus size={13} />
-                        <span>Add First Staff Member</span>
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                      {staff
-                        .filter(emp => staffRoleFilter === 'All' || emp.role === staffRoleFilter)
-                        .map(emp => {
-                          const showPw = revealedPasswords[emp.id];
-                          return (
-                            <div 
-                              key={emp.id} 
-                              className={`p-5 rounded-3xl border shadow-xs flex flex-col justify-between transition-all ${
-                                isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100'
-                              }`}
-                            >
+                        <div>
+                          {/* Header with Waiter Photo, Name, and Shift */}
+                          <div className="flex items-start justify-between border-b border-slate-100 pb-3 mb-3 gap-3">
+                            <div className="flex items-center gap-3">
+                              <StaffAvatar photo={emp.photo} name={emp.name} size="lg" />
                               <div>
-                                {/* Header with Staff Photo, Name, and Role */}
-                                <div className="flex items-start justify-between border-b border-gray-100 dark:border-gray-800 pb-3 mb-3 gap-3">
-                                  <div className="flex items-center gap-3">
-                                    <StaffAvatar photo={emp.photo} name={emp.name} size="lg" />
-                                    <div>
-                                      <div className="flex items-center gap-2 flex-wrap">
-                                        <h4 className="font-extrabold text-base text-gray-900 dark:text-white">{emp.name}</h4>
-                                        <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-extrabold ${
-                                          emp.role === 'Waiter' ? 'bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-300' :
-                                          emp.role === 'Chef' ? 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300' :
-                                          emp.role === 'Manager' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' :
-                                          emp.role === 'Cashier' ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300' :
-                                          emp.role === 'Cleaner' ? 'bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300' :
-                                          'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-                                        }`}>
-                                          {emp.role}
-                                        </span>
-                                      </div>
-                                      <div className="flex items-center gap-2 mt-1 flex-wrap">
-                                        <span className="text-[10px] bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-2 py-0.5 rounded font-mono font-bold">
-                                          ID: {emp.empid}
-                                        </span>
-                                        <span className="text-[10px] bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-full font-bold">
-                                          Shift: {emp.shift}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  <div className="text-right shrink-0">
-                                    <span className="text-[10px] text-gray-400 block font-normal">Salary / Month</span>
-                                    <strong className="text-sm font-black text-gray-900 dark:text-white">{formatPrice(emp.salary)}</strong>
-                                  </div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <h4 className="font-black text-base text-slate-900">{emp.name}</h4>
+                                  <span className="text-[10px] px-2.5 py-0.5 rounded-full font-black bg-orange-50 text-orange-600 border border-orange-200/70">
+                                    Waiter
+                                  </span>
                                 </div>
-
-                                {/* Credentials & Contact Info */}
-                                <div className="grid grid-cols-2 gap-2 p-3 rounded-2xl bg-gray-50/80 dark:bg-gray-800/40 mb-3 text-[11px]">
-                                  <div>
-                                    <span className="text-[10px] text-gray-400 block font-medium">Terminal Password</span>
-                                    <div className="flex items-center gap-1.5 mt-0.5">
-                                      <span className="font-mono font-bold text-gray-900 dark:text-white">
-                                        {showPw ? (emp.password || '••••••') : '••••••••'}
-                                      </span>
-                                      <button
-                                        type="button"
-                                        onClick={() => setRevealedPasswords(prev => ({ ...prev, [emp.id]: !prev[emp.id] }))}
-                                        className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 cursor-pointer p-0.5"
-                                        title={showPw ? "Hide Password" : "Show Password"}
-                                      >
-                                        {showPw ? <EyeOff size={13} /> : <Eye size={13} />}
-                                      </button>
-                                      {emp.password && (
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            navigator.clipboard.writeText(emp.password || '');
-                                            alert(`Copied password for ${emp.name}`);
-                                          }}
-                                          className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 cursor-pointer p-0.5"
-                                          title="Copy Password"
-                                        >
-                                          <Copy size={13} />
-                                        </button>
-                                      )}
-                                    </div>
-                                  </div>
-
-                                  <div>
-                                    <span className="text-[10px] text-gray-400 block font-medium">Phone / WhatsApp</span>
-                                    {emp.mobile ? (
-                                      <a
-                                        href={`tel:${emp.mobile}`}
-                                        className="font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 mt-0.5 truncate"
-                                      >
-                                        <Phone size={11} className="shrink-0" /> 
-                                        <span>{emp.mobile}</span>
-                                      </a>
-                                    ) : (
-                                      <span className="text-gray-400 italic">Not set</span>
-                                    )}
-                                  </div>
-
-                                  {emp.email && (
-                                    <div className="col-span-2 border-t border-gray-200/60 dark:border-gray-700/60 pt-1.5 mt-0.5">
-                                      <span className="text-[10px] text-gray-400 block font-medium">Email Address</span>
-                                      <a href={`mailto:${emp.email}`} className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-bold truncate">
-                                        <Mail size={11} className="shrink-0" />
-                                        <span>{emp.email}</span>
-                                      </a>
-                                    </div>
-                                  )}
-                                </div>
-
-                                {/* Role Specific Assignment Section */}
-                                <div className="mb-3">
-                                  {emp.role === 'Waiter' && (
-                                    <div>
-                                      <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider block mb-1">
-                                        Table Routing & Assignment
-                                      </span>
-                                      {(!emp.assignedTables || emp.assignedTables.length === 0 || emp.assignedTables.length === tables.length) ? (
-                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-300 text-[10px] font-bold border border-green-200 dark:border-green-800">
-                                          ⚡ Serves All Tables (Full Restaurant Floor)
-                                        </span>
-                                      ) : (
-                                        <div className="flex flex-wrap gap-1.5">
-                                          {emp.assignedTables.map(tId => (
-                                            <span key={tId} className="px-2 py-0.5 rounded-lg bg-orange-100 dark:bg-orange-950 text-orange-800 dark:text-orange-300 text-[10px] font-bold">
-                                              Table #{tId}
-                                            </span>
-                                          ))}
-                                        </div>
-                                      )}
-                                    </div>
-                                  )}
-
-                                  {emp.role === 'Chef' && (
-                                    <div>
-                                      <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider block mb-1">
-                                        Kitchen Station
-                                      </span>
-                                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 text-[10px] font-bold border border-purple-200 dark:border-purple-800">
-                                        🍳 {emp.stationOrCounter || 'Main Kitchen & Preparation'}
-                                      </span>
-                                    </div>
-                                  )}
-
-                                  {emp.role === 'Cashier' && (
-                                    <div>
-                                      <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider block mb-1">
-                                        Billing Counter
-                                      </span>
-                                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 text-[10px] font-bold border border-blue-200 dark:border-blue-800">
-                                        💳 {emp.stationOrCounter || 'Counter #1 (Main Floor)'}
-                                      </span>
-                                    </div>
-                                  )}
-
-                                  {emp.role === 'Manager' && (
-                                    <div>
-                                      <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider block mb-1">
-                                        Operational Jurisdiction
-                                      </span>
-                                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold border border-emerald-200 dark:border-emerald-800">
-                                        🏢 Full Operations Floor & POS Terminal Access
-                                      </span>
-                                    </div>
-                                  )}
-
-                                  {emp.role === 'Cleaner' && (
-                                    <div>
-                                      <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider block mb-1">
-                                        Sanitation Zone
-                                      </span>
-                                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 text-[10px] font-bold border border-teal-200 dark:border-teal-800">
-                                        🧹 {emp.stationOrCounter || 'Dining Floor & Common Areas'}
-                                      </span>
-                                    </div>
-                                  )}
-
-                                  {emp.role === 'Delivery Staff' && (
-                                    <div>
-                                      <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider block mb-1">
-                                        Delivery Fleet
-                                      </span>
-                                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 text-[10px] font-bold border border-amber-200 dark:border-amber-800">
-                                        🛵 {emp.stationOrCounter || 'Zone A & Local Deliveries'}
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
-
-                                {/* Performance Badges */}
-                                <div className="grid grid-cols-3 gap-2 py-2 border-t border-b border-gray-100 dark:border-gray-800 text-center text-[10px]">
-                                  <div>
-                                    <span className="text-gray-400 block">Rating</span>
-                                    <strong className="text-amber-500 font-bold">★ {emp.performance?.ratings || '5.0'}</strong>
-                                  </div>
-                                  <div>
-                                    <span className="text-gray-400 block">Attendance</span>
-                                    <strong className="text-emerald-600 font-bold">{emp.attendance || 100}%</strong>
-                                  </div>
-                                  <div>
-                                    <span className="text-gray-400 block">Completed</span>
-                                    <strong className="font-bold text-gray-900 dark:text-white">{emp.performance?.ordersDelivered || 0} orders</strong>
-                                  </div>
+                                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                                  <span className="text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-lg font-mono font-bold">
+                                    ID: {emp.empid}
+                                  </span>
+                                  <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200/60 px-2 py-0.5 rounded-lg font-bold">
+                                    Shift: {emp.shift}
+                                  </span>
                                 </div>
                               </div>
+                            </div>
 
-                              {/* Footer Actions */}
-                              <div className="pt-3 mt-2 flex justify-between items-center text-[11px]">
-                                <span className="text-[10px] text-gray-400">
-                                  Avg: {emp.performance?.avgServingTime || 'N/A'}
+                            <div className="text-right shrink-0">
+                              <span className="text-[10px] text-slate-400 block font-medium">Salary / Month</span>
+                              <strong className="text-sm font-black text-slate-900">{formatPrice(emp.salary)}</strong>
+                            </div>
+                          </div>
+
+                          {/* Credentials & Contact Box */}
+                          <div className="grid grid-cols-2 gap-2 p-3 rounded-2xl bg-slate-50 border border-slate-100 mb-3 text-[11px]">
+                            <div>
+                              <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">Terminal Password</span>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <span className="font-mono font-black text-slate-900 text-xs">
+                                  {showPw ? (emp.password || '••••••') : '••••••••'}
                                 </span>
-                                {(role === 'Hotel Manager' || role === 'Admin' || role === 'Manager' || !role) && (
-                                  <div className="flex gap-2">
-                                    <button
-                                      onClick={() => handleOpenEditStaff(emp)}
-                                      className="px-3 py-1 bg-orange-50 hover:bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300 rounded-lg font-bold cursor-pointer flex items-center gap-1 transition-colors"
-                                      title="Edit Staff Member"
-                                    >
-                                      <Edit3 size={12} /> Edit
-                                    </button>
-                                    <button
-                                      onClick={() => handleDeleteStaffMember(emp.id, emp.name)}
-                                      className="px-3 py-1 bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-950/40 rounded-lg font-bold cursor-pointer flex items-center gap-1 transition-colors"
-                                      title="Delete Staff Member"
-                                    >
-                                      <Trash2 size={12} /> Delete
-                                    </button>
-                                  </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setRevealedPasswords(prev => ({ ...prev, [emp.id]: !prev[emp.id] }))}
+                                  className="text-slate-400 hover:text-slate-700 cursor-pointer p-0.5"
+                                  title={showPw ? "Hide Password" : "Show Password"}
+                                >
+                                  {showPw ? <EyeOff size={13} /> : <Eye size={13} />}
+                                </button>
+                                {emp.password && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(emp.password || '');
+                                      alert(`Copied password for ${emp.name}`);
+                                    }}
+                                    className="text-slate-400 hover:text-slate-700 cursor-pointer p-0.5"
+                                    title="Copy Password"
+                                  >
+                                    <Copy size={13} />
+                                  </button>
                                 )}
                               </div>
                             </div>
-                          );
-                        })}
-                    </div>
-                  )}
+
+                            <div>
+                              <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">Phone / Mobile</span>
+                              {emp.mobile ? (
+                                <a
+                                  href={`tel:${emp.mobile}`}
+                                  className="font-bold text-primary hover:underline flex items-center gap-1 mt-0.5 truncate"
+                                >
+                                  <Phone size={11} className="shrink-0" /> 
+                                  <span>{emp.mobile}</span>
+                                </a>
+                              ) : (
+                                <span className="text-slate-400 italic">Not set</span>
+                              )}
+                            </div>
+
+                            {emp.email && (
+                              <div className="col-span-2 border-t border-slate-200/60 pt-1.5 mt-0.5">
+                                <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">Email Address</span>
+                                <a href={`mailto:${emp.email}`} className="text-primary hover:underline flex items-center gap-1 font-bold truncate">
+                                  <Mail size={11} className="shrink-0" />
+                                  <span>{emp.email}</span>
+                                </a>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Table Routing Assignment */}
+                          <div className="mb-3">
+                            <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block mb-1">
+                              Table Routing & Assignment
+                            </span>
+                            {(!emp.assignedTables || emp.assignedTables.length === 0 || emp.assignedTables.length === tables.length) ? (
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200/70">
+                                ⚡ Serves All Tables (Full Floor)
+                              </span>
+                            ) : (
+                              <div className="flex flex-wrap gap-1.5">
+                                {emp.assignedTables.map(tId => (
+                                  <span key={tId} className="px-2.5 py-0.5 rounded-xl bg-orange-50 text-orange-700 border border-orange-200/70 text-xs font-bold">
+                                    Table #{tId}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Performance Badges */}
+                          <div className="grid grid-cols-3 gap-2 py-2.5 border-t border-b border-slate-100 text-center text-xs">
+                            <div>
+                              <span className="text-[10px] text-slate-400 block uppercase font-bold">Rating</span>
+                              <strong className="text-amber-500 font-bold">★ {emp.performance?.ratings || '5.0'}</strong>
+                            </div>
+                            <div>
+                              <span className="text-[10px] text-slate-400 block uppercase font-bold">Attendance</span>
+                              <strong className="text-emerald-600 font-bold">{emp.attendance || 100}%</strong>
+                            </div>
+                            <div>
+                              <span className="text-[10px] text-slate-400 block uppercase font-bold">Completed</span>
+                              <strong className="font-bold text-slate-900">{emp.performance?.ordersDelivered || 0} orders</strong>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Footer Actions */}
+                        <div className="pt-3 mt-2 flex justify-between items-center text-xs">
+                          <span className="text-[10px] text-slate-400">
+                            Avg serving: {emp.performance?.avgServingTime || 'N/A'}
+                          </span>
+                          {(role === 'Hotel Manager' || role === 'Admin' || role === 'Manager' || !role) && (
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleOpenEditStaff(emp)}
+                                className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold cursor-pointer flex items-center gap-1.5 transition-colors"
+                                title="Edit Waiter Details"
+                              >
+                                <Edit3 size={12} /> Edit
+                              </button>
+                              <button
+                                onClick={() => handleDeleteStaffMember(emp.id, emp.name)}
+                                className="px-3.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl font-bold cursor-pointer flex items-center gap-1.5 transition-colors"
+                                title="Delete Waiter"
+                              >
+                                <Trash2 size={12} /> Delete
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -2947,7 +2444,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-xs font-semibold">
-                <div className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-50'}`}>
+                <div className={`p-4 rounded-3xl border bg-white border-gray-50`}>
                   <h4 className="font-extrabold text-xs mb-3">Loyalty Conversion Rules</h4>
                   <div className="space-y-2">
                     <p className="flex justify-between"><span>Standard Rule:</span> <strong className="text-primary font-black">₹100 = {loyaltyRules.pointsPerHundred} Points</strong></p>
@@ -2981,7 +2478,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
               {/* Modal form */}
               {newPromotionModal && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                  <div className={`w-full max-w-sm rounded-3xl p-6 shadow-2xl ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-white'}`}>
+                  <div className={`w-full max-w-sm rounded-3xl p-6 shadow-2xl bg-white`}>
                     <div className="flex justify-between items-center mb-4 pb-2 border-b">
                       <h4 className="font-extrabold text-sm">New Promotion Coupon</h4>
                       <button onClick={() => setNewPromotionModal(false)}><X size={18} /></button>
@@ -3028,7 +2525,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                 {coupons.map(cp => (
                   <div 
                     key={cp.id}
-                    className={`p-4 rounded-3xl border shadow-sm flex flex-col justify-between ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-50'}`}
+                    className={`p-4 rounded-3xl border shadow-sm flex flex-col justify-between bg-white border-gray-50`}
                   >
                     <div>
                       <h4 className="font-black text-sm text-primary">{cp.code}</h4>
@@ -3072,7 +2569,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 
                 {/* 1. SALES INSIGHTS */}
-                <div className={`p-5 rounded-3xl border shadow-sm relative overflow-hidden ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-50'}`}>
+                <div className={`p-5 rounded-3xl border shadow-sm relative overflow-hidden bg-white border-gray-50`}>
                   <h4 className="font-extrabold text-xs text-primary uppercase tracking-wider flex items-center gap-1.5 mb-3.5">
                     <Sparkles size={14} fill="currentColor" />
                     AI Sales Predictions
@@ -3090,7 +2587,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                 </div>
 
                 {/* 2. BUSINESS STRATEGY */}
-                <div className={`p-5 rounded-3xl border shadow-sm ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-50'}`}>
+                <div className={`p-5 rounded-3xl border shadow-sm bg-white border-gray-50`}>
                   <h4 className="font-extrabold text-xs text-primary uppercase tracking-wider flex items-center gap-1.5 mb-3.5">
                     <TrendingUp size={14} />
                     AI Pricing & Strategy Suggestions
@@ -3143,7 +2640,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
               <div className="border-t border-gray-100 my-2"></div>
 
               {/* Filter Section */}
-              <div className={`p-5 rounded-2xl border shadow-sm ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'} flex flex-wrap gap-4 justify-between items-center relative z-20`}>
+              <div className={`p-5 rounded-2xl border shadow-sm bg-white border-gray-200 flex flex-wrap gap-4 justify-between items-center relative z-20`}>
                 <div className="flex flex-wrap gap-4">
                   <div className="flex flex-col gap-1.5">
                     <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Date Range Filter</label>
@@ -3151,7 +2648,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                       <select 
                         value={reportDateFilter}
                         onChange={(e) => setReportDateFilter(e.target.value as any)}
-                        className={`appearance-none border text-xs py-2 pl-3.5 pr-9 rounded-xl font-bold outline-none cursor-pointer transition-colors ${isDarkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-700 hover:border-gray-400'}`}
+                        className={`appearance-none border text-xs py-2 pl-3.5 pr-9 rounded-xl font-bold outline-none cursor-pointer transition-colors bg-white border-gray-300 text-gray-700 hover:border-gray-400`}
                       >
                         <option value="Today">Today Only</option>
                         <option value="This Week">This Week (Last 7 Days)</option>
@@ -3168,7 +2665,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                       <select 
                         value={reportCategoryFilter}
                         onChange={(e) => setReportCategoryFilter(e.target.value)}
-                        className={`appearance-none border text-xs py-2 pl-3.5 pr-9 rounded-xl font-bold outline-none cursor-pointer transition-colors ${isDarkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-700 hover:border-gray-400'}`}
+                        className={`appearance-none border text-xs py-2 pl-3.5 pr-9 rounded-xl font-bold outline-none cursor-pointer transition-colors bg-white border-gray-300 text-gray-700 hover:border-gray-400`}
                       >
                         <option value="All">All Food Categories</option>
                         <option value="Breakfast">Breakfast</option>
@@ -3189,7 +2686,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
               </div>
 
               {/* Custom SVG Sales Chart */}
-              <div className={`p-6 rounded-2xl border shadow-sm ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'} relative z-10 mt-2`}>
+              <div className={`p-6 rounded-2xl border shadow-sm bg-white border-gray-200 relative z-10 mt-2`}>
                 <h4 className="font-extrabold text-sm mb-6 text-gray-800">Weekly Sales Volume Chart</h4>
                 
                 <div className="w-full h-[280px] relative">
@@ -3240,7 +2737,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                 <p className="text-[10px] text-gray-400">Modify operating hours, tax metrics, invoice GST numbers, and system theme.</p>
               </div>
 
-              <div className={`p-6 rounded-3xl border shadow-sm ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-50'}`}>
+              <div className={`p-6 rounded-3xl border shadow-sm bg-white border-gray-50`}>
                 <form className="space-y-4 text-xs font-semibold max-w-2xl" onSubmit={handleSaveSettings}>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
@@ -3275,7 +2772,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                     </div>
                   </div>
 
-                  <div className={`border-t pt-4 mt-4 ${isDarkMode ? 'border-gray-800' : 'border-gray-100'}`}>
+                  <div className={`border-t pt-4 mt-4 border-gray-100`}>
                     <h4 className="font-bold text-gray-500 mb-3 uppercase tracking-wider">Registration Details</h4>
                     <div className="grid grid-cols-3 gap-3">
                       <div>
@@ -3309,7 +2806,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                     </div>
                   </div>
 
-                  <div className={`border-t pt-4 mt-4 ${isDarkMode ? 'border-gray-800' : 'border-gray-100'}`}>
+                  <div className={`border-t pt-4 mt-4 border-gray-100`}>
                     <h4 className="font-bold text-gray-500 mb-3 uppercase tracking-wider">Location Details</h4>
                     <div className="space-y-3">
                       <div>
@@ -3353,7 +2850,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                             <button 
                               type="button" 
                               onClick={handleGetLocation}
-                              className="bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-gray-300 p-2.5 rounded-xl border border-transparent dark:border-gray-700 flex items-center justify-center cursor-pointer transition-colors"
+                              className="bg-gray-100 hover:bg-gray-200 text-gray-700  dark:hover:bg-gray-700  p-2.5 rounded-xl border border-transparent  flex items-center justify-center cursor-pointer transition-colors"
                               title="Detect Current Location"
                             >
                               <Map size={18} />
@@ -3384,7 +2881,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                 <p className="text-[10px] text-gray-400">Renders role-based access logs and database audit records.</p>
               </div>
 
-              <div className={`p-5 rounded-3xl border shadow-sm ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-50'}`}>
+              <div className={`p-5 rounded-3xl border shadow-sm bg-white border-gray-50`}>
                 <h4 className="font-extrabold text-xs mb-3">Roster Audit Activity Logs</h4>
                 <div className="space-y-2.5">
                   {activityLogs.map(log => (
@@ -3437,7 +2934,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                     ? `${baseUrl}/table/${num.id}?token=${num.qr_token}` 
                     : `No Token Session Configured`;
                   return (
-                    <div key={num.id} className={`p-4 rounded-3xl border text-center shadow-sm ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-50'}`}>
+                    <div key={num.id} className={`p-4 rounded-3xl border text-center shadow-sm bg-white border-gray-50`}>
                       <h4 className="font-extrabold">Table #{num.id} QR</h4>
                       <div className="w-24 h-24 bg-gray-50 rounded-2xl mx-auto my-3 flex items-center justify-center border">
                         {num.qr_token ? (
@@ -3495,7 +2992,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                   return (
                     <div 
                       key={item.id}
-                      className={`p-4 rounded-3xl border shadow-sm ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-50'}`}
+                      className={`p-4 rounded-3xl border shadow-sm bg-white border-gray-50`}
                     >
                       <div className="flex justify-between items-start mb-2 text-xs">
                         <div>
@@ -3619,7 +3116,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
 
       {editLoyaltyModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className={`w-full max-w-sm rounded-3xl p-6 ${isDarkMode ? 'bg-gray-900 border border-gray-800' : 'bg-white'}`}>
+          <div className={`w-full max-w-sm rounded-3xl p-6 bg-white`}>
             <div className="flex justify-between items-center mb-5">
               <h3 className="font-extrabold">Edit Loyalty Rules</h3>
               <button onClick={() => setEditLoyaltyModal(false)} className="text-gray-400 hover:text-red-500 cursor-pointer"><X size={20}/></button>
@@ -3631,7 +3128,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                   type="number" 
                   value={loyaltyRules.pointsPerHundred} 
                   onChange={e => setLoyaltyRules({...loyaltyRules, pointsPerHundred: Number(e.target.value)})}
-                  className={`w-full p-3 rounded-xl border ${isDarkMode ? 'bg-black border-gray-800 text-white' : 'bg-gray-50 border-gray-200'}`}
+                  className={`w-full p-3 rounded-xl border bg-gray-50 border-gray-200`}
                   required
                 />
               </div>
@@ -3641,7 +3138,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                   type="number" 
                   value={loyaltyRules.silverTierPoints} 
                   onChange={e => setLoyaltyRules({...loyaltyRules, silverTierPoints: Number(e.target.value)})}
-                  className={`w-full p-3 rounded-xl border ${isDarkMode ? 'bg-black border-gray-800 text-white' : 'bg-gray-50 border-gray-200'}`}
+                  className={`w-full p-3 rounded-xl border bg-gray-50 border-gray-200`}
                   required
                 />
               </div>
@@ -3651,7 +3148,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                   type="number" 
                   value={loyaltyRules.goldTierPoints} 
                   onChange={e => setLoyaltyRules({...loyaltyRules, goldTierPoints: Number(e.target.value)})}
-                  className={`w-full p-3 rounded-xl border ${isDarkMode ? 'bg-black border-gray-800 text-white' : 'bg-gray-50 border-gray-200'}`}
+                  className={`w-full p-3 rounded-xl border bg-gray-50 border-gray-200`}
                   required
                 />
               </div>
@@ -3661,7 +3158,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                   type="number" 
                   value={loyaltyRules.goldDiscountPercent} 
                   onChange={e => setLoyaltyRules({...loyaltyRules, goldDiscountPercent: Number(e.target.value)})}
-                  className={`w-full p-3 rounded-xl border ${isDarkMode ? 'bg-black border-gray-800 text-white' : 'bg-gray-50 border-gray-200'}`}
+                  className={`w-full p-3 rounded-xl border bg-gray-50 border-gray-200`}
                   required
                 />
               </div>
@@ -3677,28 +3174,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
           Guarantees perfect viewport centering, backdrop coverage, and pinned headers
           ========================================================================= */}
 
-      {/* 1. EDIT / ADD ACTIVE STAFF MODAL */}
+      {/* 1. EDIT / ADD WAITER MODAL */}
       {newStaffForm && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm overflow-y-auto animate-fade-in font-sans">
           <div 
             onClick={(e) => e.stopPropagation()} 
-            className={`relative my-auto w-full max-w-lg max-h-[88vh] flex flex-col rounded-3xl shadow-2xl border ${
-              isDarkMode ? 'bg-gray-900 border-gray-800 text-white' : 'bg-white border-gray-100 text-slate-900'
-            } overflow-hidden`}
+            className="relative my-auto w-full max-w-lg max-h-[88vh] flex flex-col rounded-3xl shadow-2xl border bg-white border-slate-100 text-slate-900 overflow-hidden"
           >
             {/* Pinned Header */}
-            <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 dark:border-gray-800 shrink-0 bg-gray-50/50 dark:bg-gray-800/40">
+            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 shrink-0 bg-slate-50/70">
               <div>
-                <h4 className="font-extrabold text-base text-slate-900 dark:text-white">
-                  {editingStaff ? 'Edit Staff Member' : 'Add New Staff Member'}
+                <h4 className="font-black text-base text-slate-900">
+                  {editingStaff ? 'Edit Waiter Details' : 'Add New Waiter'}
                 </h4>
-                <p className="text-[11px] text-gray-400">
-                  {editingStaff ? `Updating details for ${editingStaff.name} (${editingStaff.empid})` : 'Register employee with terminal login credentials'}
+                <p className="text-[11px] text-slate-400">
+                  {editingStaff ? `Updating details for ${editingStaff.name} (${editingStaff.empid})` : 'Register waiter account with terminal login credentials'}
                 </p>
               </div>
               <button 
                 type="button"
-                className="cursor-pointer text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-all" 
+                className="cursor-pointer text-slate-400 hover:text-slate-700 p-1.5 rounded-full hover:bg-slate-100 transition-all" 
                 onClick={() => setNewStaffForm(false)}
               >
                 <X size={18} />
@@ -3708,22 +3203,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
             {/* Scrollable Form Body */}
             <form id="active-staff-form" onSubmit={handleSaveStaffMember} className="overflow-y-auto p-6 space-y-4 flex-1 text-xs font-semibold">
               {/* Photo Section */}
-              <div className="p-3.5 bg-gradient-to-tr from-orange-50/60 to-amber-50/40 dark:from-orange-950/20 dark:to-amber-950/10 rounded-2xl border border-orange-100 dark:border-orange-900/40">
-                <label className="block text-orange-950 dark:text-orange-200 mb-2 text-[10px] uppercase font-bold tracking-wider">
-                  Staff Photo / Avatar
+              <div className="p-3.5 bg-gradient-to-tr from-orange-50/60 to-amber-50/40 rounded-2xl border border-orange-100">
+                <label className="block text-orange-950 mb-2 text-[10px] uppercase font-bold tracking-wider">
+                  Waiter Photo / Avatar
                 </label>
                 <div className="flex gap-3 items-center mb-3">
-                  <StaffAvatar photo={staffFormState.photo} name={staffFormState.name || 'Staff'} size="lg" />
+                  <StaffAvatar photo={staffFormState.photo} name={staffFormState.name || 'Waiter'} size="lg" />
                   <div className="flex-1 space-y-1.5">
                     <input
                       type="text"
                       value={staffFormState.photo}
                       onChange={(e) => setStaffFormState({...staffFormState, photo: e.target.value})}
                       placeholder="Paste Photo URL or Google Drive link"
-                      className="w-full p-2 border border-orange-200 dark:border-orange-900/60 rounded-xl text-xs bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                      className="w-full p-2 border border-orange-200 rounded-xl text-xs bg-white focus:outline-none focus:ring-2 focus:ring-orange-500"
                     />
                     <div className="flex gap-2 items-center flex-wrap pt-0.5">
-                      <label className="cursor-pointer bg-white dark:bg-gray-800 border border-orange-200 dark:border-orange-800 hover:bg-orange-50 text-orange-800 dark:text-orange-300 px-3 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 shadow-xs transition-all">
+                      <label className="cursor-pointer bg-white border border-orange-200 hover:bg-orange-50 text-orange-800 px-3 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 shadow-xs transition-all">
                         <Upload size={12} className="text-orange-500" /> Upload from Computer / Phone
                         <input
                           type="file"
@@ -3756,7 +3251,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
 
                 {/* Presets */}
                 <div>
-                  <p className="text-[9px] text-gray-500 dark:text-gray-400 mb-1.5 font-bold">Or pick a quick professional avatar:</p>
+                  <p className="text-[9px] text-slate-500 mb-1.5 font-bold">Or pick a quick professional avatar:</p>
                   <div className="flex gap-2 overflow-x-auto pb-1">
                     {PRESET_AVATARS.map((p, idx) => (
                       <button
@@ -3765,7 +3260,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                         onClick={() => setStaffFormState({...staffFormState, photo: p.url})}
                         title={p.name}
                         className={`w-8 h-8 rounded-xl overflow-hidden border-2 transition-all shrink-0 cursor-pointer ${
-                          staffFormState.photo === p.url ? 'border-orange-500 ring-2 ring-orange-400' : 'border-white dark:border-gray-700 hover:border-orange-300'
+                          staffFormState.photo === p.url ? 'border-orange-500 ring-2 ring-orange-400' : 'border-white hover:border-orange-300'
                         }`}
                       >
                         <img src={p.url} alt={p.name} className="w-full h-full object-cover" />
@@ -3777,37 +3272,38 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
 
               {/* Full Name */}
               <div>
-                <label className="block text-gray-500 mb-1 text-[10px] uppercase font-bold">Full Name *</label>
+                <label className="block text-slate-600 mb-1 text-[10px] uppercase font-bold">Full Name *</label>
                 <input
                   type="text"
                   value={staffFormState.name}
                   onChange={(e) => setStaffFormState({...staffFormState, name: e.target.value})}
-                  placeholder="e.g. B. Jagannadham"
+                  placeholder="e.g. Anand Sharma"
                   required
-                  className="w-full p-2.5 border rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white"
+                  className="w-full p-2.5 border rounded-xl bg-white border-slate-200 text-slate-900"
                 />
               </div>
 
               {/* Phone & Email */}
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-gray-500 mb-1 text-[10px] uppercase font-bold">Phone / Mobile</label>
+                  <label className="block text-slate-600 mb-1 text-[10px] uppercase font-bold">Phone / Mobile *</label>
                   <input
                     type="text"
                     value={staffFormState.mobile}
                     onChange={(e) => setStaffFormState({...staffFormState, mobile: e.target.value})}
                     placeholder="+91 98765 43210"
-                    className="w-full p-2.5 border rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white"
+                    required
+                    className="w-full p-2.5 border rounded-xl bg-white border-slate-200 text-slate-900"
                   />
                 </div>
                 <div>
-                  <label className="block text-gray-500 mb-1 text-[10px] uppercase font-bold">Email</label>
+                  <label className="block text-slate-600 mb-1 text-[10px] uppercase font-bold">Email Address</label>
                   <input
                     type="email"
                     value={staffFormState.email}
                     onChange={(e) => setStaffFormState({...staffFormState, email: e.target.value})}
-                    placeholder="staff@restaurant.com"
-                    className="w-full p-2.5 border rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white"
+                    placeholder="waiter@restaurant.com"
+                    className="w-full p-2.5 border rounded-xl bg-white border-slate-200 text-slate-900"
                   />
                 </div>
               </div>
@@ -3815,19 +3311,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
               {/* Employee ID & Terminal Password */}
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-gray-500 mb-1 text-[10px] uppercase font-bold">Employee ID (EmpID) *</label>
+                  <label className="block text-slate-600 mb-1 text-[10px] uppercase font-bold">Employee ID (EmpID) *</label>
                   <input
                     type="text"
                     value={staffFormState.empid}
                     onChange={(e) => setStaffFormState({...staffFormState, empid: e.target.value})}
                     placeholder="e.g. EMP-1024"
                     required
-                    className="w-full p-2.5 border rounded-xl font-mono uppercase bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white"
+                    className="w-full p-2.5 border rounded-xl font-mono uppercase bg-white border-slate-200 text-slate-900 font-bold"
                   />
                 </div>
                 <div>
                   <div className="flex justify-between items-center mb-1">
-                    <label className="block text-gray-500 text-[10px] uppercase font-bold">Password *</label>
+                    <label className="block text-slate-600 text-[10px] uppercase font-bold">Terminal Password *</label>
                     <button
                       type="button"
                       onClick={() => {
@@ -3845,162 +3341,100 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                     onChange={(e) => setStaffFormState({...staffFormState, password: e.target.value})}
                     placeholder="Terminal password"
                     required
-                    className="w-full p-2.5 border rounded-xl font-mono bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white"
+                    className="w-full p-2.5 border rounded-xl font-mono bg-white border-slate-200 text-slate-900 font-bold"
                   />
                 </div>
               </div>
 
-              {/* Role, Shift, & Salary */}
+              {/* Shift & Salary (Role is strictly Waiter!) */}
               <div className="grid grid-cols-3 gap-2">
                 <div>
-                  <label className="block text-gray-500 mb-1 text-[10px] uppercase font-bold">Role *</label>
-                  <select
-                    value={staffFormState.role}
-                    onChange={(e) => setStaffFormState({...staffFormState, role: e.target.value as any})}
-                    className="w-full p-2.5 border rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white"
-                  >
-                    <option value="Waiter">Waiter</option>
-                    <option value="Chef">Chef</option>
-                    <option value="Manager">Manager</option>
-                    <option value="Cashier">Cashier</option>
-                    <option value="Cleaner">Cleaner</option>
-                    <option value="Delivery Staff">Delivery Staff</option>
-                  </select>
+                  <label className="block text-slate-600 mb-1 text-[10px] uppercase font-bold">Role (Locked)</label>
+                  <div className="p-2.5 bg-orange-50 border border-orange-200 text-primary font-black rounded-xl text-center">
+                    Waiter
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-gray-500 mb-1 text-[10px] uppercase font-bold">Shift *</label>
+                  <label className="block text-slate-600 mb-1 text-[10px] uppercase font-bold">Shift *</label>
                   <select
                     value={staffFormState.shift}
                     onChange={(e) => setStaffFormState({...staffFormState, shift: e.target.value as any})}
-                    className="w-full p-2.5 border rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white"
+                    className="w-full p-2.5 border rounded-xl bg-white border-slate-200 text-slate-900 font-bold"
                   >
-                    <option value="Morning">Morning</option>
-                    <option value="Evening">Evening</option>
-                    <option value="Night">Night</option>
+                    <option value="Morning">Morning Shift</option>
+                    <option value="Evening">Evening Shift</option>
+                    <option value="Night">Night Shift</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-gray-500 mb-1 text-[10px] uppercase font-bold">Salary (₹) *</label>
+                  <label className="block text-slate-600 mb-1 text-[10px] uppercase font-bold">Salary (₹) *</label>
                   <input
                     type="number"
                     value={staffFormState.salary}
                     onChange={(e) => setStaffFormState({...staffFormState, salary: parseInt(e.target.value) || 0})}
                     required
-                    className="w-full p-2.5 border rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white"
+                    className="w-full p-2.5 border rounded-xl bg-white border-slate-200 text-slate-900 font-bold"
                   />
                 </div>
               </div>
 
-              {/* Role-Specific Assignment Details */}
-              {staffFormState.role === 'Waiter' && (
-                <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800">
-                  <div className="flex justify-between items-center mb-2">
-                    <label className="block text-gray-600 dark:text-gray-300 text-[10px] uppercase font-bold">
-                      Table Routing & Assignment
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setStaffFormState(prev => ({
-                        ...prev,
-                        assignedTables: prev.assignedTables.length === tables.length ? [] : tables.map(t => t.id)
-                      }))}
-                      className="text-[10px] text-orange-600 font-bold hover:underline cursor-pointer"
-                    >
-                      {staffFormState.assignedTables.length === tables.length ? 'Clear All' : 'Select All Tables (Full Floor)'}
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-4 gap-2">
-                    {tables.map(table => {
-                      const isSelected = staffFormState.assignedTables.includes(table.id);
-                      return (
-                        <button
-                          type="button"
-                          key={table.id}
-                          onClick={() => {
-                            setStaffFormState(prev => ({
-                              ...prev,
-                              assignedTables: isSelected 
-                                ? prev.assignedTables.filter(t => t !== table.id)
-                                : [...prev.assignedTables, table.id]
-                            }));
-                          }}
-                          className={`p-2 rounded-xl text-[10px] font-bold border transition-all cursor-pointer ${
-                            isSelected
-                              ? 'bg-orange-500 text-white border-orange-500 shadow-xs'
-                              : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-700 hover:border-orange-500'
-                          }`}
-                        >
-                          Table #{table.id}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-2 font-medium">
-                    {staffFormState.assignedTables.length === 0 || staffFormState.assignedTables.length === tables.length
-                      ? '⚡ Waiter serves ALL tables across the restaurant'
-                      : `Specific tables: ${staffFormState.assignedTables.map(t => `T#${t}`).join(', ')}`}
-                  </p>
-                </div>
-              )}
-
-              {staffFormState.role === 'Chef' && (
-                <div className="p-3 bg-purple-50/50 dark:bg-purple-950/20 rounded-2xl border border-purple-100 dark:border-purple-900/40">
-                  <label className="block text-purple-950 dark:text-purple-200 text-[10px] uppercase font-bold mb-1">
-                    Kitchen Station Assignment
+              {/* Table Routing Assignment */}
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-slate-600 text-[10px] uppercase font-bold">
+                    Table Routing & Assignment
                   </label>
-                  <select
-                    value={staffFormState.stationOrCounter || 'Main Kitchen & Gravy'}
-                    onChange={(e) => setStaffFormState({...staffFormState, stationOrCounter: e.target.value})}
-                    className="w-full p-2.5 border border-purple-200 dark:border-purple-800 rounded-xl bg-white dark:bg-gray-800 text-xs"
+                  <button
+                    type="button"
+                    onClick={() => setStaffFormState(prev => ({
+                      ...prev,
+                      assignedTables: prev.assignedTables.length === tables.length ? [] : tables.map(t => t.id)
+                    }))}
+                    className="text-[10px] text-orange-600 font-bold hover:underline cursor-pointer"
                   >
-                    <option value="Main Kitchen & Curry">Main Kitchen & Curry</option>
-                    <option value="Tandoor & Grill Station">Tandoor & Grill Station</option>
-                    <option value="Chinese & Wok Station">Chinese & Wok Station</option>
-                    <option value="South Indian Tiffin & Dosa">South Indian Tiffin & Dosa</option>
-                    <option value="Bakery & Desserts">Bakery & Desserts</option>
-                  </select>
+                    {staffFormState.assignedTables.length === tables.length ? 'Clear All' : 'Select All Tables (Full Floor)'}
+                  </button>
                 </div>
-              )}
-
-              {staffFormState.role === 'Cashier' && (
-                <div className="p-3 bg-blue-50/50 dark:bg-blue-950/20 rounded-2xl border border-blue-100 dark:border-blue-900/40">
-                  <label className="block text-blue-950 dark:text-blue-200 text-[10px] uppercase font-bold mb-1">
-                    Assigned Billing Counter
-                  </label>
-                  <select
-                    value={staffFormState.stationOrCounter || 'Main Billing Counter (Floor 1)'}
-                    onChange={(e) => setStaffFormState({...staffFormState, stationOrCounter: e.target.value})}
-                    className="w-full p-2.5 border border-blue-200 dark:border-blue-800 rounded-xl bg-white dark:bg-gray-800 text-xs"
-                  >
-                    <option value="Main Billing Counter (Floor 1)">Main Billing Counter (Floor 1)</option>
-                    <option value="Express Counter & Takeaway">Express Counter & Takeaway</option>
-                    <option value="Bar & Beverage Counter">Bar & Beverage Counter</option>
-                  </select>
+                <div className="grid grid-cols-4 gap-2">
+                  {tables.map(table => {
+                    const isSelected = staffFormState.assignedTables.includes(table.id);
+                    return (
+                      <button
+                        type="button"
+                        key={table.id}
+                        onClick={() => {
+                          setStaffFormState(prev => ({
+                            ...prev,
+                            assignedTables: isSelected 
+                              ? prev.assignedTables.filter(t => t !== table.id)
+                              : [...prev.assignedTables, table.id]
+                          }));
+                        }}
+                        className={`p-2 rounded-xl text-[10px] font-bold border transition-all cursor-pointer ${
+                          isSelected
+                            ? 'bg-orange-500 text-white border-orange-500 shadow-xs'
+                            : 'bg-white text-slate-600 border-slate-200 hover:border-orange-500'
+                        }`}
+                      >
+                        Table #{table.id}
+                      </button>
+                    );
+                  })}
                 </div>
-              )}
-
-              {(staffFormState.role === 'Cleaner' || staffFormState.role === 'Delivery Staff') && (
-                <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800">
-                  <label className="block text-gray-600 dark:text-gray-300 text-[10px] uppercase font-bold mb-1">
-                    Route / Zone Details
-                  </label>
-                  <input
-                    type="text"
-                    value={staffFormState.stationOrCounter || ''}
-                    onChange={(e) => setStaffFormState({...staffFormState, stationOrCounter: e.target.value})}
-                    placeholder="e.g. Zone A (Dining Hall) or 0-5km Express Fleet"
-                    className="w-full p-2.5 border rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-xs"
-                  />
-                </div>
-              )}
+                <p className="text-[10px] text-slate-500 mt-2 font-medium">
+                  {staffFormState.assignedTables.length === 0 || staffFormState.assignedTables.length === tables.length
+                    ? '⚡ Waiter serves ALL tables across the restaurant floor'
+                    : `Assigned tables: ${staffFormState.assignedTables.map(t => `T#${t}`).join(', ')}`}
+                </p>
+              </div>
             </form>
 
             {/* Pinned Footer */}
-            <div className="px-6 py-3.5 border-t border-gray-100 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-800/40 flex gap-2 shrink-0">
+            <div className="px-6 py-3.5 border-t border-slate-100 bg-slate-50/70 flex gap-2 shrink-0">
               <button
                 type="button"
                 onClick={() => setNewStaffForm(false)}
-                className="w-1/3 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-bold py-2.5 rounded-xl cursor-pointer transition-all"
+                className="w-1/3 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-2.5 rounded-xl cursor-pointer transition-all"
               >
                 Cancel
               </button>
@@ -4009,508 +3443,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                 form="active-staff-form"
                 className="w-2/3 bg-primary hover:bg-orange-600 text-white font-bold py-2.5 rounded-xl cursor-pointer shadow-md transition-all flex items-center justify-center gap-1.5"
               >
-                <Check size={16} /> Save Staff Member
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {/* 2. APPROVAL CONFIRMATION MODAL (PORTALIZED) */}
-      {approveModalStaff && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm overflow-y-auto animate-fade-in font-sans">
-          <div 
-            onClick={(e) => e.stopPropagation()} 
-            className={`relative my-auto w-full max-w-lg max-h-[88vh] flex flex-col rounded-3xl shadow-2xl border ${
-              isDarkMode ? 'bg-gray-900 border-gray-800 text-white' : 'bg-white border-gray-100 text-slate-900'
-            } overflow-hidden`}
-          >
-            {/* Pinned Header */}
-            <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 dark:border-gray-800 shrink-0 bg-emerald-50/50 dark:bg-emerald-950/30">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-black">
-                  <Check size={18} />
-                </div>
-                <div>
-                  <h4 className="font-extrabold text-base text-slate-900 dark:text-white">
-                    Approve Application & Assign Credentials
-                  </h4>
-                  <p className="text-[11px] text-gray-400">
-                    Review candidate details, confirm role, and issue terminal credentials
-                  </p>
-                </div>
-              </div>
-              <button 
-                type="button"
-                className="cursor-pointer text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-all" 
-                onClick={() => setApproveModalStaff(null)}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Scrollable Form Body */}
-            <form id="approve-candidate-form" onSubmit={handleConfirmApproval} className="overflow-y-auto p-6 space-y-4 flex-1 text-xs font-semibold">
-              {/* Candidate Quick Overview */}
-              <div className="p-3.5 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800 flex items-center gap-3">
-                <StaffAvatar photo={approveModalStaff.photo} name={approveModalStaff.name} size="md" />
-                <div className="flex-1 min-w-0">
-                  <h5 className="font-extrabold text-sm text-gray-900 dark:text-white truncate">{approveModalStaff.name}</h5>
-                  <div className="flex items-center gap-3 text-[11px] text-gray-500 mt-0.5">
-                    <span>📱 {approveModalStaff.mobile}</span>
-                    <span className="truncate">✉️ {approveModalStaff.email}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Role & Shift Selection */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-gray-500 mb-1 text-[10px] uppercase font-bold">Confirmed Role *</label>
-                  <select
-                    value={approvalForm.role}
-                    onChange={(e) => setApprovalForm({...approvalForm, role: e.target.value as any})}
-                    className="w-full p-2.5 border rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white"
-                  >
-                    <option value="Waiter">Waiter (Floor Service)</option>
-                    <option value="Chef">Chef (Kitchen Operations)</option>
-                    <option value="Manager">Manager (Supervisory)</option>
-                    <option value="Cashier">Cashier (Point of Sale)</option>
-                    <option value="Cleaner">Cleaner (Sanitation)</option>
-                    <option value="Delivery Staff">Delivery Staff (Fleet)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-gray-500 mb-1 text-[10px] uppercase font-bold">Assigned Shift *</label>
-                  <select
-                    value={approvalForm.shift}
-                    onChange={(e) => setApprovalForm({...approvalForm, shift: e.target.value as any})}
-                    className="w-full p-2.5 border rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white"
-                  >
-                    <option value="Morning">Morning Shift</option>
-                    <option value="Evening">Evening Shift</option>
-                    <option value="Night">Night Shift</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Salary */}
-              <div>
-                <label className="block text-gray-500 mb-1 text-[10px] uppercase font-bold">Monthly Salary (₹) *</label>
-                <input
-                  type="number"
-                  value={approvalForm.salary}
-                  onChange={(e) => setApprovalForm({...approvalForm, salary: parseInt(e.target.value) || 0})}
-                  required
-                  className="w-full p-2.5 border rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white"
-                />
-              </div>
-
-              {/* Auto-Generated Login Credentials */}
-              <div className="grid grid-cols-2 gap-3 p-3.5 bg-orange-50/50 dark:bg-orange-950/20 rounded-2xl border border-orange-100 dark:border-orange-900/40">
-                <div>
-                  <label className="block text-orange-950 dark:text-orange-200 mb-1 text-[10px] uppercase font-bold">Generated Emp ID</label>
-                  <input
-                    type="text"
-                    value={approvalForm.empid}
-                    onChange={(e) => setApprovalForm({...approvalForm, empid: e.target.value})}
-                    required
-                    className="w-full p-2 border border-orange-200 dark:border-orange-800 rounded-xl font-mono uppercase bg-white dark:bg-gray-800 text-xs font-bold"
-                  />
-                </div>
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="block text-orange-950 dark:text-orange-200 text-[10px] uppercase font-bold">Terminal Password</label>
-                    <button
-                      type="button"
-                      onClick={() => setApprovalForm(prev => ({ ...prev, password: generateRandomString(9) }))}
-                      className="text-[9px] text-orange-600 font-bold hover:underline cursor-pointer"
-                    >
-                      Regenerate
-                    </button>
-                  </div>
-                  <input
-                    type="text"
-                    value={approvalForm.password}
-                    onChange={(e) => setApprovalForm({...approvalForm, password: e.target.value})}
-                    required
-                    className="w-full p-2 border border-orange-200 dark:border-orange-800 rounded-xl font-mono bg-white dark:bg-gray-800 text-xs font-bold"
-                  />
-                </div>
-                <p className="col-span-2 text-[10px] text-orange-800/80 dark:text-orange-300/70">
-                  These credentials will be sent to the candidate's email automatically.
-                </p>
-              </div>
-
-              {/* Role specific routing if Waiter */}
-              {approvalForm.role === 'Waiter' && (
-                <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800">
-                  <div className="flex justify-between items-center mb-2">
-                    <label className="block text-gray-600 dark:text-gray-300 text-[10px] uppercase font-bold">
-                      Table Routing Assignment
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setApprovalForm(prev => ({
-                        ...prev,
-                        assignedTables: prev.assignedTables.length === tables.length ? [] : tables.map(t => t.id)
-                      }))}
-                      className="text-[10px] text-orange-600 font-bold hover:underline cursor-pointer"
-                    >
-                      {approvalForm.assignedTables.length === tables.length ? 'Clear All' : 'Select All Tables'}
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-4 gap-2">
-                    {tables.map(table => {
-                      const isSelected = approvalForm.assignedTables.includes(table.id);
-                      return (
-                        <button
-                          type="button"
-                          key={table.id}
-                          onClick={() => {
-                            setApprovalForm(prev => ({
-                              ...prev,
-                              assignedTables: isSelected 
-                                ? prev.assignedTables.filter(t => t !== table.id)
-                                : [...prev.assignedTables, table.id]
-                            }));
-                          }}
-                          className={`p-2 rounded-xl text-[10px] font-bold border transition-all cursor-pointer ${
-                            isSelected
-                              ? 'bg-orange-500 text-white border-orange-500'
-                              : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-700'
-                          }`}
-                        >
-                          Table #{table.id}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </form>
-
-            {/* Pinned Footer */}
-            <div className="px-6 py-3.5 border-t border-gray-100 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-800/40 flex gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => setApproveModalStaff(null)}
-                className="w-1/3 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-bold py-2.5 rounded-xl cursor-pointer transition-all"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                form="approve-candidate-form"
-                className="w-2/3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl cursor-pointer shadow-md transition-all flex items-center justify-center gap-1.5"
-              >
-                <Check size={16} /> Confirm Approval & Issue ID
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {/* 3. EDIT PENDING APPLICATION MODAL (PORTALIZED) */}
-      {editPendingStaffModal && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm overflow-y-auto animate-fade-in font-sans">
-          <div 
-            onClick={(e) => e.stopPropagation()} 
-            className={`relative my-auto w-full max-w-md max-h-[88vh] flex flex-col rounded-3xl shadow-2xl border ${
-              isDarkMode ? 'bg-gray-900 border-gray-800 text-white' : 'bg-white border-gray-100 text-slate-900'
-            } overflow-hidden`}
-          >
-            {/* Pinned Header */}
-            <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 dark:border-gray-800 shrink-0 bg-gray-50/50 dark:bg-gray-800/40">
-              <h4 className="font-extrabold text-base text-slate-900 dark:text-white">Edit Pending Application</h4>
-              <button 
-                type="button"
-                className="cursor-pointer text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-all" 
-                onClick={() => setEditPendingStaffModal(null)}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Scrollable Form Body */}
-            <form id="edit-pending-form" onSubmit={handleSavePendingStaff} className="overflow-y-auto p-6 space-y-4 flex-1 text-xs font-semibold">
-              {/* Photo */}
-              <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800">
-                <label className="block text-gray-500 mb-2 text-[10px] uppercase font-bold">Applicant Photo</label>
-                <div className="flex gap-3 items-center mb-2">
-                  <StaffAvatar photo={editPendingStaffModal.photo} name={editPendingStaffModal.name || 'Applicant'} size="md" />
-                  <div className="flex-1 space-y-1">
-                    <input
-                      type="text"
-                      value={editPendingStaffModal.photo || ''}
-                      onChange={(e) => setEditPendingStaffModal({...editPendingStaffModal, photo: e.target.value})}
-                      placeholder="Photo URL or Google Drive link"
-                      className="w-full p-2 border rounded-xl text-xs bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
-                    />
-                    <div className="flex gap-2 items-center pt-0.5">
-                      <label className="cursor-pointer bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 text-gray-700 dark:text-gray-300 px-2.5 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 shadow-xs transition-all">
-                        <Upload size={11} /> Upload Device File
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              const reader = new FileReader();
-                              reader.onloadend = () => {
-                                setEditPendingStaffModal(prev => prev ? ({ ...prev, photo: reader.result as string }) : null);
-                              };
-                              reader.readAsDataURL(file);
-                            }
-                          }}
-                        />
-                      </label>
-                      {editPendingStaffModal.photo && (
-                        <button
-                          type="button"
-                          onClick={() => setEditPendingStaffModal({...editPendingStaffModal, photo: ''})}
-                          className="text-[10px] text-red-500 font-bold hover:underline cursor-pointer"
-                        >
-                          Remove
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-gray-400 mb-1 text-[10px] uppercase font-bold">Full Name *</label>
-                <input
-                  type="text"
-                  value={editPendingStaffModal.name}
-                  onChange={(e) => setEditPendingStaffModal({...editPendingStaffModal, name: e.target.value})}
-                  required
-                  className="w-full p-2.5 border rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-gray-400 mb-1 text-[10px] uppercase font-bold">Mobile *</label>
-                  <input
-                    type="text"
-                    value={editPendingStaffModal.mobile}
-                    onChange={(e) => setEditPendingStaffModal({...editPendingStaffModal, mobile: e.target.value})}
-                    required
-                    className="w-full p-2.5 border rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
-                  />
-                </div>
-                <div>
-                  <label className="block text-gray-400 mb-1 text-[10px] uppercase font-bold">WhatsApp</label>
-                  <input
-                    type="text"
-                    value={editPendingStaffModal.whatsapp}
-                    onChange={(e) => setEditPendingStaffModal({...editPendingStaffModal, whatsapp: e.target.value})}
-                    className="w-full p-2.5 border rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-gray-400 mb-1 text-[10px] uppercase font-bold">Email ID *</label>
-                <input
-                  type="email"
-                  value={editPendingStaffModal.email}
-                  onChange={(e) => setEditPendingStaffModal({...editPendingStaffModal, email: e.target.value})}
-                  required
-                  className="w-full p-2.5 border rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-gray-400 mb-1 text-[10px] uppercase font-bold">Applied Role *</label>
-                  <select
-                    value={editPendingStaffModal.role || 'Waiter'}
-                    onChange={(e) => setEditPendingStaffModal({...editPendingStaffModal, role: e.target.value as any})}
-                    className="w-full p-2.5 border rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
-                  >
-                    <option value="Waiter">Waiter</option>
-                    <option value="Chef">Chef</option>
-                    <option value="Manager">Manager</option>
-                    <option value="Cashier">Cashier</option>
-                    <option value="Cleaner">Cleaner</option>
-                    <option value="Delivery Staff">Delivery Staff</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-gray-400 mb-1 text-[10px] uppercase font-bold">Preferred Shift *</label>
-                  <select
-                    value={editPendingStaffModal.shift || 'Morning'}
-                    onChange={(e) => setEditPendingStaffModal({...editPendingStaffModal, shift: e.target.value as any})}
-                    className="w-full p-2.5 border rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
-                  >
-                    <option value="Morning">Morning</option>
-                    <option value="Evening">Evening</option>
-                    <option value="Night">Night</option>
-                  </select>
-                </div>
-              </div>
-            </form>
-
-            {/* Pinned Footer */}
-            <div className="px-6 py-3.5 border-t border-gray-100 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-800/40 flex gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => setEditPendingStaffModal(null)}
-                className="w-1/3 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-bold py-2.5 rounded-xl cursor-pointer transition-all"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                form="edit-pending-form"
-                className="w-2/3 bg-primary hover:bg-orange-600 text-white font-bold py-2.5 rounded-xl cursor-pointer shadow-md transition-all flex items-center justify-center gap-1.5"
-              >
-                <Check size={16} /> Save Changes
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {/* 4. ADMIN REGISTER NEW APPLICANT MODAL (PORTALIZED) */}
-      {newPendingStaffModal && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm overflow-y-auto animate-fade-in font-sans">
-          <div 
-            onClick={(e) => e.stopPropagation()} 
-            className={`relative my-auto w-full max-w-md max-h-[88vh] flex flex-col rounded-3xl shadow-2xl border ${
-              isDarkMode ? 'bg-gray-900 border-gray-800 text-white' : 'bg-white border-gray-100 text-slate-900'
-            } overflow-hidden`}
-          >
-            {/* Pinned Header */}
-            <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 dark:border-gray-800 shrink-0 bg-gray-50/50 dark:bg-gray-800/40">
-              <div>
-                <h4 className="font-extrabold text-base text-slate-900 dark:text-white">Register Walk-in Applicant</h4>
-                <p className="text-[10px] text-gray-400">Adds directly to Pending Applications queue</p>
-              </div>
-              <button 
-                type="button"
-                className="cursor-pointer text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-all" 
-                onClick={() => setNewPendingStaffModal(false)}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Scrollable Form Body */}
-            <form id="create-pending-form" onSubmit={handleCreatePendingStaff} className="overflow-y-auto p-6 space-y-4 flex-1 text-xs font-semibold">
-              <div>
-                <label className="block text-gray-400 mb-1 text-[10px] uppercase font-bold">Candidate Full Name *</label>
-                <input
-                  type="text"
-                  value={newPendingStaffForm.name}
-                  onChange={(e) => setNewPendingStaffForm({...newPendingStaffForm, name: e.target.value})}
-                  placeholder="e.g. Anand Sharma"
-                  required
-                  className="w-full p-2.5 border rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-gray-400 mb-1 text-[10px] uppercase font-bold">Mobile Number *</label>
-                  <input
-                    type="tel"
-                    value={newPendingStaffForm.mobile}
-                    onChange={(e) => setNewPendingStaffForm({...newPendingStaffForm, mobile: e.target.value})}
-                    placeholder="+91 9876543210"
-                    required
-                    className="w-full p-2.5 border rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
-                  />
-                </div>
-                <div>
-                  <label className="block text-gray-400 mb-1 text-[10px] uppercase font-bold">WhatsApp</label>
-                  <input
-                    type="tel"
-                    value={newPendingStaffForm.whatsapp}
-                    onChange={(e) => setNewPendingStaffForm({...newPendingStaffForm, whatsapp: e.target.value})}
-                    placeholder="Same as mobile"
-                    className="w-full p-2.5 border rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-gray-400 mb-1 text-[10px] uppercase font-bold">Email Address *</label>
-                <input
-                  type="email"
-                  value={newPendingStaffForm.email}
-                  onChange={(e) => setNewPendingStaffForm({...newPendingStaffForm, email: e.target.value})}
-                  placeholder="applicant@email.com"
-                  required
-                  className="w-full p-2.5 border rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-gray-400 mb-1 text-[10px] uppercase font-bold">Applied Role *</label>
-                  <select
-                    value={newPendingStaffForm.role}
-                    onChange={(e) => setNewPendingStaffForm({...newPendingStaffForm, role: e.target.value as any})}
-                    className="w-full p-2.5 border rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
-                  >
-                    <option value="Waiter">Waiter (Floor)</option>
-                    <option value="Chef">Chef (Kitchen)</option>
-                    <option value="Manager">Manager (Operations)</option>
-                    <option value="Cashier">Cashier (Billing)</option>
-                    <option value="Cleaner">Cleaner (Sanitation)</option>
-                    <option value="Delivery Staff">Delivery Staff (Fleet)</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-gray-400 mb-1 text-[10px] uppercase font-bold">Preferred Shift *</label>
-                  <select
-                    value={newPendingStaffForm.shift}
-                    onChange={(e) => setNewPendingStaffForm({...newPendingStaffForm, shift: e.target.value as any})}
-                    className="w-full p-2.5 border rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
-                  >
-                    <option value="Morning">Morning</option>
-                    <option value="Evening">Evening</option>
-                    <option value="Night">Night</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-gray-400 mb-1 text-[10px] uppercase font-bold">Notes / Prior Experience</label>
-                <textarea
-                  rows={2}
-                  value={newPendingStaffForm.notes}
-                  onChange={(e) => setNewPendingStaffForm({...newPendingStaffForm, notes: e.target.value})}
-                  placeholder="e.g. Experienced in table service and billing"
-                  className="w-full p-2.5 border rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-xs"
-                />
-              </div>
-            </form>
-
-            {/* Pinned Footer */}
-            <div className="px-6 py-3.5 border-t border-gray-100 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-800/40 flex gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => setNewPendingStaffModal(false)}
-                className="w-1/3 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-bold py-2.5 rounded-xl cursor-pointer transition-all"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                form="create-pending-form"
-                className="w-2/3 bg-primary hover:bg-orange-600 text-white font-bold py-2.5 rounded-xl cursor-pointer shadow-md transition-all flex items-center justify-center gap-1.5"
-              >
-                <Plus size={16} /> Add to Pending Queue
+                <Check size={16} /> Save Waiter Member
               </button>
             </div>
           </div>
@@ -4524,10 +3457,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
           <div 
             onClick={(e) => e.stopPropagation()} 
             className={`relative my-auto w-full max-w-sm rounded-3xl p-6 shadow-2xl border ${
-              isDarkMode ? 'bg-gray-900 border-gray-800 text-white' : 'bg-white border-gray-100 text-slate-900'
+              'bg-white border-gray-100 text-slate-900'
             }`}
           >
-            <div className="flex justify-between items-center mb-4 pb-2 border-b border-gray-100 dark:border-gray-800">
+            <div className="flex justify-between items-center mb-4 pb-2 border-b border-gray-100 ">
               <h4 className="font-extrabold text-sm">Security Verification</h4>
               <button className="cursor-pointer text-gray-400 hover:text-gray-700" onClick={() => { setOtpModal(false); setPendingEditStaff(null); }}>
                 <X size={18} />
@@ -4542,7 +3475,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                   onChange={(e) => setOtpInput(e.target.value)}
                   placeholder="Enter OTP (e.g., 1234)"
                   required
-                  className="w-full p-2.5 border rounded-xl text-center text-lg tracking-widest bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
+                  className="w-full p-2.5 border rounded-xl text-center text-lg tracking-widest bg-white  border-gray-200 "
                 />
               </div>
               <button onClick={handleVerifyOTP} className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 rounded-xl cursor-pointer transition-colors shadow-sm">
