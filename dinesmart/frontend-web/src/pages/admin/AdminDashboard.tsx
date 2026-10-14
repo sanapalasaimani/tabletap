@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { db } from '../../supabase';
 import { MenuItem, Order, UserProfile, WaiterRequest, PendingStaff } from '../../types';
 import { MENU_ITEMS } from '../../data/menu';
@@ -54,6 +55,7 @@ interface Employee {
   empid: string;
   password?: string;
   assignedTables?: number[];
+  stationOrCounter?: string;
 }
 
 export const StaffAvatar: React.FC<{
@@ -237,6 +239,35 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
 
   const [editPendingStaffModal, setEditPendingStaffModal] = useState<PendingStaff | null>(null);
 
+  // Approval Modal State
+  const [approveModalStaff, setApproveModalStaff] = useState<PendingStaff | null>(null);
+  const [approvalForm, setApprovalForm] = useState({
+    role: 'Waiter' as Employee['role'],
+    shift: 'Morning' as Employee['shift'],
+    salary: 18000,
+    empid: '',
+    password: '',
+    assignedTables: [] as number[],
+    stationOrCounter: ''
+  });
+
+  // Admin Manual Register to Pending Queue Modal
+  const [newPendingStaffModal, setNewPendingStaffModal] = useState(false);
+  const [newPendingStaffForm, setNewPendingStaffForm] = useState({
+    name: '',
+    mobile: '',
+    whatsapp: '',
+    email: '',
+    photo: '',
+    role: 'Waiter' as 'Waiter' | 'Chef' | 'Manager' | 'Cashier' | 'Cleaner' | 'Delivery Staff',
+    shift: 'Morning' as 'Morning' | 'Evening' | 'Night',
+    notes: ''
+  });
+
+  // Role Filtering for Staff Roster and Pending Applications
+  const [staffRoleFilter, setStaffRoleFilter] = useState<string>('All');
+  const [pendingRoleFilter, setPendingRoleFilter] = useState<string>('All');
+
   // Form Fields State
   const [menuFormState, setMenuFormState] = useState({
     name: '',
@@ -262,7 +293,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
     salary: 18000,
     empid: '',
     password: '',
-    assignedTables: [] as number[]
+    assignedTables: [] as number[],
+    stationOrCounter: ''
   });
 
   const [couponFormState, setCouponFormState] = useState({
@@ -575,36 +607,88 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
     return result;
   };
 
-  const handleApprovePendingStaff = async (app: PendingStaff) => {
+  // Open Approval Confirmation Modal with Role and Credential Configuration
+  const handleOpenApproveModal = (app: PendingStaff) => {
     const newEmpId = `EMP-${Math.floor(1000 + Math.random() * 9000)}`;
     const newPassword = generateRandomString(Math.floor(Math.random() * 3) + 8);
-
-    const newEmp = {
-      id: `s_${Date.now()}`,
-      name: app.name,
-      mobile: app.mobile,
-      role: 'Waiter',
-      shift: 'Morning',
+    setApproveModalStaff(app);
+    setApprovalForm({
+      role: (app.role as Employee['role']) || 'Waiter',
+      shift: (app.shift as Employee['shift']) || 'Morning',
       salary: 18000,
       empid: newEmpId,
       password: newPassword,
-      photo: app.photo || '',
       assignedTables: [],
+      stationOrCounter: ''
+    });
+  };
+
+  // Confirm Approval & Add to Staff
+  const handleConfirmApproval = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!approveModalStaff) return;
+
+    const newEmp: Employee = {
+      id: `s_${Date.now()}`,
+      name: approveModalStaff.name,
+      mobile: approveModalStaff.mobile,
+      email: approveModalStaff.email,
+      photo: approveModalStaff.photo || '',
+      role: approvalForm.role,
+      shift: approvalForm.shift,
+      salary: Number(approvalForm.salary) || 18000,
+      empid: approvalForm.empid,
+      password: approvalForm.password,
       attendance: 100,
-      performance: { score: 90, ordersDelivered: 0, avgServingTime: 'N/A', ratings: 5.0, tips: 0 }
+      performance: { score: 90, ordersDelivered: 0, avgServingTime: 'N/A', ratings: 5.0, tips: 0 },
+      assignedTables: approvalForm.role === 'Waiter' ? approvalForm.assignedTables : [],
+      stationOrCounter: approvalForm.stationOrCounter || ''
     };
 
     try {
       await db.saveStaffMember(newEmp as any);
-      await db.deletePendingStaff(app.id);
+      await db.deletePendingStaff(approveModalStaff.id);
       await fetchData();
-      logActivity(`Approved pending application for ${app.name}. Assigned EMP ID: ${newEmpId}`);
+      logActivity(`Approved pending application for ${approveModalStaff.name} as ${approvalForm.role}. Assigned EMP ID: ${approvalForm.empid}`);
       
-      const subject = encodeURIComponent('Your DineSmart Waiter Application is Approved!');
-      const body = encodeURIComponent(`Hello ${app.name},\n\nYour application has been approved.\n\nHere are your login credentials for the DineSmart terminal:\nEMP ID: ${newEmpId}\nPassword: ${newPassword}\n\nWelcome to the team!\n\nDineSmart Admin`);
-      window.location.href = `mailto:${app.email}?subject=${subject}&body=${body}`;
+      const subject = encodeURIComponent(`Your DineSmart ${approvalForm.role} Application is Approved!`);
+      const body = encodeURIComponent(`Hello ${approveModalStaff.name},\n\nCongratulations! Your application for ${approvalForm.role} has been approved.\n\nHere are your login credentials for the DineSmart terminal:\nEMP ID: ${approvalForm.empid}\nPassword: ${approvalForm.password}\nRole: ${approvalForm.role}\nShift: ${approvalForm.shift}\n\nWelcome to the DineSmart team!\n\nDineSmart Administration`);
+      window.location.href = `mailto:${approveModalStaff.email}?subject=${subject}&body=${body}`;
+      setApproveModalStaff(null);
     } catch (e) {
       alert('Failed to approve application.');
+    }
+  };
+
+  // Direct manual addition to Pending Applications by Admin
+  const handleCreatePendingStaff = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await db.submitPendingStaff({
+        name: newPendingStaffForm.name,
+        mobile: newPendingStaffForm.mobile,
+        whatsapp: newPendingStaffForm.whatsapp || newPendingStaffForm.mobile,
+        email: newPendingStaffForm.email,
+        photo: newPendingStaffForm.photo,
+        role: newPendingStaffForm.role,
+        shift: newPendingStaffForm.shift,
+        notes: newPendingStaffForm.notes
+      });
+      await fetchData();
+      setNewPendingStaffModal(false);
+      setNewPendingStaffForm({
+        name: '',
+        mobile: '',
+        whatsapp: '',
+        email: '',
+        photo: '',
+        role: 'Waiter',
+        shift: 'Morning',
+        notes: ''
+      });
+      logActivity(`Registered applicant to pending queue: ${newPendingStaffForm.name}`);
+    } catch (err) {
+      alert('Failed to register applicant to pending queue.');
     }
   };
 
@@ -630,7 +714,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
         password: staffFormState.password,
         attendance: editingStaff ? editingStaff.attendance : 100,
         performance: editingStaff ? editingStaff.performance : { score: 90, ordersDelivered: 0, avgServingTime: 'N/A', ratings: 5.0, tips: 0 },
-        assignedTables: staffFormState.role === 'Waiter' ? staffFormState.assignedTables : []
+        assignedTables: staffFormState.role === 'Waiter' ? staffFormState.assignedTables : [],
+        stationOrCounter: staffFormState.stationOrCounter
       };
 
       await db.saveStaffMember(newEmp);
@@ -638,7 +723,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
       logActivity(editingStaff ? `Updated staff member: ${newEmp.name}` : `Added new staff member: ${newEmp.name}`);
       setNewStaffForm(false);
       setEditingStaff(null);
-      setStaffFormState({ name: '', mobile: '', email: '', photo: '', role: 'Waiter', shift: 'Morning', salary: 18000, empid: '', password: '', assignedTables: [] });
+      setStaffFormState({ name: '', mobile: '', email: '', photo: '', role: 'Waiter', shift: 'Morning', salary: 18000, empid: '', password: '', assignedTables: [], stationOrCounter: '' });
     } catch (e) {
       alert('Failed to register employee. Employee ID must be unique.');
     }
@@ -668,7 +753,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
       salary: emp.salary || 18000,
       empid: emp.empid || '',
       password: emp.password || '',
-      assignedTables: emp.assignedTables || []
+      assignedTables: emp.assignedTables || [],
+      stationOrCounter: emp.stationOrCounter || ''
     });
     setNewStaffForm(true);
   };
@@ -686,7 +772,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
       salary: 18000,
       empid: `EMP${randNum}`,
       password: `pass${Math.floor(1000 + Math.random() * 9000)}`,
-      assignedTables: []
+      assignedTables: [],
+      stationOrCounter: ''
     });
     setNewStaffForm(true);
   };
@@ -707,7 +794,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
           salary: pendingEditStaff.salary,
           empid: pendingEditStaff.empid,
           password: pendingEditStaff.password || '',
-          assignedTables: pendingEditStaff.assignedTables || []
+          assignedTables: pendingEditStaff.assignedTables || [],
+          stationOrCounter: pendingEditStaff.stationOrCounter || ''
         });
         setNewStaffForm(true);
         setPendingEditStaff(null);
@@ -1923,9 +2011,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                 </div>
 
                 {/* Form Modal with Direct Image URL Open Link */}
-                {newMenuItemForm && (
-                  <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className={`w-full max-w-lg rounded-3xl p-6 shadow-2xl ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'} max-h-[90vh] overflow-y-auto`}>
+                {newMenuItemForm && createPortal(
+                  <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+                    <div className={`relative my-auto w-full max-w-lg rounded-3xl p-6 shadow-2xl ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'} max-h-[90vh] overflow-y-auto`}>
                       <div className="flex justify-between items-center mb-4 pb-3 border-b">
                         <h4 className="font-extrabold text-sm">{editingMenuItem ? 'Edit Menu Item' : 'Create New Menu Item'}</h4>
                         <button onClick={() => setNewMenuItemForm(false)} className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer">
@@ -2088,7 +2176,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                         </button>
                       </form>
                     </div>
-                  </div>
+                  </div>,
+                  document.body
                 )}
 
                 {/* Menu Grid with Direct Openable Image Links */}
@@ -2240,657 +2329,426 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
           {/* ----------------------------------------------------
               VIEW 6: STAFF SCORECARD
               ---------------------------------------------------- */}
+          {/* ----------------------------------------------------
+              VIEW 6: STAFF MANAGEMENT & ONBOARDING
+              ---------------------------------------------------- */}
           {activeTab === 'staff' && (
             <div className="space-y-6 animate-fade-in">
-              <div className="flex justify-between items-start border-b pb-3">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b pb-4">
                 <div>
-                  <h3 className="font-extrabold text-sm">Staff Management</h3>
-                  <p className="text-[10px] text-gray-400 mt-1">Manage employee accounts and pending applications.</p>
+                  <h3 className="font-extrabold text-base flex items-center gap-2">
+                    <UserCheck size={18} className="text-primary" />
+                    <span>Staff Management & Operations</span>
+                  </h3>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Manage active staff roster, credentials, routing, and pending candidate applications.
+                  </p>
                 </div>
                 
                 {/* SUB-TABS */}
-                <div className="flex bg-gray-100 rounded-xl p-1">
+                <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-2xl shrink-0">
                   <button 
                     onClick={() => setStaffSubTab('roster')} 
-                    className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${staffSubTab === 'roster' ? 'bg-white shadow text-primary' : 'text-gray-500 hover:text-gray-700'}`}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                      staffSubTab === 'roster' 
+                        ? 'bg-white dark:bg-gray-900 shadow-sm text-primary dark:text-orange-400 font-extrabold' 
+                        : 'text-gray-500 hover:text-gray-900 dark:hover:text-gray-200'
+                    }`}
                   >
-                    Staff Roster
+                    <Users size={14} />
+                    <span>Active Roster</span>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold">
+                      {staff.length}
+                    </span>
                   </button>
+
                   <button 
                     onClick={() => setStaffSubTab('pending')} 
-                    className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${staffSubTab === 'pending' ? 'bg-white shadow text-primary' : 'text-gray-500 hover:text-gray-700'}`}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                      staffSubTab === 'pending' 
+                        ? 'bg-white dark:bg-gray-900 shadow-sm text-primary dark:text-orange-400 font-extrabold' 
+                        : 'text-gray-500 hover:text-gray-900 dark:hover:text-gray-200'
+                    }`}
                   >
-                    Pending Apps
-                    {pendingStaffList.length > 0 && (
-                      <span className="bg-red-500 text-white text-[9px] px-1.5 py-0.5 rounded-full">{pendingStaffList.length}</span>
+                    <Clock size={14} />
+                    <span>Pending Applications</span>
+                    {pendingStaffList.length > 0 ? (
+                      <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.2 rounded-full font-black animate-pulse">
+                        {pendingStaffList.length}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold">0</span>
                     )}
                   </button>
                 </div>
               </div>
 
-              {/* Edit Pending Staff Modal (Always render if active) */}
-              {editPendingStaffModal && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                  <div className={`w-full max-w-md max-h-[90vh] overflow-y-auto rounded-3xl p-6 shadow-2xl ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-white'}`}>
-                    <div className="flex justify-between items-center mb-4 pb-2 border-b">
-                      <h4 className="font-extrabold text-sm">Edit Application</h4>
-                      <button className="cursor-pointer text-gray-400 hover:text-gray-700" onClick={() => setEditPendingStaffModal(null)}><X size={18} /></button>
+              {/* ATTENTION BANNER WHEN PENDING APPLICATIONS EXIST */}
+              {pendingStaffList.length > 0 && staffSubTab === 'roster' && (
+                <div className="p-3.5 bg-gradient-to-r from-orange-500/10 via-amber-500/10 to-transparent border border-orange-200 dark:border-orange-900/50 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+                  <div className="flex items-center gap-3">
+                    <span className="relative flex h-3 w-3">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-orange-500"></span>
+                    </span>
+                    <div>
+                      <p className="text-xs font-bold text-orange-950 dark:text-orange-200">
+                        {pendingStaffList.length} New Candidate Application{pendingStaffList.length > 1 ? 's' : ''} Awaiting Review
+                      </p>
+                      <p className="text-[10px] text-orange-800/80 dark:text-orange-300/70">
+                        Candidates have applied for Waiter, Kitchen, or Staff roles. Click to review, assign credentials, or approve.
+                      </p>
                     </div>
-                    <form onSubmit={handleSavePendingStaff} className="space-y-4 text-xs font-semibold text-black">
-                      {/* Photo Section */}
-                      <div className="p-3 bg-gray-50 rounded-2xl border border-gray-100">
-                        <label className="block text-gray-500 mb-2 text-[10px] uppercase font-bold">Applicant Photo</label>
-                        <div className="flex gap-3 items-center mb-3">
-                          <StaffAvatar photo={editPendingStaffModal.photo} name={editPendingStaffModal.name || 'Applicant'} size="lg" />
-                          <div className="flex-1 space-y-1">
-                            <input
-                              type="text"
-                              value={editPendingStaffModal.photo || ''}
-                              onChange={(e) => setEditPendingStaffModal({...editPendingStaffModal, photo: e.target.value})}
-                              placeholder="Photo URL or Google Drive link"
-                              className="w-full p-2 border rounded-xl text-xs bg-white"
-                            />
-                            <div className="flex gap-2 items-center pt-1">
-                              <label className="cursor-pointer bg-white border border-gray-200 hover:bg-gray-100 text-gray-700 px-2.5 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 shadow-xs transition-all">
-                                <Upload size={11} /> Upload Device File
-                                <input
-                                  type="file"
-                                  accept="image/*"
-                                  className="hidden"
-                                  onChange={(e) => {
-                                    const file = e.target.files?.[0];
-                                    if (file) {
-                                      const reader = new FileReader();
-                                      reader.onloadend = () => {
-                                        setEditPendingStaffModal(prev => prev ? ({ ...prev, photo: reader.result as string }) : null);
-                                      };
-                                      reader.readAsDataURL(file);
-                                    }
-                                  }}
-                                />
-                              </label>
-                              {editPendingStaffModal.photo && (
-                                <button
-                                  type="button"
-                                  onClick={() => setEditPendingStaffModal({...editPendingStaffModal, photo: ''})}
-                                  className="text-[10px] text-red-500 font-bold hover:underline cursor-pointer"
-                                >
-                                  Remove
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Preset Avatars */}
-                        <div>
-                          <p className="text-[9px] text-gray-400 mb-1 font-bold">Or pick preset avatar:</p>
-                          <div className="flex gap-1.5 overflow-x-auto pb-1">
-                            {PRESET_AVATARS.map((p, i) => (
-                              <button
-                                type="button"
-                                key={i}
-                                onClick={() => setEditPendingStaffModal({...editPendingStaffModal, photo: p.url})}
-                                title={p.name}
-                                className="w-7 h-7 rounded-lg overflow-hidden border border-gray-200 hover:border-orange-500 transition-all shrink-0 cursor-pointer"
-                              >
-                                <img src={p.url} alt={p.name} className="w-full h-full object-cover" />
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-gray-400 mb-1 text-[10px] uppercase">Full Name</label>
-                        <input
-                          type="text"
-                          value={editPendingStaffModal.name}
-                          onChange={(e) => setEditPendingStaffModal({...editPendingStaffModal, name: e.target.value})}
-                          required
-                          className="w-full p-2.5 border rounded-xl"
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="block text-gray-400 mb-1 text-[10px] uppercase">Mobile</label>
-                          <input
-                            type="text"
-                            value={editPendingStaffModal.mobile}
-                            onChange={(e) => setEditPendingStaffModal({...editPendingStaffModal, mobile: e.target.value})}
-                            required
-                            className="w-full p-2.5 border rounded-xl"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-gray-400 mb-1 text-[10px] uppercase">WhatsApp</label>
-                          <input
-                            type="text"
-                            value={editPendingStaffModal.whatsapp}
-                            onChange={(e) => setEditPendingStaffModal({...editPendingStaffModal, whatsapp: e.target.value})}
-                            required
-                            className="w-full p-2.5 border rounded-xl"
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-gray-400 mb-1 text-[10px] uppercase">Email ID</label>
-                        <input
-                          type="email"
-                          value={editPendingStaffModal.email}
-                          onChange={(e) => setEditPendingStaffModal({...editPendingStaffModal, email: e.target.value})}
-                          required
-                          className="w-full p-2.5 border rounded-xl"
-                        />
-                      </div>
-                      <button type="submit" className="w-full bg-primary text-white font-bold py-3 rounded-xl mt-2 cursor-pointer shadow-md hover:bg-orange-600 transition-all">
-                        Save Changes
-                      </button>
-                    </form>
                   </div>
+                  <button
+                    onClick={() => setStaffSubTab('pending')}
+                    className="px-3.5 py-1.5 bg-primary hover:bg-orange-600 text-white text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer shrink-0"
+                  >
+                    Review Pending Apps →
+                  </button>
                 </div>
               )}
 
-              {/* Edit / Add Staff Form Drawer */}
-              {newStaffForm && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                  <div className={`w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-3xl p-6 shadow-2xl ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-white'}`}>
-                    <div className="flex justify-between items-center mb-4 pb-2 border-b">
-                      <div>
-                        <h4 className="font-extrabold text-base text-slate-900">
-                          {editingStaff ? 'Edit Staff Member' : 'Add New Staff Member'}
-                        </h4>
-                        <p className="text-[10px] text-gray-400">
-                          {editingStaff ? `Updating details for ${editingStaff.name} (${editingStaff.empid})` : 'Register a new employee with terminal login credentials'}
-                        </p>
-                      </div>
-                      <button className="cursor-pointer text-gray-400 hover:text-gray-700 p-1 rounded-full hover:bg-gray-100 transition-all" onClick={() => setNewStaffForm(false)}>
-                        <X size={20} />
-                      </button>
-                    </div>
-
-                    <form onSubmit={handleSaveStaffMember} className="space-y-4 text-xs font-semibold text-black">
-                      {/* Photo Section */}
-                      <div className="p-3.5 bg-gradient-to-tr from-orange-50/60 to-amber-50/40 rounded-2xl border border-orange-100">
-                        <label className="block text-orange-950 mb-2 text-[10px] uppercase font-bold tracking-wider">
-                          Staff Photo / Avatar
-                        </label>
-                        <div className="flex gap-3 items-center mb-3">
-                          <StaffAvatar photo={staffFormState.photo} name={staffFormState.name || 'Staff'} size="lg" />
-                          <div className="flex-1 space-y-1.5">
-                            <input
-                              type="text"
-                              value={staffFormState.photo}
-                              onChange={(e) => setStaffFormState({...staffFormState, photo: e.target.value})}
-                              placeholder="Paste Photo URL or Google Drive link"
-                              className="w-full p-2 border border-orange-200 rounded-xl text-xs bg-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-                            />
-                            <div className="flex gap-2 items-center flex-wrap pt-0.5">
-                              <label className="cursor-pointer bg-white border border-orange-200 hover:bg-orange-50 text-orange-800 px-3 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 shadow-xs transition-all">
-                                <Upload size={12} className="text-orange-500" /> Upload from Computer / Phone
-                                <input
-                                  type="file"
-                                  accept="image/*"
-                                  className="hidden"
-                                  onChange={(e) => {
-                                    const file = e.target.files?.[0];
-                                    if (file) {
-                                      const reader = new FileReader();
-                                      reader.onloadend = () => {
-                                        setStaffFormState(prev => ({ ...prev, photo: reader.result as string }));
-                                      };
-                                      reader.readAsDataURL(file);
-                                    }
-                                  }}
-                                />
-                              </label>
-                              {staffFormState.photo && (
-                                <button
-                                  type="button"
-                                  onClick={() => setStaffFormState({...staffFormState, photo: ''})}
-                                  className="text-[10px] text-red-500 font-bold hover:underline cursor-pointer"
-                                >
-                                  Remove Photo
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Presets */}
-                        <div>
-                          <p className="text-[9px] text-gray-500 mb-1.5 font-bold">Or pick a quick professional avatar:</p>
-                          <div className="flex gap-2 overflow-x-auto pb-1">
-                            {PRESET_AVATARS.map((p, idx) => (
-                              <button
-                                type="button"
-                                key={idx}
-                                onClick={() => setStaffFormState({...staffFormState, photo: p.url})}
-                                title={p.name}
-                                className={`w-8 h-8 rounded-xl overflow-hidden border-2 transition-all shrink-0 cursor-pointer ${
-                                  staffFormState.photo === p.url ? 'border-orange-500 ring-2 ring-orange-400' : 'border-white hover:border-orange-300'
-                                }`}
-                              >
-                                <img src={p.url} alt={p.name} className="w-full h-full object-cover" />
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Full Name */}
-                      <div>
-                        <label className="block text-gray-500 mb-1 text-[10px] uppercase font-bold">Full Name</label>
-                        <input
-                          type="text"
-                          value={staffFormState.name}
-                          onChange={(e) => setStaffFormState({...staffFormState, name: e.target.value})}
-                          placeholder="e.g. John Doe"
-                          required
-                          className="w-full p-2.5 border rounded-xl bg-white"
-                        />
-                      </div>
-
-                      {/* Phone & Email */}
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="block text-gray-500 mb-1 text-[10px] uppercase font-bold">Phone / Mobile</label>
-                          <input
-                            type="text"
-                            value={staffFormState.mobile}
-                            onChange={(e) => setStaffFormState({...staffFormState, mobile: e.target.value})}
-                            placeholder="+91 98765 43210"
-                            className="w-full p-2.5 border rounded-xl bg-white"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-gray-500 mb-1 text-[10px] uppercase font-bold">Email</label>
-                          <input
-                            type="email"
-                            value={staffFormState.email}
-                            onChange={(e) => setStaffFormState({...staffFormState, email: e.target.value})}
-                            placeholder="staff@restaurant.com"
-                            className="w-full p-2.5 border rounded-xl bg-white"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Employee ID & Terminal Password */}
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="block text-gray-500 mb-1 text-[10px] uppercase font-bold">Employee ID (EmpID)</label>
-                          <input
-                            type="text"
-                            value={staffFormState.empid}
-                            onChange={(e) => setStaffFormState({...staffFormState, empid: e.target.value})}
-                            placeholder="e.g. EMP1024"
-                            required
-                            className="w-full p-2.5 border rounded-xl font-mono uppercase bg-white"
-                          />
-                        </div>
-                        <div>
-                          <div className="flex justify-between items-center mb-1">
-                            <label className="block text-gray-500 text-[10px] uppercase font-bold">Password</label>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const newPw = 'pass' + Math.floor(1000 + Math.random() * 9000);
-                                setStaffFormState(prev => ({ ...prev, password: newPw }));
-                              }}
-                              className="text-[9px] text-orange-600 font-bold hover:underline cursor-pointer"
-                            >
-                              Generate
-                            </button>
-                          </div>
-                          <input
-                            type="text"
-                            value={staffFormState.password}
-                            onChange={(e) => setStaffFormState({...staffFormState, password: e.target.value})}
-                            placeholder="Terminal login password"
-                            required
-                            className="w-full p-2.5 border rounded-xl font-mono bg-white"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Role & Salary */}
-                      <div className="grid grid-cols-3 gap-2">
-                        <div>
-                          <label className="block text-gray-500 mb-1 text-[10px] uppercase font-bold">Role</label>
-                          <select
-                            value={staffFormState.role}
-                            onChange={(e) => setStaffFormState({...staffFormState, role: e.target.value as any})}
-                            className="w-full p-2.5 border rounded-xl bg-white"
-                          >
-                            <option>Waiter</option>
-                            <option>Chef</option>
-                            <option>Manager</option>
-                            <option>Cashier</option>
-                            <option>Cleaner</option>
-                            <option>Delivery Staff</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-gray-500 mb-1 text-[10px] uppercase font-bold">Shift</label>
-                          <select
-                            value={staffFormState.shift}
-                            onChange={(e) => setStaffFormState({...staffFormState, shift: e.target.value as any})}
-                            className="w-full p-2.5 border rounded-xl bg-white"
-                          >
-                            <option>Morning</option>
-                            <option>Evening</option>
-                            <option>Night</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-gray-500 mb-1 text-[10px] uppercase font-bold">Monthly Salary</label>
-                          <input
-                            type="number"
-                            value={staffFormState.salary}
-                            onChange={(e) => setStaffFormState({...staffFormState, salary: parseInt(e.target.value) || 0})}
-                            required
-                            className="w-full p-2.5 border rounded-xl bg-white"
-                          />
-                        </div>
-                      </div>
-                      
-                      {/* Table routing (Waiters only) */}
-                      {staffFormState.role === 'Waiter' && (
-                        <div className="p-3 bg-gray-50 rounded-2xl border border-gray-100">
-                          <div className="flex justify-between items-center mb-2">
-                            <label className="block text-gray-600 text-[10px] uppercase font-bold">Table Routing & Assignment</label>
-                            <button
-                              type="button"
-                              onClick={() => setStaffFormState(prev => ({
-                                ...prev,
-                                assignedTables: prev.assignedTables.length === tables.length ? [] : tables.map(t => t.id)
-                              }))}
-                              className="text-[10px] text-orange-600 font-bold hover:underline cursor-pointer"
-                            >
-                              {staffFormState.assignedTables.length === tables.length ? 'Clear All' : 'Select All Tables (Full Floor)'}
-                            </button>
-                          </div>
-                          <div className="grid grid-cols-4 gap-2">
-                            {tables.map(table => {
-                              const isSelected = staffFormState.assignedTables.includes(table.id);
-                              return (
-                                <button
-                                  type="button"
-                                  key={table.id}
-                                  onClick={() => {
-                                    setStaffFormState(prev => ({
-                                      ...prev,
-                                      assignedTables: isSelected 
-                                        ? prev.assignedTables.filter(t => t !== table.id)
-                                        : [...prev.assignedTables, table.id]
-                                    }));
-                                  }}
-                                  className={`p-2 rounded-xl text-[10px] font-bold border transition-all cursor-pointer ${
-                                    isSelected
-                                      ? 'bg-orange-500 text-white border-orange-500 shadow-sm'
-                                      : 'bg-white text-gray-600 border-gray-300 hover:border-orange-500'
-                                  }`}
-                                >
-                                  Table #{table.id}
-                                </button>
-                              );
-                            })}
-                          </div>
-                          <p className="text-[10px] text-gray-500 mt-2 font-medium">
-                            {staffFormState.assignedTables.length === 0 || staffFormState.assignedTables.length === tables.length
-                              ? '⚡ Waiter serves ALL tables across the restaurant'
-                              : `Specific tables: ${staffFormState.assignedTables.map(t => `T#${t}`).join(', ')}`}
-                          </p>
-                        </div>
-                      )}
-
-                      <div className="flex gap-2 pt-2">
-                        <button
-                          type="button"
-                          onClick={() => setNewStaffForm(false)}
-                          className="w-1/3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 rounded-xl cursor-pointer transition-all"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="submit"
-                          className="w-2/3 bg-primary hover:bg-orange-600 text-white font-bold py-3 rounded-xl cursor-pointer shadow-md transition-all flex items-center justify-center gap-1.5"
-                        >
-                          <Check size={16} /> Save Staff Member
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              )}
-
-              {/* OTP Modal */}
-              {otpModal && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                  <div className={`w-full max-w-sm rounded-3xl p-6 shadow-2xl ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-white'}`}>
-                    <div className="flex justify-between items-center mb-4 pb-2 border-b">
-                      <h4 className="font-extrabold text-sm">Security Verification</h4>
-                      <button className="cursor-pointer" onClick={() => { setOtpModal(false); setPendingEditStaff(null); }}><X size={18} /></button>
-                    </div>
-                    <div className="space-y-4 text-xs font-semibold text-black">
-                      <p className="text-[10px] text-gray-500">To edit staff credentials, please enter the Admin OTP.</p>
-                      <div>
-                        <input
-                          type="text"
-                          value={otpInput}
-                          onChange={(e) => setOtpInput(e.target.value)}
-                          placeholder="Enter OTP (e.g., 1234)"
-                          required
-                          className="w-full p-2.5 border rounded-xl text-center text-lg tracking-widest"
-                        />
-                      </div>
-                      <button onClick={handleVerifyOTP} className="w-full bg-orange-500 text-white font-bold py-3 rounded-xl cursor-pointer">Verify & Edit</button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* SUB-TAB CONTENTS */}
+              {/* ---------------- SUB-TAB 1: PENDING APPLICATIONS ---------------- */}
               {staffSubTab === 'pending' && (
-                <div className="space-y-6 animate-fade-in">
-                  {/* Google Forms Integration Simulation */}
-                  <div className="bg-blue-50/50 p-3 rounded-xl border border-blue-100 flex items-center justify-between">
-                    {isEditingFormLink ? (
-                      <div className="flex-1 mr-4">
-                        <p className="text-[10px] font-bold text-blue-800 mb-1">Edit Google Form Link</p>
-                        <input 
-                          type="text" 
-                          value={waiterFormLink} 
-                          onChange={(e) => setWaiterFormLink(e.target.value)}
-                          className="w-full text-xs p-1.5 border border-blue-200 rounded"
-                        />
-                      </div>
-                    ) : (
-                      <div>
-                        <p className="text-[10px] font-bold text-blue-800">Waiter Application Link (Google Forms)</p>
-                        <p className="text-[9px] text-blue-600">Share this link. Responses are automatically synced as "Pending Applicants".</p>
-                      </div>
-                    )}
-                    <div className="flex items-center gap-2">
-                      {isEditingFormLink ? (
-                        <button 
-                          onClick={() => {
-                            localStorage.setItem('waiterFormLink', waiterFormLink);
-                            setIsEditingFormLink(false);
-                          }} 
-                          className="bg-green-100 text-green-700 px-3 py-1.5 rounded-lg text-[9px] font-bold cursor-pointer"
-                        >
-                          Save
-                        </button>
-                      ) : (
-                        <>
-                          <button 
-                            onClick={() => setIsEditingFormLink(true)} 
-                            className="bg-white border border-blue-200 text-blue-700 px-3 py-1.5 rounded-lg text-[9px] font-bold cursor-pointer hover:bg-blue-50"
-                          >
-                            Edit Link
-                          </button>
-                          <button 
-                            onClick={() => {
-                              navigator.clipboard.writeText(waiterFormLink);
-                              alert(`Link Copied: ${waiterFormLink}`);
-                            }} 
-                            className="bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg text-[9px] font-bold cursor-pointer"
-                          >
-                            Copy Link
-                          </button>
-                        </>
-                      )}
+                <div className="space-y-4">
+                  {/* Action Bar */}
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white dark:bg-gray-900 p-4 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-xs">
+                    <div>
+                      <h4 className="font-extrabold text-sm flex items-center gap-2">
+                        <span>Candidate Applications</span>
+                        <span className="bg-orange-100 dark:bg-orange-950 text-orange-700 dark:text-orange-300 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                          {pendingStaffList.length} Pending
+                        </span>
+                      </h4>
+                      <p className="text-[10px] text-gray-400 mt-0.5">
+                        Submitted directly from Waiter login portal or Google Form. Approving generates login credentials.
+                      </p>
                     </div>
-                  </div>
 
-                  {/* PENDING APPLICATIONS SECTION */}
-                  <div className={`mt-2 rounded-3xl shadow p-5 ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
-                    <div className="flex justify-between items-center mb-3">
-                      <h4 className="font-extrabold text-sm">Pending Applications</h4>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setNewPendingStaffModal(true)}
+                        className="bg-primary hover:bg-orange-600 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+                      >
+                        <UserPlus size={14} />
+                        <span>+ Add Applicant</span>
+                      </button>
+
                       <button
                         onClick={fetchData}
-                        className="text-[11px] font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
+                        className="p-2 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:text-primary rounded-xl cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                         title="Refresh applications from database"
                       >
-                        <RefreshCw size={12} /> Refresh List
+                        <RefreshCw size={14} />
                       </button>
                     </div>
-                    {pendingStaffList.length === 0 ? (
-                      <p className="text-xs text-gray-400">No pending applications.</p>
-                    ) : (
+                  </div>
+
+                  {/* Role Filter Pills */}
+                  <div className="flex gap-1.5 overflow-x-auto pb-1 items-center">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mr-1">Filter Role:</span>
+                    {['All', 'Waiter', 'Chef', 'Manager', 'Cashier', 'Cleaner', 'Delivery Staff'].map((r) => {
+                      const count = r === 'All' 
+                        ? pendingStaffList.length 
+                        : pendingStaffList.filter(s => (s.role || 'Waiter') === r).length;
+                      return (
+                        <button
+                          key={r}
+                          onClick={() => setPendingRoleFilter(r)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
+                            pendingRoleFilter === r
+                              ? 'bg-primary text-white shadow-xs'
+                              : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:border-orange-300'
+                          }`}
+                        >
+                          {r} ({count})
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Applications List */}
+                  {pendingStaffList.length === 0 ? (
+                    <div className="text-center py-12 px-4 bg-white dark:bg-gray-900 rounded-3xl border border-dashed border-gray-200 dark:border-gray-800">
+                      <div className="w-12 h-12 rounded-full bg-orange-50 dark:bg-orange-950/40 text-orange-500 mx-auto flex items-center justify-center mb-3">
+                        <Clock size={22} />
+                      </div>
+                      <h4 className="font-extrabold text-sm text-gray-800 dark:text-gray-200">No Pending Applications</h4>
+                      <p className="text-xs text-gray-400 mt-1 max-w-sm mx-auto">
+                        There are currently no staff candidates waiting for approval. New applicants who apply via the Waiter portal or walk-in candidates added via "+ Add Applicant" will appear here.
+                      </p>
+                      <button
+                        onClick={() => setNewPendingStaffModal(true)}
+                        className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-white text-xs font-bold rounded-xl hover:bg-orange-600 transition-all cursor-pointer shadow-xs"
+                      >
+                        <UserPlus size={13} />
+                        <span>Register Walk-in Candidate</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="bg-white dark:bg-gray-900 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
                       <div className="overflow-x-auto">
                         <table className="w-full text-left text-xs">
                           <thead>
-                            <tr className="text-gray-400 border-b">
-                              <th className="pb-2 font-bold">Applicant Name</th>
-                              <th className="pb-2 font-bold">Mobile</th>
-                              <th className="pb-2 font-bold">WhatsApp</th>
-                              <th className="pb-2 font-bold">Email</th>
-                              <th className="pb-2 font-bold text-right">Actions</th>
+                            <tr className="text-gray-400 border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/40">
+                              <th className="py-3 px-4 font-bold">Candidate</th>
+                              <th className="py-3 px-3 font-bold">Applied Role</th>
+                              <th className="py-3 px-3 font-bold">Shift Preference</th>
+                              <th className="py-3 px-3 font-bold">Contact (Phone / WhatsApp)</th>
+                              <th className="py-3 px-3 font-bold">Email</th>
+                              <th className="py-3 px-3 font-bold">Notes</th>
+                              <th className="py-3 px-4 font-bold text-right">Actions</th>
                             </tr>
                           </thead>
-                          <tbody className="font-semibold">
-                            {pendingStaffList.map((app) => (
-                              <tr key={app.id} className={`border-b last:border-0 ${isDarkMode ? 'hover:bg-gray-700/50' : 'hover:bg-gray-50'}`}>
-                                <td className="py-3">
-                                  <div className="flex items-center gap-2">
-                                    <StaffAvatar photo={app.photo} name={app.name || 'Applicant'} size="sm" />
-                                    <span>{app.name}</span>
-                                  </div>
-                                </td>
-                                <td className="py-3">{app.mobile}</td>
-                                <td className="py-3">{app.whatsapp}</td>
-                                <td className="py-3">{app.email}</td>
-                                <td className="py-3 text-right">
-                                  <div className="flex justify-end gap-2">
-                                    <button
-                                      onClick={() => handleApprovePendingStaff(app)}
-                                      className="bg-green-100 text-green-700 px-3 py-1.5 rounded-lg text-[10px] font-bold hover:bg-green-200 cursor-pointer flex items-center gap-1"
-                                    >
-                                      <Check size={12}/> Approve
-                                    </button>
-                                    <button
-                                      onClick={() => setEditPendingStaffModal(app)}
-                                      className="bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg text-[10px] font-bold hover:bg-blue-200 cursor-pointer flex items-center gap-1"
-                                    >
-                                      <Edit3 size={12}/> Edit
-                                    </button>
-                                    <button
-                                      onClick={() => handleDeletePendingStaff(app.id, app.name)}
-                                      className="bg-red-100 text-red-700 px-3 py-1.5 rounded-lg text-[10px] font-bold hover:bg-red-200 cursor-pointer flex items-center gap-1"
-                                    >
-                                      <Trash2 size={12}/> Remove
-                                    </button>
-                                  </div>
-                                </td>
-                              </tr>
-                            ))}
+                          <tbody className="divide-y divide-gray-100 dark:divide-gray-800 font-semibold">
+                            {pendingStaffList
+                              .filter(app => pendingRoleFilter === 'All' || (app.role || 'Waiter') === pendingRoleFilter)
+                              .map((app) => (
+                                <tr key={app.id} className="hover:bg-gray-50/80 dark:hover:bg-gray-800/50 transition-colors">
+                                  {/* Candidate */}
+                                  <td className="py-3.5 px-4">
+                                    <div className="flex items-center gap-3">
+                                      <StaffAvatar photo={app.photo} name={app.name || 'Candidate'} size="sm" />
+                                      <div>
+                                        <p className="font-extrabold text-sm text-gray-900 dark:text-white">{app.name}</p>
+                                        <span className="text-[10px] text-gray-400">ID: {app.id.substring(0, 8)}...</span>
+                                      </div>
+                                    </div>
+                                  </td>
+
+                                  {/* Role */}
+                                  <td className="py-3.5 px-3">
+                                    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold ${
+                                      (app.role || 'Waiter') === 'Waiter' ? 'bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-300' :
+                                      (app.role || 'Waiter') === 'Chef' ? 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300' :
+                                      (app.role || 'Waiter') === 'Manager' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' :
+                                      (app.role || 'Waiter') === 'Cashier' ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300' :
+                                      (app.role || 'Waiter') === 'Cleaner' ? 'bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300' :
+                                      'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                                    }`}>
+                                      {app.role || 'Waiter'}
+                                    </span>
+                                  </td>
+
+                                  {/* Shift */}
+                                  <td className="py-3.5 px-3">
+                                    <span className="text-[11px] font-bold text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-lg">
+                                      {app.shift || 'Morning'}
+                                    </span>
+                                  </td>
+
+                                  {/* Contact */}
+                                  <td className="py-3.5 px-3">
+                                    <div className="space-y-0.5">
+                                      <a href={`tel:${app.mobile}`} className="text-gray-900 dark:text-white hover:text-primary font-bold flex items-center gap-1">
+                                        <Phone size={11} className="text-gray-400" />
+                                        <span>{app.mobile}</span>
+                                      </a>
+                                      {app.whatsapp && (
+                                        <a 
+                                          href={`https://wa.me/${app.whatsapp.replace(/[^0-9]/g, '')}`} 
+                                          target="_blank" 
+                                          rel="noopener noreferrer" 
+                                          className="text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 text-[10px] font-bold"
+                                        >
+                                          <MessageCircle size={10} />
+                                          <span>WhatsApp</span>
+                                        </a>
+                                      )}
+                                    </div>
+                                  </td>
+
+                                  {/* Email */}
+                                  <td className="py-3.5 px-3">
+                                    <a href={`mailto:${app.email}`} className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1">
+                                      <Mail size={11} />
+                                      <span className="truncate max-w-[130px]">{app.email}</span>
+                                    </a>
+                                  </td>
+
+                                  {/* Notes */}
+                                  <td className="py-3.5 px-3 max-w-[150px]">
+                                    <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate" title={app.notes || 'No notes'}>
+                                      {app.notes || '—'}
+                                    </p>
+                                  </td>
+
+                                  {/* Actions */}
+                                  <td className="py-3.5 px-4 text-right">
+                                    <div className="flex items-center justify-end gap-1.5">
+                                      <button
+                                        onClick={() => handleOpenApproveModal(app)}
+                                        className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1 cursor-pointer"
+                                        title="Approve & Set Role/Credentials"
+                                      >
+                                        <Check size={13} />
+                                        <span>Approve</span>
+                                      </button>
+                                      
+                                      <button
+                                        onClick={() => setEditPendingStaffModal(app)}
+                                        className="p-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl transition-all cursor-pointer"
+                                        title="Edit Application"
+                                      >
+                                        <Edit3 size={13} />
+                                      </button>
+
+                                      <button
+                                        onClick={() => handleDeletePendingStaff(app.id, app.name)}
+                                        className="p-1.5 bg-red-50 hover:bg-red-100 dark:bg-red-950/40 text-red-600 rounded-xl transition-all cursor-pointer"
+                                        title="Reject / Remove Application"
+                                      >
+                                        <Trash2 size={13} />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
                           </tbody>
                         </table>
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               )}
 
+              {/* ---------------- SUB-TAB 2: STAFF ROSTER ---------------- */}
               {staffSubTab === 'roster' && (
-                <div className="space-y-6 animate-fade-in">
-                  <div>
-                    <div className="flex justify-between items-center mb-3">
-                      <h4 className="font-bold text-xs flex items-center gap-1.5"><UserCheck size={14} /> Active Staff ({staff.length})</h4>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={handleOpenAddStaff}
-                          className="bg-primary hover:bg-orange-600 text-white text-[11px] font-bold px-3 py-1.5 rounded-xl transition-all flex items-center gap-1 cursor-pointer shadow-sm"
-                        >
-                          <Plus size={13} /> Add Staff
-                        </button>
-                        <button
-                          onClick={fetchData}
-                          className="text-[11px] font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
-                          title="Refresh active staff"
-                        >
-                          <RefreshCw size={12} /> Refresh
-                        </button>
-                      </div>
+                <div className="space-y-4">
+                  {/* Top Action Bar */}
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white dark:bg-gray-900 p-4 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-xs">
+                    <div>
+                      <h4 className="font-extrabold text-sm flex items-center gap-2">
+                        <span>Active Team Members</span>
+                        <span className="bg-primary/10 text-primary text-[10px] px-2 py-0.5 rounded-full font-bold">
+                          {staff.length} Active
+                        </span>
+                      </h4>
+                      <p className="text-[10px] text-gray-400 mt-0.5">
+                        Registered employees across Waiter, Kitchen, Cashier, and Operations roles.
+                      </p>
                     </div>
-                    {staff.length === 0 ? (
-                      <div className="text-center p-10 bg-gray-50 rounded-3xl border border-dashed border-gray-200">
-                        <p className="text-xs text-gray-500 font-bold mb-2">No Active Staff Members.</p>
-                        <p className="text-[10px] text-gray-400">Approve pending applications or click "+ Add Staff" to register team members.</p>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleOpenAddStaff}
+                        className="bg-primary hover:bg-orange-600 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+                      >
+                        <Plus size={14} />
+                        <span>+ Add Staff</span>
+                      </button>
+
+                      <button
+                        onClick={fetchData}
+                        className="p-2 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:text-primary rounded-xl cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                        title="Refresh active staff"
+                      >
+                        <RefreshCw size={14} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Role Filter Pills */}
+                  <div className="flex gap-1.5 overflow-x-auto pb-1 items-center">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mr-1">Filter Role:</span>
+                    {['All', 'Waiter', 'Chef', 'Manager', 'Cashier', 'Cleaner', 'Delivery Staff'].map((r) => {
+                      const count = r === 'All' ? staff.length : staff.filter(s => s.role === r).length;
+                      return (
+                        <button
+                          key={r}
+                          onClick={() => setStaffRoleFilter(r)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
+                            staffRoleFilter === r
+                              ? 'bg-primary text-white shadow-xs'
+                              : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:border-orange-300'
+                          }`}
+                        >
+                          {r} ({count})
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Staff Cards Grid */}
+                  {staff.length === 0 ? (
+                    <div className="text-center py-12 px-4 bg-white dark:bg-gray-900 rounded-3xl border border-dashed border-gray-200 dark:border-gray-800">
+                      <div className="w-12 h-12 rounded-full bg-orange-50 dark:bg-orange-950/40 text-orange-500 mx-auto flex items-center justify-center mb-3">
+                        <Users size={22} />
                       </div>
-                    ) : (
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 text-xs font-semibold">
-                        {staff.map(emp => {
+                      <h4 className="font-extrabold text-sm text-gray-800 dark:text-gray-200">No Active Staff Members</h4>
+                      <p className="text-xs text-gray-400 mt-1 max-w-sm mx-auto">
+                        Click "+ Add Staff" to directly register a team member, or review Pending Applications to approve candidates.
+                      </p>
+                      <button
+                        onClick={handleOpenAddStaff}
+                        className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-white text-xs font-bold rounded-xl hover:bg-orange-600 transition-all cursor-pointer shadow-xs"
+                      >
+                        <Plus size={13} />
+                        <span>Add First Staff Member</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      {staff
+                        .filter(emp => staffRoleFilter === 'All' || emp.role === staffRoleFilter)
+                        .map(emp => {
                           const showPw = revealedPasswords[emp.id];
                           return (
-                            <div key={emp.id} className={`p-5 rounded-3xl border shadow-sm flex flex-col justify-between transition-all ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100'}`}>
+                            <div 
+                              key={emp.id} 
+                              className={`p-5 rounded-3xl border shadow-xs flex flex-col justify-between transition-all ${
+                                isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100'
+                              }`}
+                            >
                               <div>
                                 {/* Header with Staff Photo, Name, and Role */}
-                                <div className="flex items-start justify-between border-b pb-3 mb-3 gap-3">
+                                <div className="flex items-start justify-between border-b border-gray-100 dark:border-gray-800 pb-3 mb-3 gap-3">
                                   <div className="flex items-center gap-3">
                                     <StaffAvatar photo={emp.photo} name={emp.name} size="lg" />
                                     <div>
-                                      <div className="flex items-center gap-2">
-                                        <h4 className="font-extrabold text-base">{emp.name}</h4>
-                                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                                          emp.role === 'Waiter' ? 'bg-orange-100 text-orange-700' :
-                                          emp.role === 'Chef' ? 'bg-purple-100 text-purple-700' :
-                                          emp.role === 'Manager' ? 'bg-emerald-100 text-emerald-700' :
-                                          'bg-blue-100 text-blue-700'
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <h4 className="font-extrabold text-base text-gray-900 dark:text-white">{emp.name}</h4>
+                                        <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-extrabold ${
+                                          emp.role === 'Waiter' ? 'bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-300' :
+                                          emp.role === 'Chef' ? 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300' :
+                                          emp.role === 'Manager' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' :
+                                          emp.role === 'Cashier' ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300' :
+                                          emp.role === 'Cleaner' ? 'bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300' :
+                                          'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
                                         }`}>
                                           {emp.role}
                                         </span>
                                       </div>
-                                      <div className="flex items-center gap-2 mt-1">
-                                        <span className="text-[10px] bg-gray-100 text-gray-700 px-2 py-0.5 rounded font-mono font-bold">
+                                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                        <span className="text-[10px] bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-2 py-0.5 rounded font-mono font-bold">
                                           ID: {emp.empid}
                                         </span>
-                                        <span className="text-[10px] bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full font-bold">
+                                        <span className="text-[10px] bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-full font-bold">
                                           Shift: {emp.shift}
                                         </span>
                                       </div>
                                     </div>
                                   </div>
-                                  <div className="text-right">
-                                    <span className="text-[10px] text-gray-400 block font-normal">Monthly Salary</span>
-                                    <strong className="text-sm text-brand-text font-black">{formatPrice(emp.salary)}</strong>
+
+                                  <div className="text-right shrink-0">
+                                    <span className="text-[10px] text-gray-400 block font-normal">Salary / Month</span>
+                                    <strong className="text-sm font-black text-gray-900 dark:text-white">{formatPrice(emp.salary)}</strong>
                                   </div>
                                 </div>
 
                                 {/* Credentials & Contact Info */}
-                                <div className="grid grid-cols-2 gap-2 p-2.5 rounded-2xl bg-gray-50/80 mb-3 text-[11px]">
+                                <div className="grid grid-cols-2 gap-2 p-3 rounded-2xl bg-gray-50/80 dark:bg-gray-800/40 mb-3 text-[11px]">
                                   <div>
                                     <span className="text-[10px] text-gray-400 block font-medium">Terminal Password</span>
                                     <div className="flex items-center gap-1.5 mt-0.5">
-                                      <span className="font-mono font-bold">
+                                      <span className="font-mono font-bold text-gray-900 dark:text-white">
                                         {showPw ? (emp.password || '••••••') : '••••••••'}
                                       </span>
                                       <button
                                         type="button"
                                         onClick={() => setRevealedPasswords(prev => ({ ...prev, [emp.id]: !prev[emp.id] }))}
-                                        className="text-gray-400 hover:text-gray-700 cursor-pointer"
+                                        className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 cursor-pointer p-0.5"
                                         title={showPw ? "Hide Password" : "Show Password"}
                                       >
                                         {showPw ? <EyeOff size={13} /> : <Eye size={13} />}
@@ -2902,7 +2760,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                                             navigator.clipboard.writeText(emp.password || '');
                                             alert(`Copied password for ${emp.name}`);
                                           }}
-                                          className="text-gray-400 hover:text-gray-700 cursor-pointer"
+                                          className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 cursor-pointer p-0.5"
                                           title="Copy Password"
                                         >
                                           <Copy size={13} />
@@ -2916,9 +2774,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                                     {emp.mobile ? (
                                       <a
                                         href={`tel:${emp.mobile}`}
-                                        className="font-bold text-blue-600 hover:underline flex items-center gap-1 mt-0.5"
+                                        className="font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 mt-0.5 truncate"
                                       >
-                                        <Phone size={11} /> {emp.mobile}
+                                        <Phone size={11} className="shrink-0" /> 
+                                        <span>{emp.mobile}</span>
                                       </a>
                                     ) : (
                                       <span className="text-gray-400 italic">Not set</span>
@@ -2926,39 +2785,97 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                                   </div>
 
                                   {emp.email && (
-                                    <div className="col-span-2 border-t pt-1.5 mt-0.5">
+                                    <div className="col-span-2 border-t border-gray-200/60 dark:border-gray-700/60 pt-1.5 mt-0.5">
                                       <span className="text-[10px] text-gray-400 block font-medium">Email Address</span>
-                                      <a href={`mailto:${emp.email}`} className="text-blue-600 hover:underline flex items-center gap-1 font-bold">
-                                        <Mail size={11} /> {emp.email}
+                                      <a href={`mailto:${emp.email}`} className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-bold truncate">
+                                        <Mail size={11} className="shrink-0" />
+                                        <span>{emp.email}</span>
                                       </a>
                                     </div>
                                   )}
                                 </div>
 
-                                {/* Table Routing & Assignments */}
-                                {emp.role === 'Waiter' && (
-                                  <div className="mb-3">
-                                    <div className="flex justify-between items-center mb-1">
-                                      <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Assigned Tables / Routing</span>
-                                    </div>
-                                    {(!emp.assignedTables || emp.assignedTables.length === 0 || emp.assignedTables.length === tables.length) ? (
-                                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-green-50 text-green-700 text-[10px] font-bold border border-green-200">
-                                        ⚡ Serves All Tables (Full Restaurant Floor)
+                                {/* Role Specific Assignment Section */}
+                                <div className="mb-3">
+                                  {emp.role === 'Waiter' && (
+                                    <div>
+                                      <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider block mb-1">
+                                        Table Routing & Assignment
                                       </span>
-                                    ) : (
-                                      <div className="flex flex-wrap gap-1.5">
-                                        {emp.assignedTables.map(tId => (
-                                          <span key={tId} className="px-2 py-0.5 rounded-lg bg-orange-100 text-orange-800 text-[10px] font-bold">
-                                            Table #{tId}
-                                          </span>
-                                        ))}
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
+                                      {(!emp.assignedTables || emp.assignedTables.length === 0 || emp.assignedTables.length === tables.length) ? (
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-300 text-[10px] font-bold border border-green-200 dark:border-green-800">
+                                          ⚡ Serves All Tables (Full Restaurant Floor)
+                                        </span>
+                                      ) : (
+                                        <div className="flex flex-wrap gap-1.5">
+                                          {emp.assignedTables.map(tId => (
+                                            <span key={tId} className="px-2 py-0.5 rounded-lg bg-orange-100 dark:bg-orange-950 text-orange-800 dark:text-orange-300 text-[10px] font-bold">
+                                              Table #{tId}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {emp.role === 'Chef' && (
+                                    <div>
+                                      <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider block mb-1">
+                                        Kitchen Station
+                                      </span>
+                                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 text-[10px] font-bold border border-purple-200 dark:border-purple-800">
+                                        🍳 {emp.stationOrCounter || 'Main Kitchen & Preparation'}
+                                      </span>
+                                    </div>
+                                  )}
+
+                                  {emp.role === 'Cashier' && (
+                                    <div>
+                                      <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider block mb-1">
+                                        Billing Counter
+                                      </span>
+                                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 text-[10px] font-bold border border-blue-200 dark:border-blue-800">
+                                        💳 {emp.stationOrCounter || 'Counter #1 (Main Floor)'}
+                                      </span>
+                                    </div>
+                                  )}
+
+                                  {emp.role === 'Manager' && (
+                                    <div>
+                                      <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider block mb-1">
+                                        Operational Jurisdiction
+                                      </span>
+                                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold border border-emerald-200 dark:border-emerald-800">
+                                        🏢 Full Operations Floor & POS Terminal Access
+                                      </span>
+                                    </div>
+                                  )}
+
+                                  {emp.role === 'Cleaner' && (
+                                    <div>
+                                      <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider block mb-1">
+                                        Sanitation Zone
+                                      </span>
+                                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 text-[10px] font-bold border border-teal-200 dark:border-teal-800">
+                                        🧹 {emp.stationOrCounter || 'Dining Floor & Common Areas'}
+                                      </span>
+                                    </div>
+                                  )}
+
+                                  {emp.role === 'Delivery Staff' && (
+                                    <div>
+                                      <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider block mb-1">
+                                        Delivery Fleet
+                                      </span>
+                                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 text-[10px] font-bold border border-amber-200 dark:border-amber-800">
+                                        🛵 {emp.stationOrCounter || 'Zone A & Local Deliveries'}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
 
                                 {/* Performance Badges */}
-                                <div className="grid grid-cols-3 gap-2 py-2 border-t border-b text-center text-[10px]">
+                                <div className="grid grid-cols-3 gap-2 py-2 border-t border-b border-gray-100 dark:border-gray-800 text-center text-[10px]">
                                   <div>
                                     <span className="text-gray-400 block">Rating</span>
                                     <strong className="text-amber-500 font-bold">★ {emp.performance?.ratings || '5.0'}</strong>
@@ -2968,8 +2885,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                                     <strong className="text-emerald-600 font-bold">{emp.attendance || 100}%</strong>
                                   </div>
                                   <div>
-                                    <span className="text-gray-400 block">Delivered</span>
-                                    <strong className="font-bold">{emp.performance?.ordersDelivered || 0} orders</strong>
+                                    <span className="text-gray-400 block">Completed</span>
+                                    <strong className="font-bold text-gray-900 dark:text-white">{emp.performance?.ordersDelivered || 0} orders</strong>
                                   </div>
                                 </div>
                               </div>
@@ -2977,20 +2894,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                               {/* Footer Actions */}
                               <div className="pt-3 mt-2 flex justify-between items-center text-[11px]">
                                 <span className="text-[10px] text-gray-400">
-                                  Avg Serving: {emp.performance?.avgServingTime || 'N/A'}
+                                  Avg: {emp.performance?.avgServingTime || 'N/A'}
                                 </span>
                                 {(role === 'Hotel Manager' || role === 'Admin' || role === 'Manager' || !role) && (
                                   <div className="flex gap-2">
                                     <button
                                       onClick={() => handleOpenEditStaff(emp)}
-                                      className="px-3 py-1 bg-orange-50 hover:bg-orange-100 text-orange-700 rounded-lg font-bold cursor-pointer flex items-center gap-1 transition-colors"
+                                      className="px-3 py-1 bg-orange-50 hover:bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300 rounded-lg font-bold cursor-pointer flex items-center gap-1 transition-colors"
                                       title="Edit Staff Member"
                                     >
                                       <Edit3 size={12} /> Edit
                                     </button>
                                     <button
                                       onClick={() => handleDeleteStaffMember(emp.id, emp.name)}
-                                      className="px-3 py-1 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg font-bold cursor-pointer flex items-center gap-1 transition-colors"
+                                      className="px-3 py-1 bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-950/40 rounded-lg font-bold cursor-pointer flex items-center gap-1 transition-colors"
                                       title="Delete Staff Member"
                                     >
                                       <Trash2 size={12} /> Delete
@@ -3001,9 +2918,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                             </div>
                           );
                         })}
-                      </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -3753,6 +3669,889 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
             </form>
           </div>
         </div>
+      )}
+
+      
+      {/* =========================================================================
+          PORTALIZED FULL-SCREEN MODALS (Directly rendered on document.body)
+          Guarantees perfect viewport centering, backdrop coverage, and pinned headers
+          ========================================================================= */}
+
+      {/* 1. EDIT / ADD ACTIVE STAFF MODAL */}
+      {newStaffForm && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm overflow-y-auto animate-fade-in font-sans">
+          <div 
+            onClick={(e) => e.stopPropagation()} 
+            className={`relative my-auto w-full max-w-lg max-h-[88vh] flex flex-col rounded-3xl shadow-2xl border ${
+              isDarkMode ? 'bg-gray-900 border-gray-800 text-white' : 'bg-white border-gray-100 text-slate-900'
+            } overflow-hidden`}
+          >
+            {/* Pinned Header */}
+            <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 dark:border-gray-800 shrink-0 bg-gray-50/50 dark:bg-gray-800/40">
+              <div>
+                <h4 className="font-extrabold text-base text-slate-900 dark:text-white">
+                  {editingStaff ? 'Edit Staff Member' : 'Add New Staff Member'}
+                </h4>
+                <p className="text-[11px] text-gray-400">
+                  {editingStaff ? `Updating details for ${editingStaff.name} (${editingStaff.empid})` : 'Register employee with terminal login credentials'}
+                </p>
+              </div>
+              <button 
+                type="button"
+                className="cursor-pointer text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-all" 
+                onClick={() => setNewStaffForm(false)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Scrollable Form Body */}
+            <form id="active-staff-form" onSubmit={handleSaveStaffMember} className="overflow-y-auto p-6 space-y-4 flex-1 text-xs font-semibold">
+              {/* Photo Section */}
+              <div className="p-3.5 bg-gradient-to-tr from-orange-50/60 to-amber-50/40 dark:from-orange-950/20 dark:to-amber-950/10 rounded-2xl border border-orange-100 dark:border-orange-900/40">
+                <label className="block text-orange-950 dark:text-orange-200 mb-2 text-[10px] uppercase font-bold tracking-wider">
+                  Staff Photo / Avatar
+                </label>
+                <div className="flex gap-3 items-center mb-3">
+                  <StaffAvatar photo={staffFormState.photo} name={staffFormState.name || 'Staff'} size="lg" />
+                  <div className="flex-1 space-y-1.5">
+                    <input
+                      type="text"
+                      value={staffFormState.photo}
+                      onChange={(e) => setStaffFormState({...staffFormState, photo: e.target.value})}
+                      placeholder="Paste Photo URL or Google Drive link"
+                      className="w-full p-2 border border-orange-200 dark:border-orange-900/60 rounded-xl text-xs bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    />
+                    <div className="flex gap-2 items-center flex-wrap pt-0.5">
+                      <label className="cursor-pointer bg-white dark:bg-gray-800 border border-orange-200 dark:border-orange-800 hover:bg-orange-50 text-orange-800 dark:text-orange-300 px-3 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 shadow-xs transition-all">
+                        <Upload size={12} className="text-orange-500" /> Upload from Computer / Phone
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const reader = new FileReader();
+                              reader.onloadend = () => {
+                                setStaffFormState(prev => ({ ...prev, photo: reader.result as string }));
+                              };
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        />
+                      </label>
+                      {staffFormState.photo && (
+                        <button
+                          type="button"
+                          onClick={() => setStaffFormState({...staffFormState, photo: ''})}
+                          className="text-[10px] text-red-500 font-bold hover:underline cursor-pointer"
+                        >
+                          Remove Photo
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Presets */}
+                <div>
+                  <p className="text-[9px] text-gray-500 dark:text-gray-400 mb-1.5 font-bold">Or pick a quick professional avatar:</p>
+                  <div className="flex gap-2 overflow-x-auto pb-1">
+                    {PRESET_AVATARS.map((p, idx) => (
+                      <button
+                        type="button"
+                        key={idx}
+                        onClick={() => setStaffFormState({...staffFormState, photo: p.url})}
+                        title={p.name}
+                        className={`w-8 h-8 rounded-xl overflow-hidden border-2 transition-all shrink-0 cursor-pointer ${
+                          staffFormState.photo === p.url ? 'border-orange-500 ring-2 ring-orange-400' : 'border-white dark:border-gray-700 hover:border-orange-300'
+                        }`}
+                      >
+                        <img src={p.url} alt={p.name} className="w-full h-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Full Name */}
+              <div>
+                <label className="block text-gray-500 mb-1 text-[10px] uppercase font-bold">Full Name *</label>
+                <input
+                  type="text"
+                  value={staffFormState.name}
+                  onChange={(e) => setStaffFormState({...staffFormState, name: e.target.value})}
+                  placeholder="e.g. B. Jagannadham"
+                  required
+                  className="w-full p-2.5 border rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white"
+                />
+              </div>
+
+              {/* Phone & Email */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-gray-500 mb-1 text-[10px] uppercase font-bold">Phone / Mobile</label>
+                  <input
+                    type="text"
+                    value={staffFormState.mobile}
+                    onChange={(e) => setStaffFormState({...staffFormState, mobile: e.target.value})}
+                    placeholder="+91 98765 43210"
+                    className="w-full p-2.5 border rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-500 mb-1 text-[10px] uppercase font-bold">Email</label>
+                  <input
+                    type="email"
+                    value={staffFormState.email}
+                    onChange={(e) => setStaffFormState({...staffFormState, email: e.target.value})}
+                    placeholder="staff@restaurant.com"
+                    className="w-full p-2.5 border rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white"
+                  />
+                </div>
+              </div>
+
+              {/* Employee ID & Terminal Password */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-gray-500 mb-1 text-[10px] uppercase font-bold">Employee ID (EmpID) *</label>
+                  <input
+                    type="text"
+                    value={staffFormState.empid}
+                    onChange={(e) => setStaffFormState({...staffFormState, empid: e.target.value})}
+                    placeholder="e.g. EMP-1024"
+                    required
+                    className="w-full p-2.5 border rounded-xl font-mono uppercase bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="block text-gray-500 text-[10px] uppercase font-bold">Password *</label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newPw = 'pass' + Math.floor(1000 + Math.random() * 9000);
+                        setStaffFormState(prev => ({ ...prev, password: newPw }));
+                      }}
+                      className="text-[9px] text-orange-600 font-bold hover:underline cursor-pointer"
+                    >
+                      Generate
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    value={staffFormState.password}
+                    onChange={(e) => setStaffFormState({...staffFormState, password: e.target.value})}
+                    placeholder="Terminal password"
+                    required
+                    className="w-full p-2.5 border rounded-xl font-mono bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white"
+                  />
+                </div>
+              </div>
+
+              {/* Role, Shift, & Salary */}
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="block text-gray-500 mb-1 text-[10px] uppercase font-bold">Role *</label>
+                  <select
+                    value={staffFormState.role}
+                    onChange={(e) => setStaffFormState({...staffFormState, role: e.target.value as any})}
+                    className="w-full p-2.5 border rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white"
+                  >
+                    <option value="Waiter">Waiter</option>
+                    <option value="Chef">Chef</option>
+                    <option value="Manager">Manager</option>
+                    <option value="Cashier">Cashier</option>
+                    <option value="Cleaner">Cleaner</option>
+                    <option value="Delivery Staff">Delivery Staff</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-gray-500 mb-1 text-[10px] uppercase font-bold">Shift *</label>
+                  <select
+                    value={staffFormState.shift}
+                    onChange={(e) => setStaffFormState({...staffFormState, shift: e.target.value as any})}
+                    className="w-full p-2.5 border rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white"
+                  >
+                    <option value="Morning">Morning</option>
+                    <option value="Evening">Evening</option>
+                    <option value="Night">Night</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-gray-500 mb-1 text-[10px] uppercase font-bold">Salary (₹) *</label>
+                  <input
+                    type="number"
+                    value={staffFormState.salary}
+                    onChange={(e) => setStaffFormState({...staffFormState, salary: parseInt(e.target.value) || 0})}
+                    required
+                    className="w-full p-2.5 border rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white"
+                  />
+                </div>
+              </div>
+
+              {/* Role-Specific Assignment Details */}
+              {staffFormState.role === 'Waiter' && (
+                <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800">
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="block text-gray-600 dark:text-gray-300 text-[10px] uppercase font-bold">
+                      Table Routing & Assignment
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setStaffFormState(prev => ({
+                        ...prev,
+                        assignedTables: prev.assignedTables.length === tables.length ? [] : tables.map(t => t.id)
+                      }))}
+                      className="text-[10px] text-orange-600 font-bold hover:underline cursor-pointer"
+                    >
+                      {staffFormState.assignedTables.length === tables.length ? 'Clear All' : 'Select All Tables (Full Floor)'}
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-4 gap-2">
+                    {tables.map(table => {
+                      const isSelected = staffFormState.assignedTables.includes(table.id);
+                      return (
+                        <button
+                          type="button"
+                          key={table.id}
+                          onClick={() => {
+                            setStaffFormState(prev => ({
+                              ...prev,
+                              assignedTables: isSelected 
+                                ? prev.assignedTables.filter(t => t !== table.id)
+                                : [...prev.assignedTables, table.id]
+                            }));
+                          }}
+                          className={`p-2 rounded-xl text-[10px] font-bold border transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-orange-500 text-white border-orange-500 shadow-xs'
+                              : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-700 hover:border-orange-500'
+                          }`}
+                        >
+                          Table #{table.id}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-2 font-medium">
+                    {staffFormState.assignedTables.length === 0 || staffFormState.assignedTables.length === tables.length
+                      ? '⚡ Waiter serves ALL tables across the restaurant'
+                      : `Specific tables: ${staffFormState.assignedTables.map(t => `T#${t}`).join(', ')}`}
+                  </p>
+                </div>
+              )}
+
+              {staffFormState.role === 'Chef' && (
+                <div className="p-3 bg-purple-50/50 dark:bg-purple-950/20 rounded-2xl border border-purple-100 dark:border-purple-900/40">
+                  <label className="block text-purple-950 dark:text-purple-200 text-[10px] uppercase font-bold mb-1">
+                    Kitchen Station Assignment
+                  </label>
+                  <select
+                    value={staffFormState.stationOrCounter || 'Main Kitchen & Gravy'}
+                    onChange={(e) => setStaffFormState({...staffFormState, stationOrCounter: e.target.value})}
+                    className="w-full p-2.5 border border-purple-200 dark:border-purple-800 rounded-xl bg-white dark:bg-gray-800 text-xs"
+                  >
+                    <option value="Main Kitchen & Curry">Main Kitchen & Curry</option>
+                    <option value="Tandoor & Grill Station">Tandoor & Grill Station</option>
+                    <option value="Chinese & Wok Station">Chinese & Wok Station</option>
+                    <option value="South Indian Tiffin & Dosa">South Indian Tiffin & Dosa</option>
+                    <option value="Bakery & Desserts">Bakery & Desserts</option>
+                  </select>
+                </div>
+              )}
+
+              {staffFormState.role === 'Cashier' && (
+                <div className="p-3 bg-blue-50/50 dark:bg-blue-950/20 rounded-2xl border border-blue-100 dark:border-blue-900/40">
+                  <label className="block text-blue-950 dark:text-blue-200 text-[10px] uppercase font-bold mb-1">
+                    Assigned Billing Counter
+                  </label>
+                  <select
+                    value={staffFormState.stationOrCounter || 'Main Billing Counter (Floor 1)'}
+                    onChange={(e) => setStaffFormState({...staffFormState, stationOrCounter: e.target.value})}
+                    className="w-full p-2.5 border border-blue-200 dark:border-blue-800 rounded-xl bg-white dark:bg-gray-800 text-xs"
+                  >
+                    <option value="Main Billing Counter (Floor 1)">Main Billing Counter (Floor 1)</option>
+                    <option value="Express Counter & Takeaway">Express Counter & Takeaway</option>
+                    <option value="Bar & Beverage Counter">Bar & Beverage Counter</option>
+                  </select>
+                </div>
+              )}
+
+              {(staffFormState.role === 'Cleaner' || staffFormState.role === 'Delivery Staff') && (
+                <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800">
+                  <label className="block text-gray-600 dark:text-gray-300 text-[10px] uppercase font-bold mb-1">
+                    Route / Zone Details
+                  </label>
+                  <input
+                    type="text"
+                    value={staffFormState.stationOrCounter || ''}
+                    onChange={(e) => setStaffFormState({...staffFormState, stationOrCounter: e.target.value})}
+                    placeholder="e.g. Zone A (Dining Hall) or 0-5km Express Fleet"
+                    className="w-full p-2.5 border rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-xs"
+                  />
+                </div>
+              )}
+            </form>
+
+            {/* Pinned Footer */}
+            <div className="px-6 py-3.5 border-t border-gray-100 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-800/40 flex gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setNewStaffForm(false)}
+                className="w-1/3 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-bold py-2.5 rounded-xl cursor-pointer transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                form="active-staff-form"
+                className="w-2/3 bg-primary hover:bg-orange-600 text-white font-bold py-2.5 rounded-xl cursor-pointer shadow-md transition-all flex items-center justify-center gap-1.5"
+              >
+                <Check size={16} /> Save Staff Member
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* 2. APPROVAL CONFIRMATION MODAL (PORTALIZED) */}
+      {approveModalStaff && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm overflow-y-auto animate-fade-in font-sans">
+          <div 
+            onClick={(e) => e.stopPropagation()} 
+            className={`relative my-auto w-full max-w-lg max-h-[88vh] flex flex-col rounded-3xl shadow-2xl border ${
+              isDarkMode ? 'bg-gray-900 border-gray-800 text-white' : 'bg-white border-gray-100 text-slate-900'
+            } overflow-hidden`}
+          >
+            {/* Pinned Header */}
+            <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 dark:border-gray-800 shrink-0 bg-emerald-50/50 dark:bg-emerald-950/30">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-black">
+                  <Check size={18} />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-base text-slate-900 dark:text-white">
+                    Approve Application & Assign Credentials
+                  </h4>
+                  <p className="text-[11px] text-gray-400">
+                    Review candidate details, confirm role, and issue terminal credentials
+                  </p>
+                </div>
+              </div>
+              <button 
+                type="button"
+                className="cursor-pointer text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-all" 
+                onClick={() => setApproveModalStaff(null)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Scrollable Form Body */}
+            <form id="approve-candidate-form" onSubmit={handleConfirmApproval} className="overflow-y-auto p-6 space-y-4 flex-1 text-xs font-semibold">
+              {/* Candidate Quick Overview */}
+              <div className="p-3.5 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800 flex items-center gap-3">
+                <StaffAvatar photo={approveModalStaff.photo} name={approveModalStaff.name} size="md" />
+                <div className="flex-1 min-w-0">
+                  <h5 className="font-extrabold text-sm text-gray-900 dark:text-white truncate">{approveModalStaff.name}</h5>
+                  <div className="flex items-center gap-3 text-[11px] text-gray-500 mt-0.5">
+                    <span>📱 {approveModalStaff.mobile}</span>
+                    <span className="truncate">✉️ {approveModalStaff.email}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Role & Shift Selection */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-gray-500 mb-1 text-[10px] uppercase font-bold">Confirmed Role *</label>
+                  <select
+                    value={approvalForm.role}
+                    onChange={(e) => setApprovalForm({...approvalForm, role: e.target.value as any})}
+                    className="w-full p-2.5 border rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white"
+                  >
+                    <option value="Waiter">Waiter (Floor Service)</option>
+                    <option value="Chef">Chef (Kitchen Operations)</option>
+                    <option value="Manager">Manager (Supervisory)</option>
+                    <option value="Cashier">Cashier (Point of Sale)</option>
+                    <option value="Cleaner">Cleaner (Sanitation)</option>
+                    <option value="Delivery Staff">Delivery Staff (Fleet)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-gray-500 mb-1 text-[10px] uppercase font-bold">Assigned Shift *</label>
+                  <select
+                    value={approvalForm.shift}
+                    onChange={(e) => setApprovalForm({...approvalForm, shift: e.target.value as any})}
+                    className="w-full p-2.5 border rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white"
+                  >
+                    <option value="Morning">Morning Shift</option>
+                    <option value="Evening">Evening Shift</option>
+                    <option value="Night">Night Shift</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Salary */}
+              <div>
+                <label className="block text-gray-500 mb-1 text-[10px] uppercase font-bold">Monthly Salary (₹) *</label>
+                <input
+                  type="number"
+                  value={approvalForm.salary}
+                  onChange={(e) => setApprovalForm({...approvalForm, salary: parseInt(e.target.value) || 0})}
+                  required
+                  className="w-full p-2.5 border rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white"
+                />
+              </div>
+
+              {/* Auto-Generated Login Credentials */}
+              <div className="grid grid-cols-2 gap-3 p-3.5 bg-orange-50/50 dark:bg-orange-950/20 rounded-2xl border border-orange-100 dark:border-orange-900/40">
+                <div>
+                  <label className="block text-orange-950 dark:text-orange-200 mb-1 text-[10px] uppercase font-bold">Generated Emp ID</label>
+                  <input
+                    type="text"
+                    value={approvalForm.empid}
+                    onChange={(e) => setApprovalForm({...approvalForm, empid: e.target.value})}
+                    required
+                    className="w-full p-2 border border-orange-200 dark:border-orange-800 rounded-xl font-mono uppercase bg-white dark:bg-gray-800 text-xs font-bold"
+                  />
+                </div>
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="block text-orange-950 dark:text-orange-200 text-[10px] uppercase font-bold">Terminal Password</label>
+                    <button
+                      type="button"
+                      onClick={() => setApprovalForm(prev => ({ ...prev, password: generateRandomString(9) }))}
+                      className="text-[9px] text-orange-600 font-bold hover:underline cursor-pointer"
+                    >
+                      Regenerate
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    value={approvalForm.password}
+                    onChange={(e) => setApprovalForm({...approvalForm, password: e.target.value})}
+                    required
+                    className="w-full p-2 border border-orange-200 dark:border-orange-800 rounded-xl font-mono bg-white dark:bg-gray-800 text-xs font-bold"
+                  />
+                </div>
+                <p className="col-span-2 text-[10px] text-orange-800/80 dark:text-orange-300/70">
+                  These credentials will be sent to the candidate's email automatically.
+                </p>
+              </div>
+
+              {/* Role specific routing if Waiter */}
+              {approvalForm.role === 'Waiter' && (
+                <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800">
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="block text-gray-600 dark:text-gray-300 text-[10px] uppercase font-bold">
+                      Table Routing Assignment
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setApprovalForm(prev => ({
+                        ...prev,
+                        assignedTables: prev.assignedTables.length === tables.length ? [] : tables.map(t => t.id)
+                      }))}
+                      className="text-[10px] text-orange-600 font-bold hover:underline cursor-pointer"
+                    >
+                      {approvalForm.assignedTables.length === tables.length ? 'Clear All' : 'Select All Tables'}
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-4 gap-2">
+                    {tables.map(table => {
+                      const isSelected = approvalForm.assignedTables.includes(table.id);
+                      return (
+                        <button
+                          type="button"
+                          key={table.id}
+                          onClick={() => {
+                            setApprovalForm(prev => ({
+                              ...prev,
+                              assignedTables: isSelected 
+                                ? prev.assignedTables.filter(t => t !== table.id)
+                                : [...prev.assignedTables, table.id]
+                            }));
+                          }}
+                          className={`p-2 rounded-xl text-[10px] font-bold border transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-orange-500 text-white border-orange-500'
+                              : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-700'
+                          }`}
+                        >
+                          Table #{table.id}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </form>
+
+            {/* Pinned Footer */}
+            <div className="px-6 py-3.5 border-t border-gray-100 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-800/40 flex gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setApproveModalStaff(null)}
+                className="w-1/3 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-bold py-2.5 rounded-xl cursor-pointer transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                form="approve-candidate-form"
+                className="w-2/3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl cursor-pointer shadow-md transition-all flex items-center justify-center gap-1.5"
+              >
+                <Check size={16} /> Confirm Approval & Issue ID
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* 3. EDIT PENDING APPLICATION MODAL (PORTALIZED) */}
+      {editPendingStaffModal && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm overflow-y-auto animate-fade-in font-sans">
+          <div 
+            onClick={(e) => e.stopPropagation()} 
+            className={`relative my-auto w-full max-w-md max-h-[88vh] flex flex-col rounded-3xl shadow-2xl border ${
+              isDarkMode ? 'bg-gray-900 border-gray-800 text-white' : 'bg-white border-gray-100 text-slate-900'
+            } overflow-hidden`}
+          >
+            {/* Pinned Header */}
+            <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 dark:border-gray-800 shrink-0 bg-gray-50/50 dark:bg-gray-800/40">
+              <h4 className="font-extrabold text-base text-slate-900 dark:text-white">Edit Pending Application</h4>
+              <button 
+                type="button"
+                className="cursor-pointer text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-all" 
+                onClick={() => setEditPendingStaffModal(null)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Scrollable Form Body */}
+            <form id="edit-pending-form" onSubmit={handleSavePendingStaff} className="overflow-y-auto p-6 space-y-4 flex-1 text-xs font-semibold">
+              {/* Photo */}
+              <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800">
+                <label className="block text-gray-500 mb-2 text-[10px] uppercase font-bold">Applicant Photo</label>
+                <div className="flex gap-3 items-center mb-2">
+                  <StaffAvatar photo={editPendingStaffModal.photo} name={editPendingStaffModal.name || 'Applicant'} size="md" />
+                  <div className="flex-1 space-y-1">
+                    <input
+                      type="text"
+                      value={editPendingStaffModal.photo || ''}
+                      onChange={(e) => setEditPendingStaffModal({...editPendingStaffModal, photo: e.target.value})}
+                      placeholder="Photo URL or Google Drive link"
+                      className="w-full p-2 border rounded-xl text-xs bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
+                    />
+                    <div className="flex gap-2 items-center pt-0.5">
+                      <label className="cursor-pointer bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 text-gray-700 dark:text-gray-300 px-2.5 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 shadow-xs transition-all">
+                        <Upload size={11} /> Upload Device File
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const reader = new FileReader();
+                              reader.onloadend = () => {
+                                setEditPendingStaffModal(prev => prev ? ({ ...prev, photo: reader.result as string }) : null);
+                              };
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        />
+                      </label>
+                      {editPendingStaffModal.photo && (
+                        <button
+                          type="button"
+                          onClick={() => setEditPendingStaffModal({...editPendingStaffModal, photo: ''})}
+                          className="text-[10px] text-red-500 font-bold hover:underline cursor-pointer"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-gray-400 mb-1 text-[10px] uppercase font-bold">Full Name *</label>
+                <input
+                  type="text"
+                  value={editPendingStaffModal.name}
+                  onChange={(e) => setEditPendingStaffModal({...editPendingStaffModal, name: e.target.value})}
+                  required
+                  className="w-full p-2.5 border rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-gray-400 mb-1 text-[10px] uppercase font-bold">Mobile *</label>
+                  <input
+                    type="text"
+                    value={editPendingStaffModal.mobile}
+                    onChange={(e) => setEditPendingStaffModal({...editPendingStaffModal, mobile: e.target.value})}
+                    required
+                    className="w-full p-2.5 border rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-400 mb-1 text-[10px] uppercase font-bold">WhatsApp</label>
+                  <input
+                    type="text"
+                    value={editPendingStaffModal.whatsapp}
+                    onChange={(e) => setEditPendingStaffModal({...editPendingStaffModal, whatsapp: e.target.value})}
+                    className="w-full p-2.5 border rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-gray-400 mb-1 text-[10px] uppercase font-bold">Email ID *</label>
+                <input
+                  type="email"
+                  value={editPendingStaffModal.email}
+                  onChange={(e) => setEditPendingStaffModal({...editPendingStaffModal, email: e.target.value})}
+                  required
+                  className="w-full p-2.5 border rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-gray-400 mb-1 text-[10px] uppercase font-bold">Applied Role *</label>
+                  <select
+                    value={editPendingStaffModal.role || 'Waiter'}
+                    onChange={(e) => setEditPendingStaffModal({...editPendingStaffModal, role: e.target.value as any})}
+                    className="w-full p-2.5 border rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
+                  >
+                    <option value="Waiter">Waiter</option>
+                    <option value="Chef">Chef</option>
+                    <option value="Manager">Manager</option>
+                    <option value="Cashier">Cashier</option>
+                    <option value="Cleaner">Cleaner</option>
+                    <option value="Delivery Staff">Delivery Staff</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-gray-400 mb-1 text-[10px] uppercase font-bold">Preferred Shift *</label>
+                  <select
+                    value={editPendingStaffModal.shift || 'Morning'}
+                    onChange={(e) => setEditPendingStaffModal({...editPendingStaffModal, shift: e.target.value as any})}
+                    className="w-full p-2.5 border rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
+                  >
+                    <option value="Morning">Morning</option>
+                    <option value="Evening">Evening</option>
+                    <option value="Night">Night</option>
+                  </select>
+                </div>
+              </div>
+            </form>
+
+            {/* Pinned Footer */}
+            <div className="px-6 py-3.5 border-t border-gray-100 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-800/40 flex gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setEditPendingStaffModal(null)}
+                className="w-1/3 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-bold py-2.5 rounded-xl cursor-pointer transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                form="edit-pending-form"
+                className="w-2/3 bg-primary hover:bg-orange-600 text-white font-bold py-2.5 rounded-xl cursor-pointer shadow-md transition-all flex items-center justify-center gap-1.5"
+              >
+                <Check size={16} /> Save Changes
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* 4. ADMIN REGISTER NEW APPLICANT MODAL (PORTALIZED) */}
+      {newPendingStaffModal && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm overflow-y-auto animate-fade-in font-sans">
+          <div 
+            onClick={(e) => e.stopPropagation()} 
+            className={`relative my-auto w-full max-w-md max-h-[88vh] flex flex-col rounded-3xl shadow-2xl border ${
+              isDarkMode ? 'bg-gray-900 border-gray-800 text-white' : 'bg-white border-gray-100 text-slate-900'
+            } overflow-hidden`}
+          >
+            {/* Pinned Header */}
+            <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 dark:border-gray-800 shrink-0 bg-gray-50/50 dark:bg-gray-800/40">
+              <div>
+                <h4 className="font-extrabold text-base text-slate-900 dark:text-white">Register Walk-in Applicant</h4>
+                <p className="text-[10px] text-gray-400">Adds directly to Pending Applications queue</p>
+              </div>
+              <button 
+                type="button"
+                className="cursor-pointer text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-all" 
+                onClick={() => setNewPendingStaffModal(false)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Scrollable Form Body */}
+            <form id="create-pending-form" onSubmit={handleCreatePendingStaff} className="overflow-y-auto p-6 space-y-4 flex-1 text-xs font-semibold">
+              <div>
+                <label className="block text-gray-400 mb-1 text-[10px] uppercase font-bold">Candidate Full Name *</label>
+                <input
+                  type="text"
+                  value={newPendingStaffForm.name}
+                  onChange={(e) => setNewPendingStaffForm({...newPendingStaffForm, name: e.target.value})}
+                  placeholder="e.g. Anand Sharma"
+                  required
+                  className="w-full p-2.5 border rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-gray-400 mb-1 text-[10px] uppercase font-bold">Mobile Number *</label>
+                  <input
+                    type="tel"
+                    value={newPendingStaffForm.mobile}
+                    onChange={(e) => setNewPendingStaffForm({...newPendingStaffForm, mobile: e.target.value})}
+                    placeholder="+91 9876543210"
+                    required
+                    className="w-full p-2.5 border rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-400 mb-1 text-[10px] uppercase font-bold">WhatsApp</label>
+                  <input
+                    type="tel"
+                    value={newPendingStaffForm.whatsapp}
+                    onChange={(e) => setNewPendingStaffForm({...newPendingStaffForm, whatsapp: e.target.value})}
+                    placeholder="Same as mobile"
+                    className="w-full p-2.5 border rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-gray-400 mb-1 text-[10px] uppercase font-bold">Email Address *</label>
+                <input
+                  type="email"
+                  value={newPendingStaffForm.email}
+                  onChange={(e) => setNewPendingStaffForm({...newPendingStaffForm, email: e.target.value})}
+                  placeholder="applicant@email.com"
+                  required
+                  className="w-full p-2.5 border rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-gray-400 mb-1 text-[10px] uppercase font-bold">Applied Role *</label>
+                  <select
+                    value={newPendingStaffForm.role}
+                    onChange={(e) => setNewPendingStaffForm({...newPendingStaffForm, role: e.target.value as any})}
+                    className="w-full p-2.5 border rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
+                  >
+                    <option value="Waiter">Waiter (Floor)</option>
+                    <option value="Chef">Chef (Kitchen)</option>
+                    <option value="Manager">Manager (Operations)</option>
+                    <option value="Cashier">Cashier (Billing)</option>
+                    <option value="Cleaner">Cleaner (Sanitation)</option>
+                    <option value="Delivery Staff">Delivery Staff (Fleet)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-gray-400 mb-1 text-[10px] uppercase font-bold">Preferred Shift *</label>
+                  <select
+                    value={newPendingStaffForm.shift}
+                    onChange={(e) => setNewPendingStaffForm({...newPendingStaffForm, shift: e.target.value as any})}
+                    className="w-full p-2.5 border rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
+                  >
+                    <option value="Morning">Morning</option>
+                    <option value="Evening">Evening</option>
+                    <option value="Night">Night</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-gray-400 mb-1 text-[10px] uppercase font-bold">Notes / Prior Experience</label>
+                <textarea
+                  rows={2}
+                  value={newPendingStaffForm.notes}
+                  onChange={(e) => setNewPendingStaffForm({...newPendingStaffForm, notes: e.target.value})}
+                  placeholder="e.g. Experienced in table service and billing"
+                  className="w-full p-2.5 border rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-xs"
+                />
+              </div>
+            </form>
+
+            {/* Pinned Footer */}
+            <div className="px-6 py-3.5 border-t border-gray-100 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-800/40 flex gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setNewPendingStaffModal(false)}
+                className="w-1/3 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-bold py-2.5 rounded-xl cursor-pointer transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                form="create-pending-form"
+                className="w-2/3 bg-primary hover:bg-orange-600 text-white font-bold py-2.5 rounded-xl cursor-pointer shadow-md transition-all flex items-center justify-center gap-1.5"
+              >
+                <Plus size={16} /> Add to Pending Queue
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* 5. OTP SECURITY VERIFICATION MODAL (PORTALIZED) */}
+      {otpModal && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm overflow-y-auto animate-fade-in font-sans">
+          <div 
+            onClick={(e) => e.stopPropagation()} 
+            className={`relative my-auto w-full max-w-sm rounded-3xl p-6 shadow-2xl border ${
+              isDarkMode ? 'bg-gray-900 border-gray-800 text-white' : 'bg-white border-gray-100 text-slate-900'
+            }`}
+          >
+            <div className="flex justify-between items-center mb-4 pb-2 border-b border-gray-100 dark:border-gray-800">
+              <h4 className="font-extrabold text-sm">Security Verification</h4>
+              <button className="cursor-pointer text-gray-400 hover:text-gray-700" onClick={() => { setOtpModal(false); setPendingEditStaff(null); }}>
+                <X size={18} />
+              </button>
+            </div>
+            <div className="space-y-4 text-xs font-semibold">
+              <p className="text-[10px] text-gray-500">To edit staff credentials, please enter the Admin OTP.</p>
+              <div>
+                <input
+                  type="text"
+                  value={otpInput}
+                  onChange={(e) => setOtpInput(e.target.value)}
+                  placeholder="Enter OTP (e.g., 1234)"
+                  required
+                  className="w-full p-2.5 border rounded-xl text-center text-lg tracking-widest bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
+                />
+              </div>
+              <button onClick={handleVerifyOTP} className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 rounded-xl cursor-pointer transition-colors shadow-sm">
+                Verify & Edit
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
 
       {/* Bhakasura AI Chat Bot */}

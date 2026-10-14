@@ -151,15 +151,18 @@ CREATE TABLE IF NOT EXISTS public.activity_logs (
 ALTER TABLE public.activity_logs ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow public access" ON public.activity_logs FOR ALL USING (true) WITH CHECK (true);
 
--- 12. PENDING STAFF (WAITERS ONBOARDING)
+-- 12. PENDING STAFF (WAITERS & STAFF ONBOARDING)
 CREATE TABLE IF NOT EXISTS public.pending_staff (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
     mobile TEXT NOT NULL,
     whatsapp TEXT NOT NULL,
     email TEXT NOT NULL,
+    photo TEXT,
+    role TEXT DEFAULT 'Waiter',
     status TEXT NOT NULL DEFAULT 'Pending',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 ALTER TABLE public.pending_staff ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow public access" ON public.pending_staff FOR ALL USING (true) WITH CHECK (true);
+

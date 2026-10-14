@@ -1077,52 +1077,187 @@ export const db = {
     saveMockData('loyaltyConfig', rules);
   },
 
-  // 13. PENDING STAFF (WAITER ONBOARDING)
+  // 13. PENDING STAFF (WAITERS & STAFF ONBOARDING)
   getPendingStaff: async (): Promise<any[]> => {
+    let list: any[] = [];
     if (isRealSupabase) {
       const { data, error } = await supabaseClient
         .from('pending_staff')
         .select('*')
         .order('created_at', { ascending: false });
-      if (!error && data) return data;
+      if (!error && data) {
+        list = data;
+      }
     }
-    return getMockData<any[]>('pending_staff', []);
+    if (!list || list.length === 0) {
+      list = getMockData<any[]>('pending_staff', []);
+    }
+
+    const localMeta = getMockData<Record<string, any>>('pending_staff_meta', {});
+    return list.map(item => {
+      const meta = localMeta[item.id] || {};
+      return {
+        ...item,
+        role: item.role || meta.role || 'Waiter',
+        photo: item.photo || meta.photo || '',
+        shift: item.shift || meta.shift || 'Morning',
+        notes: item.notes || meta.notes || '',
+        whatsapp: item.whatsapp || item.mobile
+      };
+    });
+  },
+
+  submitPendingStaff: async (staff: any): Promise<any> => {
+    const isUuid = staff.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(staff.id);
+    const candidateId = isUuid ? staff.id : (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'b' + Math.random().toString(36).substring(2, 11) + '-0000-0000-0000-000000000000');
+    
+    const candidate = {
+      id: candidateId,
+      name: staff.name ? staff.name.trim() : 'New Applicant',
+      mobile: staff.mobile ? staff.mobile.trim() : '',
+      whatsapp: (staff.whatsapp || staff.mobile || '').trim(),
+      email: staff.email ? staff.email.trim() : '',
+      role: staff.role || 'Waiter',
+      photo: staff.photo || '',
+      shift: staff.shift || 'Morning',
+      notes: staff.notes || '',
+      status: 'Pending',
+      created_at: new Date().toISOString()
+    };
+
+    if (isRealSupabase) {
+      let { data, error } = await supabaseClient
+        .from('pending_staff')
+        .insert([{
+          id: candidate.id,
+          name: candidate.name,
+          mobile: candidate.mobile,
+          whatsapp: candidate.whatsapp,
+          email: candidate.email,
+          role: candidate.role,
+          photo: candidate.photo,
+          status: 'Pending'
+        }])
+        .select()
+        .single();
+
+      if (error && (error.code === 'PGRST204' || (error.message && error.message.includes('column')))) {
+        const fallbackRes = await supabaseClient
+          .from('pending_staff')
+          .insert([{
+            id: candidate.id,
+            name: candidate.name,
+            mobile: candidate.mobile,
+            whatsapp: candidate.whatsapp,
+            email: candidate.email,
+            status: 'Pending'
+          }])
+          .select()
+          .single();
+
+        if (!fallbackRes.error) {
+          data = fallbackRes.data;
+          error = null;
+        }
+      }
+
+      if (!error && data) {
+        const localMeta = getMockData<Record<string, any>>('pending_staff_meta', {});
+        localMeta[candidate.id] = {
+          role: candidate.role,
+          photo: candidate.photo,
+          shift: candidate.shift,
+          notes: candidate.notes
+        };
+        saveMockData('pending_staff_meta', localMeta);
+        return { ...data, ...candidate };
+      }
+    }
+
+    const staffList = getMockData<any[]>('pending_staff', []);
+    staffList.unshift(candidate);
+    saveMockData('pending_staff', staffList);
+
+    const localMeta = getMockData<Record<string, any>>('pending_staff_meta', {});
+    localMeta[candidate.id] = {
+      role: candidate.role,
+      photo: candidate.photo,
+      shift: candidate.shift,
+      notes: candidate.notes
+    };
+    saveMockData('pending_staff_meta', localMeta);
+    return candidate;
   },
 
   updatePendingStaff: async (staff: any): Promise<any> => {
-    if (isRealSupabase) {
-      const { data, error } = await supabaseClient
+    const isUuid = staff.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(staff.id);
+    
+    if (isRealSupabase && isUuid) {
+      let { error } = await supabaseClient
         .from('pending_staff')
-        .upsert(staff)
-        .select()
-        .single();
-      if (!error && data) return data;
+        .upsert({
+          id: staff.id,
+          name: staff.name,
+          mobile: staff.mobile,
+          whatsapp: staff.whatsapp || staff.mobile,
+          email: staff.email,
+          role: staff.role || 'Waiter',
+          photo: staff.photo || '',
+          status: staff.status || 'Pending'
+        });
+
+      if (error && (error.code === 'PGRST204' || (error.message && error.message.includes('column')))) {
+        await supabaseClient
+          .from('pending_staff')
+          .upsert({
+            id: staff.id,
+            name: staff.name,
+            mobile: staff.mobile,
+            whatsapp: staff.whatsapp || staff.mobile,
+            email: staff.email,
+            status: staff.status || 'Pending'
+          });
+      }
     }
+
+    const localMeta = getMockData<Record<string, any>>('pending_staff_meta', {});
+    localMeta[staff.id] = {
+      role: staff.role || localMeta[staff.id]?.role || 'Waiter',
+      photo: staff.photo !== undefined ? staff.photo : (localMeta[staff.id]?.photo || ''),
+      shift: staff.shift || localMeta[staff.id]?.shift || 'Morning',
+      notes: staff.notes || localMeta[staff.id]?.notes || ''
+    };
+    saveMockData('pending_staff_meta', localMeta);
+
     const staffList = getMockData<any[]>('pending_staff', []);
     const idx = staffList.findIndex(s => s.id === staff.id);
+    const enriched = { ...staff, ...localMeta[staff.id] };
     if (idx !== -1) {
-      staffList[idx] = staff;
+      staffList[idx] = enriched;
     } else {
-      staffList.push(staff);
+      staffList.push(enriched);
     }
     saveMockData('pending_staff', staffList);
-    return staff;
+    return enriched;
   },
 
   deletePendingStaff: async (id: string): Promise<boolean> => {
-    if (isRealSupabase) {
-      const { error } = await supabaseClient
+    const isUuid = id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    if (isRealSupabase && isUuid) {
+      await supabaseClient
         .from('pending_staff')
         .delete()
         .eq('id', id);
-      if (!error) return true;
     }
     const staffList = getMockData<any[]>('pending_staff', []);
     const updated = staffList.filter(s => s.id !== id);
     saveMockData('pending_staff', updated);
+
+    const localMeta = getMockData<Record<string, any>>('pending_staff_meta', {});
+    delete localMeta[id];
+    saveMockData('pending_staff_meta', localMeta);
     return true;
   },
-
   // 14. HOTEL SETTINGS
   getSettings: async (): Promise<any> => {
     if (isRealSupabase) {

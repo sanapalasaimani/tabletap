@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { db } from '../../supabase';
 import { Order, WaiterRequest } from '../../types';
 import { 
   ArrowLeft, User, Lock, Eye, EyeOff, 
   Fingerprint, CheckCircle, Wallet, Sparkles, AlertTriangle,
-  Clock, ShieldCheck, Upload, Edit3, X, Check
+  Clock, ShieldCheck, Upload, Edit3, X, Check, UserPlus, Send
 } from 'lucide-react';
 import { formatPhotoUrl, getInitials, PRESET_AVATARS } from '../../utils/photoHelper';
 
@@ -34,6 +35,43 @@ export const WaiterModule: React.FC = () => {
 
   // Staff Credentials Form
   const [employeeId, setEmployeeId] = useState('');
+  
+  // Public Onboarding Application Modal
+  const [showApplyModal, setShowApplyModal] = useState(false);
+  const [applyForm, setApplyForm] = useState({
+    name: '',
+    mobile: '',
+    whatsapp: '',
+    email: '',
+    role: 'Waiter' as 'Waiter' | 'Chef' | 'Manager' | 'Cashier' | 'Cleaner' | 'Delivery Staff',
+    shift: 'Morning' as 'Morning' | 'Evening' | 'Night',
+    photo: '',
+    notes: ''
+  });
+  const [isSubmittingApply, setIsSubmittingApply] = useState(false);
+  const [applySuccess, setApplySuccess] = useState(false);
+
+  const handleApplySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmittingApply(true);
+    try {
+      await db.submitPendingStaff({
+        name: applyForm.name,
+        mobile: applyForm.mobile,
+        whatsapp: applyForm.whatsapp || applyForm.mobile,
+        email: applyForm.email,
+        role: applyForm.role,
+        shift: applyForm.shift,
+        photo: applyForm.photo,
+        notes: applyForm.notes
+      });
+      setApplySuccess(true);
+    } catch (err) {
+      alert('Failed to submit application. Please try again.');
+    } finally {
+      setIsSubmittingApply(false);
+    }
+  };
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -525,10 +563,27 @@ export const WaiterModule: React.FC = () => {
               </div>
 
               {/* Security Hint */}
-              <p className="text-[11px] text-slate-400 font-medium text-center mt-6 flex items-center justify-center gap-1.5">
+              <p className="text-[11px] text-slate-400 font-medium text-center mt-5 flex items-center justify-center gap-1.5">
                 <ShieldCheck size={13} className="text-emerald-500" />
                 <span>30-minute inactivity session. Fingerprint unlock active inside session.</span>
               </p>
+
+              {/* DIRECT STAFF ONBOARDING LINK */}
+              <div className="mt-6 pt-5 border-t border-slate-200/80 text-center">
+                <p className="text-xs text-slate-500 font-medium">Want to work with DineSmart?</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setApplySuccess(false);
+                    setShowApplyModal(true);
+                  }}
+                  className="mt-2.5 inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-orange-50 hover:bg-orange-100 text-[#FF6B00] text-xs font-bold border border-orange-200 cursor-pointer shadow-xs transition-all hover:scale-102 active:scale-98"
+                >
+                  <UserPlus size={15} />
+                  <span>Submit Waiter & Staff Application</span>
+                </button>
+                <p className="text-[10px] text-slate-400 mt-1">Directly pushes to Manager Pending Review queue</p>
+              </div>
             </div>
           </div>
         )}
@@ -1025,6 +1080,258 @@ export const WaiterModule: React.FC = () => {
         )}
 
       </div>
+
+      {/* PUBLIC ONBOARDING APPLICATION MODAL (PORTALIZED) */}
+      {showApplyModal && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm overflow-y-auto animate-fade-in font-sans">
+          <div 
+            onClick={(e) => e.stopPropagation()} 
+            className="relative my-auto w-full max-w-lg max-h-[88vh] flex flex-col bg-white rounded-3xl shadow-2xl border border-gray-100 text-slate-900 overflow-hidden"
+          >
+            {/* Pinned Header */}
+            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 shrink-0 bg-slate-50/50">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-orange-100 text-[#FF6B00] flex items-center justify-center font-black">
+                  <UserPlus size={18} />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-sm text-slate-900">DineSmart Staff Application</h4>
+                  <p className="text-[10px] text-slate-400">Apply for Waiter, Kitchen, or Management roles</p>
+                </div>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setShowApplyModal(false)}
+                className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer transition-all"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {applySuccess ? (
+              <div className="p-8 text-center flex-1 flex flex-col items-center justify-center space-y-4">
+                <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center">
+                  <CheckCircle size={36} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-slate-900">Application Submitted!</h3>
+                  <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">
+                    Thank you <strong>{applyForm.name}</strong>. Your application has been directly pushed to the Manager's <strong>Pending Applications</strong> queue.
+                  </p>
+                  <p className="text-[11px] text-slate-400 mt-2">
+                    Once approved, your Employee ID & Terminal Password will be sent to <strong>{applyForm.email || applyForm.mobile}</strong>.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowApplyModal(false);
+                    setApplySuccess(false);
+                    setApplyForm({ name: '', mobile: '', whatsapp: '', email: '', role: 'Waiter', shift: 'Morning', photo: '', notes: '' });
+                  }}
+                  className="px-6 py-2.5 rounded-xl bg-[#FF6B00] hover:bg-orange-600 text-white font-bold text-xs shadow-md transition-all cursor-pointer"
+                >
+                  Done
+                </button>
+              </div>
+            ) : (
+              <>
+                {/* Scrollable Form Body */}
+                <form id="apply-staff-form" onSubmit={handleApplySubmit} className="overflow-y-auto p-6 space-y-4 flex-1 text-xs font-semibold">
+                  {/* Photo / Avatar Section */}
+                  <div className="p-3 bg-gradient-to-tr from-orange-50/50 to-amber-50/30 rounded-2xl border border-orange-100">
+                    <label className="block text-orange-950 mb-2 text-[10px] uppercase font-bold tracking-wider">
+                      Applicant Photo / Profile Picture
+                    </label>
+                    <div className="flex gap-3 items-center mb-2">
+                      <div className="w-12 h-12 rounded-xl bg-orange-500 text-white flex items-center justify-center font-black text-sm shrink-0 overflow-hidden shadow-xs">
+                        {applyForm.photo ? (
+                          <img src={applyForm.photo} alt="Applicant" className="w-full h-full object-cover" />
+                        ) : (
+                          getInitials(applyForm.name || 'Applicant')
+                        )}
+                      </div>
+                      <div className="flex-1 space-y-1.5">
+                        <input
+                          type="text"
+                          value={applyForm.photo}
+                          onChange={(e) => setApplyForm({...applyForm, photo: e.target.value})}
+                          placeholder="Paste image link or upload below"
+                          className="w-full p-2 border border-orange-200 rounded-xl text-xs bg-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        />
+                        <div className="flex gap-2 items-center">
+                          <label className="cursor-pointer bg-white border border-orange-200 hover:bg-orange-50 text-orange-800 px-2.5 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 shadow-xs transition-all">
+                            <Upload size={11} className="text-orange-500" /> Upload from Device
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  const reader = new FileReader();
+                                  reader.onloadend = () => {
+                                    setApplyForm(prev => ({ ...prev, photo: reader.result as string }));
+                                  };
+                                  reader.readAsDataURL(file);
+                                }
+                              }}
+                            />
+                          </label>
+                          {applyForm.photo && (
+                            <button
+                              type="button"
+                              onClick={() => setApplyForm({...applyForm, photo: ''})}
+                              className="text-[10px] text-red-500 font-bold hover:underline cursor-pointer"
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Presets */}
+                    <div>
+                      <p className="text-[9px] text-slate-500 mb-1 font-bold">Or pick preset avatar:</p>
+                      <div className="flex gap-1.5 overflow-x-auto pb-1">
+                        {PRESET_AVATARS.map((p, idx) => (
+                          <button
+                            type="button"
+                            key={idx}
+                            onClick={() => setApplyForm({...applyForm, photo: p.url})}
+                            className={`w-7 h-7 rounded-lg overflow-hidden border-2 transition-all shrink-0 cursor-pointer ${
+                              applyForm.photo === p.url ? 'border-orange-500 ring-2 ring-orange-400' : 'border-white hover:border-orange-300'
+                            }`}
+                          >
+                            <img src={p.url} alt={p.name} className="w-full h-full object-cover" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Full Name */}
+                  <div>
+                    <label className="block text-slate-500 mb-1 text-[10px] uppercase font-bold">Full Name *</label>
+                    <input
+                      type="text"
+                      value={applyForm.name}
+                      onChange={(e) => setApplyForm({...applyForm, name: e.target.value})}
+                      placeholder="e.g. Ramesh Kumar"
+                      required
+                      className="w-full p-2.5 border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    />
+                  </div>
+
+                  {/* Mobile & WhatsApp */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-slate-500 mb-1 text-[10px] uppercase font-bold">Mobile Number *</label>
+                      <input
+                        type="tel"
+                        value={applyForm.mobile}
+                        onChange={(e) => setApplyForm({...applyForm, mobile: e.target.value})}
+                        placeholder="+91 9876543210"
+                        required
+                        className="w-full p-2.5 border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-500 mb-1 text-[10px] uppercase font-bold">WhatsApp Number</label>
+                      <input
+                        type="tel"
+                        value={applyForm.whatsapp}
+                        onChange={(e) => setApplyForm({...applyForm, whatsapp: e.target.value})}
+                        placeholder="Same as mobile or other"
+                        className="w-full p-2.5 border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Email */}
+                  <div>
+                    <label className="block text-slate-500 mb-1 text-[10px] uppercase font-bold">Email ID *</label>
+                    <input
+                      type="email"
+                      value={applyForm.email}
+                      onChange={(e) => setApplyForm({...applyForm, email: e.target.value})}
+                      placeholder="applicant@email.com"
+                      required
+                      className="w-full p-2.5 border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    />
+                  </div>
+
+                  {/* Role & Shift */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-slate-500 mb-1 text-[10px] uppercase font-bold">Applied Role *</label>
+                      <select
+                        value={applyForm.role}
+                        onChange={(e) => setApplyForm({...applyForm, role: e.target.value as any})}
+                        className="w-full p-2.5 border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                      >
+                        <option value="Waiter">Waiter (Floor Service)</option>
+                        <option value="Chef">Chef (Kitchen)</option>
+                        <option value="Manager">Manager (Operations)</option>
+                        <option value="Cashier">Cashier (Billing)</option>
+                        <option value="Cleaner">Cleaner (Sanitation)</option>
+                        <option value="Delivery Staff">Delivery Staff (Fleet)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-slate-500 mb-1 text-[10px] uppercase font-bold">Preferred Shift *</label>
+                      <select
+                        value={applyForm.shift}
+                        onChange={(e) => setApplyForm({...applyForm, shift: e.target.value as any})}
+                        className="w-full p-2.5 border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                      >
+                        <option value="Morning">Morning Shift (8 AM - 4 PM)</option>
+                        <option value="Evening">Evening Shift (4 PM - 12 AM)</option>
+                        <option value="Night">Night Shift (12 AM - 8 AM)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Notes / Experience */}
+                  <div>
+                    <label className="block text-slate-500 mb-1 text-[10px] uppercase font-bold">Prior Experience / Remarks</label>
+                    <textarea
+                      rows={2}
+                      value={applyForm.notes}
+                      onChange={(e) => setApplyForm({...applyForm, notes: e.target.value})}
+                      placeholder="e.g. 2 years experience at Hotel Royal, experienced in South Indian dishes and table service"
+                      className="w-full p-2.5 border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 text-xs"
+                    />
+                  </div>
+                </form>
+
+                {/* Pinned Footer */}
+                <div className="px-6 py-3.5 border-t border-slate-100 bg-slate-50/70 flex gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setShowApplyModal(false)}
+                    className="w-1/3 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-2.5 rounded-xl cursor-pointer transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    form="apply-staff-form"
+                    disabled={isSubmittingApply}
+                    className="w-2/3 bg-[#FF6B00] hover:bg-orange-600 disabled:opacity-50 text-white font-bold py-2.5 rounded-xl cursor-pointer shadow-md transition-all flex items-center justify-center gap-1.5"
+                  >
+                    <Send size={14} />
+                    <span>{isSubmittingApply ? 'Submitting...' : 'Submit Application'}</span>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>,
+        document.body
+      )}
+
     </div>
   );
 };

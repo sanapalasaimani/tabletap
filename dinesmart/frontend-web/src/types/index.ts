@@ -70,6 +70,9 @@ export interface PendingStaff {
   whatsapp: string;
   email: string;
   photo?: string;
+  role?: 'Waiter' | 'Chef' | 'Manager' | 'Cashier' | 'Cleaner' | 'Delivery Staff';
+  shift?: 'Morning' | 'Evening' | 'Night';
+  notes?: string;
   status: 'Pending' | 'Approved' | 'Rejected';
   createdAt?: string;
 }
