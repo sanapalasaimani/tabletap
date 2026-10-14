@@ -209,6 +209,9 @@ export const KitchenDashboard: React.FC<KitchenDashboardProps> = ({ onLogout }) 
     }
   });
 
+  // Note 21: FIFO sorting in Chef dashboard - Oldest orders first, newest orders last
+  virtualCards.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
   // Update virtual card status and sync parent order to DB
   const handleUpdateVirtualStatus = async (vId: string, nextStatus: VirtualStatus) => {
     const updated = { ...virtualStatuses, [vId]: nextStatus };

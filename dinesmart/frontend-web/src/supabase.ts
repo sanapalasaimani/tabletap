@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { MenuItem, CartItem, Order, UserProfile, WaiterRequest } from './types';
 import { MENU_ITEMS } from './data/menu';
 import { analyzeReviewSentiment } from './utils/nlpSentiment';
+import { spoonacularService } from './services/spoonacularService';
 
 // Read Supabase environment variables
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
@@ -33,22 +34,26 @@ const saveMockData = <T>(key: string, data: T): void => {
 };
 
 // Mapping helpers between Supabase snake_case columns and TypeScript MenuItem
-const mapSupabaseToMenuItem = (row: any): MenuItem => ({
-  id: String(row.id),
-  name: row.name || 'Unnamed Dish',
-  price: Number(row.price || 0),
-  category: row.category || 'Main Course',
-  subcategory: row.subcategory || undefined,
-  image: row.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500',
-  rating: Number(row.rating || 4.5),
-  reviewsCount: Number(row.reviews_count ?? row.reviewsCount ?? 50),
-  isVeg: row.is_veg !== undefined ? Boolean(row.is_veg) : Boolean(row.isVeg),
-  spicyLevel: row.spicy_level !== undefined ? (row.spicy_level as 0 | 1 | 2 | 3) : ((row.spicyLevel ?? 1) as 0 | 1 | 2 | 3),
-  isSpecial: row.is_special !== undefined ? Boolean(row.is_special) : Boolean(row.isSpecial),
-  calories: Number(row.calories || 300),
-  prepTime: row.prep_time || row.prepTime || '15 mins',
-  description: row.description || '',
-});
+const mapSupabaseToMenuItem = (row: any): MenuItem => {
+  const dishId = String(row.id);
+  const dishName = row.name || 'Unnamed Dish';
+  return {
+    id: dishId,
+    name: dishName,
+    price: Number(row.price || 0),
+    category: row.category || 'Main Course',
+    subcategory: row.subcategory || undefined,
+    image: spoonacularService.getDishImage(dishId, dishName, row.image),
+    rating: Number(row.rating || 4.5),
+    reviewsCount: Number(row.reviews_count ?? row.reviewsCount ?? 50),
+    isVeg: row.is_veg !== undefined ? Boolean(row.is_veg) : Boolean(row.isVeg),
+    spicyLevel: row.spicy_level !== undefined ? (row.spicy_level as 0 | 1 | 2 | 3) : ((row.spicyLevel ?? 1) as 0 | 1 | 2 | 3),
+    isSpecial: row.is_special !== undefined ? Boolean(row.is_special) : Boolean(row.isSpecial),
+    calories: Number(row.calories || 300),
+    prepTime: row.prep_time || row.prepTime || '15 mins',
+    description: row.description || '',
+  };
+};
 
 const mapMenuItemToSupabase = (item: MenuItem): any => ({
   id: String(item.id),
@@ -728,6 +733,120 @@ export const db = {
     return true;
   },
 
+  // STRICT TABLE SESSION LOCKING SYSTEM (PREVENTS QR OVERFLOW)
+  claimTableSession: async (tableId: number, deviceId: string, phone?: string, name?: string): Promise<{
+    status: 'success' | 'locked' | 'invalid';
+    table?: any;
+    sessionId?: string;
+    message?: string;
+    activeSession?: any;
+  }> => {
+    const table = await db.getTable(tableId);
+    if (!table) return { status: 'invalid', message: 'Table not found in restaurant directory.' };
+
+    let sessionData: any = null;
+    if (table.customer_name) {
+      try {
+        sessionData = typeof table.customer_name === 'string' && table.customer_name.startsWith('{')
+          ? JSON.parse(table.customer_name)
+          : { name: table.customer_name, deviceId: '', startedAt: Date.now() };
+      } catch {
+        sessionData = { name: table.customer_name, deviceId: '', startedAt: Date.now() };
+      }
+    }
+
+    const now = Date.now();
+    const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+    const isExpired = sessionData?.lastActivityAt && (now - Number(sessionData.lastActivityAt) > TWO_HOURS_MS);
+
+    // If table is occupied, not expired, and device does not match
+    if (table.status === 'Occupied' && !isExpired && sessionData?.deviceId && sessionData.deviceId !== deviceId) {
+      // Check if phone matches (allow same party/phone to re-join session)
+      if (phone && sessionData.phone && sessionData.phone.replace(/\D/g, '') === phone.replace(/\D/g, '')) {
+        sessionData.deviceId = deviceId;
+        sessionData.lastActivityAt = now;
+        const updatedTable = { ...table, customer_name: JSON.stringify(sessionData) };
+        await db.saveTable(updatedTable);
+        return { status: 'success', table: updatedTable, sessionId: sessionData.sessionId };
+      }
+
+      return {
+        status: 'locked',
+        table,
+        activeSession: sessionData,
+        message: `Table #${tableId} is currently occupied by an active dining party.`
+      };
+    }
+
+    // Table is available or expired or belongs to current device: claim it!
+    const newSessionId = (table.status === 'Occupied' && !isExpired && sessionData?.sessionId) 
+      ? sessionData.sessionId 
+      : `sess_${tableId}_${now}`;
+
+    const newSession = {
+      sessionId: newSessionId,
+      deviceId,
+      phone: phone || sessionData?.phone || '',
+      name: name || sessionData?.name || 'Diner',
+      startedAt: (table.status === 'Occupied' && !isExpired && sessionData?.startedAt) ? sessionData.startedAt : now,
+      lastActivityAt: now
+    };
+
+    const updatedTable = {
+      ...table,
+      status: 'Occupied',
+      customer_name: JSON.stringify(newSession)
+    };
+
+    await db.saveTable(updatedTable);
+    return { status: 'success', table: updatedTable, sessionId: newSessionId };
+  },
+
+  releaseTableSession: async (tableId: number): Promise<boolean> => {
+    const table = await db.getTable(tableId);
+    if (!table) return false;
+    const updated = {
+      ...table,
+      status: 'Available',
+      customer_name: null
+    };
+    await db.saveTable(updated);
+    return true;
+  },
+
+  touchTableActivity: async (tableId: number, deviceId: string): Promise<void> => {
+    const table = await db.getTable(tableId);
+    if (!table || !table.customer_name) return;
+    try {
+      if (typeof table.customer_name === 'string' && table.customer_name.startsWith('{')) {
+        const session = JSON.parse(table.customer_name);
+        if (session.deviceId === deviceId) {
+          session.lastActivityAt = Date.now();
+          await db.saveTable({ ...table, customer_name: JSON.stringify(session) });
+        }
+      }
+    } catch {}
+  },
+
+  joinTableSession: async (tableId: number, deviceId: string, phone: string): Promise<boolean> => {
+    const table = await db.getTable(tableId);
+    if (!table || !table.customer_name) return false;
+    try {
+      if (typeof table.customer_name === 'string' && table.customer_name.startsWith('{')) {
+        const session = JSON.parse(table.customer_name);
+        const cleanEntered = phone.replace(/\D/g, '');
+        const cleanSaved = (session.phone || '').replace(/\D/g, '');
+        if (cleanSaved && cleanSaved === cleanEntered) {
+          session.deviceId = deviceId;
+          session.lastActivityAt = Date.now();
+          await db.saveTable({ ...table, customer_name: JSON.stringify(session) });
+          return true;
+        }
+      }
+    } catch {}
+    return false;
+  },
+
   // 8. PROMOTIONS / COUPONS
   getPromotions: async (): Promise<any[]> => {
     if (isRealSupabase) {
@@ -741,23 +860,42 @@ export const db = {
   },
 
   savePromotion: async (promo: any): Promise<any> => {
-    if (isRealSupabase) {
-      const { data, error } = await supabaseClient
-        .from('promotions')
-        .upsert(promo)
-        .select()
-        .single();
-      if (!error && data) return data;
-    }
+    // ⚡ Instant local-first save
     const coupons = getMockData<any[]>('coupons', []);
-    const idx = coupons.findIndex(c => c.id === promo.id);
+    const cleanCode = String(promo.code).toUpperCase().trim();
+    const formattedPromo = {
+      ...promo,
+      code: cleanCode,
+      min_bill: Number(promo.min_bill ?? promo.minBill ?? 0),
+      discount: Number(promo.discount || 0),
+      active: promo.active !== undefined ? Boolean(promo.active) : true
+    };
+
+    const idx = coupons.findIndex(c => c.id === promo.id || c.code === cleanCode);
     if (idx !== -1) {
-      coupons[idx] = promo;
+      coupons[idx] = formattedPromo;
     } else {
-      coupons.push(promo);
+      coupons.push(formattedPromo);
     }
     saveMockData('coupons', coupons);
-    return promo;
+
+    // Sync to Supabase
+    if (isRealSupabase) {
+      try {
+        const dbPayload = {
+          id: String(formattedPromo.id),
+          code: cleanCode,
+          discount: formattedPromo.discount,
+          type: formattedPromo.type || 'Fixed',
+          min_bill: formattedPromo.min_bill,
+          active: formattedPromo.active
+        };
+        await supabaseClient.from('promotions').upsert(dbPayload);
+      } catch (err) {
+        console.warn('Supabase promotion upsert error, saved locally:', err);
+      }
+    }
+    return formattedPromo;
   },
 
   deletePromotion: async (id: string): Promise<boolean> => {
@@ -781,26 +919,43 @@ export const db = {
         .from('reviews')
         .select('*')
         .order('date', { ascending: false });
-      if (!error && data) return data;
+      if (!error && data) {
+        saveMockData('reviews', data);
+        return data;
+      }
     }
     return getMockData<any[]>('reviews', []);
   },
 
   saveReview: async (review: any): Promise<any> => {
+    // Sanitize payload to match exact schema columns in Supabase reviews table:
+    // id, order_id, customer_name, rating, comment, date, reply
+    const dbPayload = {
+      id: String(review.id || `rev_${Date.now()}`),
+      order_id: String(review.order_id || review.orderId || ''),
+      customer_name: String(review.customer_name || review.customerName || 'Guest'),
+      rating: Number(review.rating || 5),
+      comment: review.comment || '',
+      date: review.date || new Date().toISOString().split('T')[0],
+      reply: review.reply || null
+    };
+
     if (isRealSupabase) {
-      const { data, error } = await supabaseClient
-        .from('reviews')
-        .upsert(review)
-        .select()
-        .single();
-      if (!error && data) return data;
+      try {
+        await supabaseClient
+          .from('reviews')
+          .upsert(dbPayload);
+      } catch (err) {
+        console.warn('Supabase reviews upsert fallback to local:', err);
+      }
     }
+
     const reviewsList = getMockData<any[]>('reviews', []);
     const idx = reviewsList.findIndex(r => r.id === review.id);
     if (idx !== -1) {
       reviewsList[idx] = review;
     } else {
-      reviewsList.push(review);
+      reviewsList.unshift(review);
     }
     saveMockData('reviews', reviewsList);
     return review;
@@ -842,16 +997,16 @@ export const db = {
     comments: string
   ): Promise<boolean> => {
     if (isRealSupabase) {
-      const { error } = await supabaseClient.from('feedback').insert({
-        order_id: orderId,
-        food_rating: ratings.food,
-        service_rating: ratings.service,
-        ambience_rating: ratings.ambience,
-        comments,
-      });
-      if (error) {
-        console.error('Supabase error submitting feedback:', error);
-        return false;
+      try {
+        await supabaseClient.from('feedback').insert({
+          order_id: orderId,
+          food_rating: ratings.food,
+          service_rating: ratings.service,
+          ambience_rating: ratings.ambience,
+          comments,
+        });
+      } catch (e) {
+        console.warn('Supabase feedback insert warning:', e);
       }
     }
     
@@ -880,6 +1035,16 @@ export const db = {
     };
     
     await db.saveReview(newReview);
+
+    // Mark feedback as submitted on the order in Supabase and local storage
+    if (orderObj) {
+      orderObj.feedbackSubmitted = true;
+      saveMockData('orders', ordersList);
+    }
+    if (isRealSupabase) {
+      supabaseClient.from('orders').update({ feedback_submitted: true }).eq('id', orderId).catch(() => {});
+    }
+
     return true;
   },
 

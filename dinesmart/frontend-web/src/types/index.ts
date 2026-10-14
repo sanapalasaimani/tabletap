@@ -73,3 +73,54 @@ export interface PendingStaff {
   status: 'Pending' | 'Approved' | 'Rejected';
   createdAt?: string;
 }
+
+export interface TableSession {
+  sessionId: string;
+  tableId: string;
+  deviceId: string;
+  customerPhone?: string;
+  customerName?: string;
+  startedAt: string;
+  lastActivityAt: string;
+  status: 'active' | 'completed' | 'expired';
+}
+
+export interface TableItem {
+  id: number;
+  name: string;
+  status: 'Available' | 'Occupied' | 'Billing';
+  customer_name?: string;
+  capacity?: number;
+  qr_token?: string;
+  active_session_id?: string;
+  active_session_device?: string;
+  active_session_phone?: string;
+  session_started_at?: string;
+  last_activity_at?: string;
+}
+
+export interface Review {
+  id: string;
+  orderId: string;
+  customerName: string;
+  rating: number;
+  comment: string;
+  date: string;
+  reply?: string;
+  category?: string;
+  foodRating?: number;
+  serviceRating?: number;
+  ambienceRating?: number;
+}
+
+export interface Promotion {
+  id: string;
+  code: string;
+  discount: number;
+  type: 'Fixed' | 'Percentage';
+  minBill?: number;
+  applicableCategory?: string;
+  active: boolean;
+  maxDiscount?: number;
+  usageCount?: number;
+}

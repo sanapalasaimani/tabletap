@@ -8,7 +8,7 @@ export const generateReportData = (data: any, settings: any) => {
 
   // 1. Summary Metrics
   const totalRevenue = orders.reduce((sum: number, o: any) => sum + (o.status !== 'Cancelled' ? o.total : 0), 0);
-  const completedOrders = orders.filter((o: any) => o.status === 'Completed').length;
+  const completedOrders = orders.filter((o: any) => o.status === 'Completed' || o.status === 'Delivered').length;
   const cancelledOrders = orders.filter((o: any) => o.status === 'Cancelled').length;
   const totalOrdersCount = orders.length;
   const cancelRate = totalOrdersCount ? ((cancelledOrders / totalOrdersCount) * 100).toFixed(2) + '%' : '0%';

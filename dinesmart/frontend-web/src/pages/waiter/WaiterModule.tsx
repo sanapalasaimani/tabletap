@@ -4,8 +4,9 @@ import { Order, WaiterRequest } from '../../types';
 import { 
   ArrowLeft, User, Lock, Eye, EyeOff, 
   Fingerprint, CheckCircle, Wallet, Sparkles, AlertTriangle,
-  Clock, ShieldCheck
+  Clock, ShieldCheck, Upload, Edit3, X, Check
 } from 'lucide-react';
+import { formatPhotoUrl, getInitials, PRESET_AVATARS } from '../../utils/photoHelper';
 
 export const ClocheIcon = ({ size = 20, className = '' }: { size?: number; className?: string }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}>
@@ -58,6 +59,48 @@ export const WaiterModule: React.FC = () => {
   });
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const [remainingMinutes, setRemainingMinutes] = useState<number>(30);
+
+  // Profile Edit State
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [editProfileForm, setEditProfileForm] = useState({
+    mobile: '',
+    photo: ''
+  });
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingProfile(true);
+    try {
+      const updatedProfile: StaffProfile = {
+        ...staffInfo,
+        mobile: editProfileForm.mobile,
+        photo: editProfileForm.photo
+      };
+      setStaffInfo(updatedProfile);
+      localStorage.setItem('tabletap_waiter_staff', JSON.stringify(updatedProfile));
+
+      // Also persist to Supabase / Mock database if possible
+      const allStaff = await db.getStaff();
+      const existing = allStaff.find((s: any) => s.empid === staffInfo.empid || s.name === staffInfo.name);
+      if (existing) {
+        await db.saveStaffMember({
+          ...existing,
+          mobile: editProfileForm.mobile,
+          photo: editProfileForm.photo
+        });
+      }
+
+      setIsEditingProfile(false);
+      setFeedbackMessage('Profile updated successfully!');
+      setTimeout(() => setFeedbackMessage(null), 3000);
+    } catch (err) {
+      console.error('Failed to save waiter profile:', err);
+      alert('Failed to update profile.');
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
 
   // Tips State
   const [todayTips, setTodayTips] = useState<number>(() => {
@@ -355,6 +398,13 @@ export const WaiterModule: React.FC = () => {
     }))
   ];
 
+  // Note 21: FIFO sorting in Waiter Dashboard - Oldest first, newest last
+  allTasksList.sort((a, b) => {
+    const timeA = new Date(a.rawOrder?.createdAt || a.rawReq?.createdAt || 0).getTime();
+    const timeB = new Date(b.rawOrder?.createdAt || b.rawReq?.createdAt || 0).getTime();
+    return timeA - timeB;
+  });
+
   const pendingTasks = allTasksList.filter(t => !t.isAccepted);
   const acceptedTasks = allTasksList.filter(t => t.isAccepted);
 
@@ -564,9 +614,18 @@ export const WaiterModule: React.FC = () => {
                 <button
                   onClick={() => setActiveView('profile')}
                   title="View Waiter Profile"
-                  className="w-9 h-9 rounded-full bg-[#FF6B00] hover:bg-orange-600 text-white font-black text-xs flex items-center justify-center shadow-md shadow-orange-500/25 active:scale-95 transition-all cursor-pointer"
+                  className="w-9 h-9 rounded-full bg-[#FF6B00] overflow-hidden hover:bg-orange-600 text-white font-black text-xs flex items-center justify-center shadow-md shadow-orange-500/25 active:scale-95 transition-all cursor-pointer border-2 border-orange-200 shrink-0"
                 >
-                  {staffInfo.initials}
+                  {staffInfo.photo ? (
+                    <img
+                      src={formatPhotoUrl(staffInfo.photo)}
+                      alt={staffInfo.name}
+                      className="w-full h-full object-cover"
+                      onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                    />
+                  ) : (
+                    staffInfo.initials || getInitials(staffInfo.name)
+                  )}
                 </button>
               </div>
             </div>
@@ -719,13 +778,39 @@ export const WaiterModule: React.FC = () => {
 
               {/* Profile Card */}
               <div className="mt-6 bg-white rounded-3xl p-6 border border-orange-100 shadow-sm text-center">
-                <div className="w-20 h-20 rounded-full bg-[#FF6B00] text-white flex items-center justify-center font-black text-2xl mx-auto shadow-lg shadow-orange-500/25">
-                  {staffInfo.initials}
+                <div className="w-20 h-20 rounded-full bg-[#FF6B00] overflow-hidden text-white flex items-center justify-center font-black text-2xl mx-auto shadow-lg shadow-orange-500/25 border-4 border-orange-100">
+                  {staffInfo.photo ? (
+                    <img
+                      src={formatPhotoUrl(staffInfo.photo)}
+                      alt={staffInfo.name}
+                      className="w-full h-full object-cover"
+                      onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                    />
+                  ) : (
+                    staffInfo.initials || getInitials(staffInfo.name)
+                  )}
                 </div>
                 <h2 className="text-lg font-black text-slate-900 mt-3">{staffInfo.name}</h2>
                 <p className="text-xs text-slate-400 font-bold">{staffInfo.empid} &bull; {staffInfo.role}</p>
 
+                <button
+                  onClick={() => {
+                    setEditProfileForm({
+                      mobile: staffInfo.mobile || '',
+                      photo: staffInfo.photo || ''
+                    });
+                    setIsEditingProfile(true);
+                  }}
+                  className="mt-3 inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-orange-50 hover:bg-orange-100 text-[#FF6B00] text-xs font-bold border border-orange-200 transition-all cursor-pointer"
+                >
+                  <Edit3 size={13} /> Edit Profile & Photo
+                </button>
+
                 <div className="mt-4 pt-4 border-t border-slate-100 text-left space-y-2 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Phone / Mobile:</span>
+                    <strong className="text-slate-800">{staffInfo.mobile || 'Not configured'}</strong>
+                  </div>
                   <div className="flex justify-between">
                     <span className="text-slate-400">Assigned Routing:</span>
                     <strong className="text-slate-800">
@@ -738,6 +823,127 @@ export const WaiterModule: React.FC = () => {
                   </div>
                 </div>
               </div>
+
+              {/* Edit Profile Modal */}
+              {isEditingProfile && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                  <div className="w-full max-w-sm rounded-3xl p-6 shadow-2xl bg-white text-slate-900 max-h-[90vh] overflow-y-auto">
+                    <div className="flex justify-between items-center mb-4 pb-2 border-b">
+                      <div>
+                        <h4 className="font-extrabold text-sm">Edit Profile & Photo</h4>
+                        <p className="text-[10px] text-gray-400">Update your photo and contact info</p>
+                      </div>
+                      <button className="cursor-pointer text-gray-400 hover:text-gray-700" onClick={() => setIsEditingProfile(false)}>
+                        <X size={18} />
+                      </button>
+                    </div>
+
+                    <form onSubmit={handleSaveProfile} className="space-y-4 text-xs font-semibold">
+                      {/* Photo Section */}
+                      <div className="p-3 bg-orange-50/60 rounded-2xl border border-orange-100 text-center">
+                        <div className="w-16 h-16 rounded-full bg-[#FF6B00] overflow-hidden text-white flex items-center justify-center font-black text-xl mx-auto mb-2 border-2 border-orange-200">
+                          {editProfileForm.photo ? (
+                            <img
+                              src={formatPhotoUrl(editProfileForm.photo)}
+                              alt="Staff"
+                              className="w-full h-full object-cover"
+                              onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                            />
+                          ) : (
+                            getInitials(staffInfo.name)
+                          )}
+                        </div>
+
+                        <div className="space-y-2 text-left">
+                          <label className="block text-gray-500 text-[10px] uppercase font-bold">Photo URL / Google Drive link</label>
+                          <input
+                            type="text"
+                            value={editProfileForm.photo}
+                            onChange={(e) => setEditProfileForm({...editProfileForm, photo: e.target.value})}
+                            placeholder="https://drive.google.com/... or image link"
+                            className="w-full p-2 border border-orange-200 rounded-xl text-xs bg-white"
+                          />
+
+                          <div className="flex gap-2 items-center flex-wrap pt-0.5">
+                            <label className="cursor-pointer bg-white border border-orange-200 hover:bg-orange-100 text-orange-700 px-2.5 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 shadow-2xs transition-all">
+                              <Upload size={11} /> Choose Device Photo
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    const reader = new FileReader();
+                                    reader.onloadend = () => {
+                                      setEditProfileForm(prev => ({ ...prev, photo: reader.result as string }));
+                                    };
+                                    reader.readAsDataURL(file);
+                                  }
+                                }}
+                              />
+                            </label>
+                            {editProfileForm.photo && (
+                              <button
+                                type="button"
+                                onClick={() => setEditProfileForm({...editProfileForm, photo: ''})}
+                                className="text-[10px] text-red-500 font-bold hover:underline cursor-pointer"
+                              >
+                                Remove
+                              </button>
+                            )}
+                          </div>
+
+                          <div>
+                            <p className="text-[9px] text-gray-400 mb-1 font-bold">Or pick preset avatar:</p>
+                            <div className="flex gap-1.5 overflow-x-auto pb-1">
+                              {PRESET_AVATARS.map((p, idx) => (
+                                <button
+                                  type="button"
+                                  key={idx}
+                                  onClick={() => setEditProfileForm({...editProfileForm, photo: p.url})}
+                                  title={p.name}
+                                  className="w-7 h-7 rounded-lg overflow-hidden border border-gray-200 hover:border-orange-500 transition-all shrink-0 cursor-pointer"
+                                >
+                                  <img src={p.url} alt={p.name} className="w-full h-full object-cover" />
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-gray-500 mb-1 text-[10px] uppercase font-bold">Phone / WhatsApp</label>
+                        <input
+                          type="text"
+                          value={editProfileForm.mobile}
+                          onChange={(e) => setEditProfileForm({...editProfileForm, mobile: e.target.value})}
+                          placeholder="+91 98765 43210"
+                          className="w-full p-2.5 border rounded-xl"
+                        />
+                      </div>
+
+                      <div className="flex gap-2 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => setIsEditingProfile(false)}
+                          className="w-1/3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2.5 rounded-xl cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={isSavingProfile}
+                          className="w-2/3 bg-[#FF6B00] hover:bg-orange-600 text-white font-bold py-2.5 rounded-xl cursor-pointer shadow-md flex items-center justify-center gap-1.5 transition-all"
+                        >
+                          <Check size={14} /> {isSavingProfile ? 'Saving...' : 'Save Profile'}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
 
               {/* Quick Options */}
               <div className="mt-4 space-y-2">

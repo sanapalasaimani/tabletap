@@ -27,6 +27,15 @@ export const CheckoutOverlay: React.FC<CheckoutOverlayProps> = ({ onClose, onPay
       return;
     }
     setIsPaying(true);
+    // Note 17: If Cash is chosen, trigger notification to waiters
+    if (paymentMethod === 'Cash') {
+      try {
+        await db.requestWaiter(activeOrder.tableId, 'Request Bill');
+      } catch (err) {
+        console.warn('Failed to notify waiter for cash payment:', err);
+      }
+    }
+
     // Simulate API checkout call
     const methodLabel = paymentMethod === 'UPI' ? `UPI (${selectedUpiProvider})` : paymentMethod;
     const updated = await db.payOrder(activeOrder.id, methodLabel);

@@ -16,19 +16,25 @@ import { CallWaiterModal } from '../../components/customer/CallWaiterModal';
 import { CheckoutOverlay } from '../../components/customer/CheckoutOverlay';
 
 // Icons
-import { Home, Search, ShoppingCart, Clock, User, ConciergeBell, RefreshCw, AlertTriangle, LogOut } from 'lucide-react';
+import { Home, Search, ShoppingCart, Clock, User, ConciergeBell, RefreshCw, AlertTriangle, LogOut, ShieldCheck, Check } from 'lucide-react';
 
 export const MainContainer: React.FC = () => {
   const { tableId: routeTableId } = useParams<{ tableId: string }>();
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
   
-  const { isLoggedIn, cart, activeOrder, tableId, setTableId } = useApp();
+  const { isLoggedIn, cart, activeOrder, tableId, setTableId, phone, customerName } = useApp();
   const [activeTab, setActiveTab] = useState<'home' | 'search' | 'cart' | 'orders' | 'profile'>('home');
   const [welcomeCompleted, setWelcomeCompleted] = useState(false);
   const [initialSearchCategory, setInitialSearchCategory] = useState<MenuItem['category'] | undefined>(undefined);
 
-  const [verificationStatus, setVerificationStatus] = useState<'verifying' | 'valid' | 'invalid'>('verifying');
+  const [verificationStatus, setVerificationStatus] = useState<'verifying' | 'valid' | 'invalid' | 'locked'>('verifying');
+  const [lockedSessionInfo, setLockedSessionInfo] = useState<any>(null);
+  const [showJoinModal, setShowJoinModal] = useState(false);
+  const [joinPhoneInput, setJoinPhoneInput] = useState('');
+  const [joinError, setJoinError] = useState('');
+  const [joinSuccess, setJoinSuccess] = useState(false);
+  const [waiterCalledNotice, setWaiterCalledNotice] = useState(false);
 
   // Modal Overlays
   const [selectedDish, setSelectedDish] = useState<MenuItem | null>(null);
@@ -52,6 +58,16 @@ export const MainContainer: React.FC = () => {
   // Cart quantity count
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
+  // Get or initialize device ID
+  const getDeviceId = () => {
+    let devId = localStorage.getItem('dinesmart_device_id');
+    if (!devId) {
+      devId = 'dev_' + Math.random().toString(36).substring(2, 12);
+      localStorage.setItem('dinesmart_device_id', devId);
+    }
+    return devId;
+  };
+
   useEffect(() => {
     const verifyTableSession = async () => {
       if (!routeTableId || !token) {
@@ -68,8 +84,25 @@ export const MainContainer: React.FC = () => {
 
         const tableObj = await db.getTable(tableNum);
         // Table must exist in database AND token must match the registered table's qr_token
-        if (tableObj && tableObj.qr_token && tableObj.qr_token === token) {
+        if (!tableObj || !tableObj.qr_token || tableObj.qr_token !== token) {
+          setVerificationStatus('invalid');
+          return;
+        }
+
+        // STRICT 1-USER/SESSION LOCK PER QR CODE
+        const deviceId = getDeviceId();
+        const claimResult = await db.claimTableSession(tableNum, deviceId, phone, customerName);
+
+        if (claimResult.status === 'locked') {
+          setLockedSessionInfo(claimResult.activeSession);
+          setVerificationStatus('locked');
+          return;
+        }
+
+        if (claimResult.status === 'success') {
           setTableId(String(tableNum));
+          localStorage.setItem('dinesmart_active_table', String(tableNum));
+          localStorage.setItem('dinesmart_session_id', claimResult.sessionId || '');
           setVerificationStatus('valid');
         } else {
           setVerificationStatus('invalid');
@@ -81,16 +114,47 @@ export const MainContainer: React.FC = () => {
     };
 
     verifyTableSession();
-  }, [routeTableId, token, setTableId]);
+  }, [routeTableId, token, setTableId, phone, customerName]);
+
+  // 2-HOUR INACTIVITY AUTO LOGOUT & SESSION EXPIRATION
+  useEffect(() => {
+    if (verificationStatus !== 'valid' || !routeTableId) return;
+
+    const tableNum = parseInt(routeTableId, 10);
+    const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+    let timer: any = null;
+
+    const resetInactivityTimer = () => {
+      if (timer) clearTimeout(timer);
+      const devId = getDeviceId();
+      db.touchTableActivity(tableNum, devId);
+
+      timer = setTimeout(async () => {
+        console.log('2 hours of user inactivity reached: automatically releasing QR session.');
+        await db.releaseTableSession(tableNum);
+        localStorage.removeItem('dinesmart_active_table');
+        localStorage.removeItem('dinesmart_active_order');
+        localStorage.removeItem('dinesmart_session_id');
+        alert('Your 2-hour dining table session has expired due to inactivity. Please scan the QR code to begin a fresh session.');
+        window.location.href = '/';
+      }, TWO_HOURS_MS);
+    };
+
+    const activityEvents = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'];
+    activityEvents.forEach(evt => window.addEventListener(evt, resetInactivityTimer, { passive: true }));
+    resetInactivityTimer();
+
+    return () => {
+      if (timer) clearTimeout(timer);
+      activityEvents.forEach(evt => window.removeEventListener(evt, resetInactivityTimer));
+    };
+  }, [verificationStatus, routeTableId]);
 
   // SWIPE-BACK & BROWSER-BACK TRAP:
-  // When user swipes back on mobile, return to 'home'. Only exit when user clicks Logout.
   useEffect(() => {
-    // Initial replaceState to establish history entry
     window.history.replaceState({ tab: 'home' }, '');
 
     const handlePopState = () => {
-      // 1. Close modal if open
       if (selectedDishRef.current) {
         setSelectedDish(null);
         window.history.pushState({ tab: activeTabRef.current }, '');
@@ -107,12 +171,10 @@ export const MainContainer: React.FC = () => {
         return;
       }
 
-      // 2. If user is in search, cart, orders, or profile -> go back to home!
       if (activeTabRef.current !== 'home') {
         setActiveTab('home');
         window.history.pushState({ tab: 'home' }, '');
       } else {
-        // If already on home, trap state so they don't drop out into Google Lens by accident
         window.history.pushState({ tab: 'home' }, '');
       }
     };
@@ -135,11 +197,38 @@ export const MainContainer: React.FC = () => {
     setActiveTab(tab);
   };
 
-  const handleExplicitLogout = () => {
-    // Clear user state and navigate back out to landing / Google Lens
+  const handleExplicitLogout = async () => {
+    if (routeTableId) {
+      const tableNum = parseInt(routeTableId, 10);
+      if (!isNaN(tableNum)) {
+        await db.releaseTableSession(tableNum);
+      }
+    }
     localStorage.removeItem('dinesmart_active_table');
     localStorage.removeItem('dinesmart_active_order');
+    localStorage.removeItem('dinesmart_session_id');
     window.location.href = '/';
+  };
+
+  const handleJoinSessionSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setJoinError('');
+    if (!joinPhoneInput.trim()) {
+      setJoinError('Please enter your phone number to re-join.');
+      return;
+    }
+
+    const tableNum = parseInt(routeTableId || '0', 10);
+    const devId = getDeviceId();
+    const joined = await db.joinTableSession(tableNum, devId, joinPhoneInput.trim());
+    if (joined) {
+      setJoinSuccess(true);
+      setTimeout(() => {
+        window.location.reload();
+      }, 800);
+    } else {
+      setJoinError('Phone number does not match the active session registered for this table.');
+    }
   };
 
   if (verificationStatus === 'verifying') {
@@ -148,6 +237,93 @@ export const MainContainer: React.FC = () => {
         <div className="text-center space-y-3">
           <RefreshCw className="animate-spin text-primary mx-auto" size={32} />
           <p className="text-sm font-bold">Verifying Secure Table QR Token...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // OCCUPIED TABLE SESSION LOCK (PREVENTS QR OVERFLOW)
+  if (verificationStatus === 'locked') {
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-950 text-white font-sans p-6 selection:bg-orange-500 selection:text-white">
+        <div className="max-w-md w-full bg-slate-900 rounded-3xl p-7 border border-orange-500/30 shadow-2xl text-center space-y-4">
+          <div className="w-16 h-16 bg-orange-500/10 text-orange-400 rounded-full flex items-center justify-center mx-auto border border-orange-500/20 shadow-lg shadow-orange-500/10">
+            <ShieldCheck size={32} />
+          </div>
+          <div>
+            <span className="text-[10px] font-extrabold uppercase tracking-widest text-orange-400 bg-orange-500/10 px-3 py-1 rounded-full border border-orange-500/20">
+              Active Dining Session Lock
+            </span>
+            <h2 className="text-2xl font-black text-white mt-3">Table #{routeTableId} is Occupied</h2>
+            <p className="text-xs text-slate-400 leading-relaxed font-medium mt-2">
+              This table is currently in use by an active party. Only one active guest session is permitted per QR code to prevent order collisions and billing errors.
+            </p>
+          </div>
+
+          <div className="space-y-2.5 pt-2">
+            <button
+              onClick={() => setShowJoinModal(true)}
+              className="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-extrabold py-3.5 rounded-2xl text-xs transition-all shadow-lg shadow-orange-500/20 cursor-pointer"
+            >
+              Re-Join Session (Registered Diner)
+            </button>
+
+            <button
+              onClick={async () => {
+                await db.requestWaiter(String(routeTableId), 'Call Waiter');
+                setWaiterCalledNotice(true);
+              }}
+              disabled={waiterCalledNotice}
+              className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-3.5 rounded-2xl text-xs transition-all border border-slate-700 cursor-pointer disabled:opacity-50"
+            >
+              {waiterCalledNotice ? '✓ Waiter Notified to Clear Table' : 'Previous Party Left? Call Waiter to Free Table'}
+            </button>
+
+            <a
+              href="/"
+              className="inline-block w-full text-center text-slate-400 hover:text-white py-2 text-xs font-semibold transition-colors"
+            >
+              Scan a Different Table
+            </a>
+          </div>
+
+          {/* Join modal */}
+          {showJoinModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+              <div className="bg-slate-900 border border-slate-700 rounded-3xl p-6 max-w-sm w-full text-left space-y-4">
+                <h3 className="text-base font-extrabold text-white">Join Table #{routeTableId} Session</h3>
+                <p className="text-xs text-slate-400">
+                  Enter the phone number used by your dining party to link your device.
+                </p>
+                <form onSubmit={handleJoinSessionSubmit} className="space-y-3">
+                  <input
+                    type="tel"
+                    value={joinPhoneInput}
+                    onChange={(e) => setJoinPhoneInput(e.target.value)}
+                    placeholder="Enter phone number (e.g. 9876543210)"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-orange-500"
+                  />
+                  {joinError && <p className="text-[11px] text-red-400 font-semibold">{joinError}</p>}
+                  {joinSuccess && <p className="text-[11px] text-emerald-400 font-semibold">✓ Verified! Connecting session...</p>}
+                  <div className="flex gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowJoinModal(false)}
+                      className="flex-1 py-2.5 bg-slate-800 text-slate-300 rounded-xl text-xs font-bold"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="flex-1 py-2.5 bg-orange-500 text-white rounded-xl text-xs font-bold"
+                    >
+                      Verify & Join
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -202,11 +378,12 @@ export const MainContainer: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Note 10: Replace bell icon with high-visibility Call Waiter Button */}
           <button
             onClick={() => setShowWaiterModal(true)}
-            className="flex items-center gap-1.5 bg-orange-50 hover:bg-orange-500 text-orange-600 hover:text-white px-3 py-1.5 rounded-full text-xs font-bold transition-all shadow-xs active:scale-95 cursor-pointer"
+            className="flex items-center gap-1.5 bg-orange-500 hover:bg-orange-600 active:scale-95 text-white px-3.5 py-1.5 rounded-full text-xs font-black transition-all shadow-md shadow-orange-500/20 cursor-pointer"
           >
-            <ConciergeBell size={13} />
+            <ConciergeBell size={14} />
             <span>Call Waiter</span>
           </button>
 

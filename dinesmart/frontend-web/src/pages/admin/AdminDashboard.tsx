@@ -9,7 +9,8 @@ import {
   Edit3, Plus, X, ChevronRight, Download, Sparkles, Filter, Check, 
   AlertTriangle, Moon, Sun, RefreshCw, FileText, Mail, MessageCircle, 
   CornerDownRight, UserPlus, Heart, TrendingUp, DollarSign, Calendar,
-  TrendingDown, ArrowUpRight, ArrowDownRight, Clock, Star, Eye, EyeOff, Phone, Copy, FileSpreadsheet, ChevronDown, ExternalLink
+  TrendingDown, ArrowUpRight, ArrowDownRight, Clock, Star, Eye, EyeOff, Phone, Copy, FileSpreadsheet, ChevronDown, ExternalLink,
+  Upload
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, CartesianGrid } from 'recharts';
 import { 
@@ -21,6 +22,7 @@ import {
 import BhakasuraChatBot from './BhakasuraChatBot';
 import { generateComprehensivePDF, generateComprehensiveExcel } from '../../utils/reportGenerator';
 import { mlService } from '../../services/mlService';
+import { formatPhotoUrl, getInitials, PRESET_AVATARS, getDriveThumbnailFallback } from '../../utils/photoHelper';
 
 interface AdminDashboardProps {
   role: string;
@@ -53,6 +55,56 @@ interface Employee {
   password?: string;
   assignedTables?: number[];
 }
+
+export const StaffAvatar: React.FC<{
+  photo?: string;
+  name: string;
+  size?: 'sm' | 'md' | 'lg' | 'xl';
+  className?: string;
+}> = ({ photo, name, size = 'md', className = '' }) => {
+  const [imgError, setImgError] = useState(false);
+  const [triedFallback, setTriedFallback] = useState(false);
+
+  useEffect(() => {
+    setImgError(false);
+    setTriedFallback(false);
+  }, [photo]);
+
+  const formattedUrl = formatPhotoUrl(photo);
+
+  const sizeClasses = {
+    sm: 'w-7 h-7 text-[10px] rounded-full',
+    md: 'w-10 h-10 text-xs rounded-xl',
+    lg: 'w-14 h-14 text-lg rounded-2xl',
+    xl: 'w-20 h-20 text-2xl rounded-2xl'
+  }[size];
+
+  if (!formattedUrl || imgError) {
+    return (
+      <div className={`${sizeClasses} bg-gradient-to-tr from-orange-400 to-amber-500 text-white flex items-center justify-center font-black shadow-sm shrink-0 ${className}`}>
+        {getInitials(name)}
+      </div>
+    );
+  }
+
+  const currentSrc = triedFallback ? (getDriveThumbnailFallback(photo || '') || formattedUrl) : formattedUrl;
+
+  return (
+    <img
+      src={currentSrc}
+      alt={name || 'Staff'}
+      className={`${sizeClasses} object-cover border-2 border-orange-500/20 shadow-sm shrink-0 ${className}`}
+      onError={() => {
+        const fallback = getDriveThumbnailFallback(photo || '');
+        if (fallback && !triedFallback && fallback !== currentSrc) {
+          setTriedFallback(true);
+        } else {
+          setImgError(true);
+        }
+      }}
+    />
+  );
+};
 
 interface TableStatus {
   id: number;
@@ -126,12 +178,46 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
     }
   };
 
+  // Note 26: Settings-based reports and export
+  const [reportDateFilter, setReportDateFilter] = useState<'All' | 'Today' | 'This Week' | 'This Month'>('This Week');
+  const [reportCategoryFilter, setReportCategoryFilter] = useState<string>('All');
+
+  const getFilteredReportData = () => {
+    let filteredOrders = [...orders];
+    const now = Date.now();
+
+    if (reportDateFilter === 'Today') {
+      const todayStr = new Date().toDateString();
+      filteredOrders = filteredOrders.filter(o => new Date(o.createdAt).toDateString() === todayStr);
+    } else if (reportDateFilter === 'This Week') {
+      filteredOrders = filteredOrders.filter(o => now - new Date(o.createdAt).getTime() <= 7 * 86400000);
+    } else if (reportDateFilter === 'This Month') {
+      filteredOrders = filteredOrders.filter(o => now - new Date(o.createdAt).getTime() <= 30 * 86400000);
+    }
+
+    let filteredMenu = [...menuItems];
+    if (reportCategoryFilter !== 'All') {
+      filteredMenu = filteredMenu.filter(m => m.category === reportCategoryFilter);
+      filteredOrders = filteredOrders.map(o => ({
+        ...o,
+        items: o.items.filter(i => {
+          const dish = menuItems.find(m => m.id === i.menuItemId || m.name === i.name);
+          return dish ? dish.category === reportCategoryFilter : true;
+        })
+      })).filter(o => o.items.length > 0);
+    }
+
+    return { orders: filteredOrders, staff, menuItems: filteredMenu };
+  };
+
   const handleExportPDF = () => {
-    generateComprehensivePDF({ orders, staff, menuItems }, alertSettings);
+    const filteredData = getFilteredReportData();
+    generateComprehensivePDF(filteredData, alertSettings);
   };
 
   const handleExportExcel = () => {
-    generateComprehensiveExcel({ orders, staff, menuItems }, alertSettings);
+    const filteredData = getFilteredReportData();
+    generateComprehensiveExcel(filteredData, alertSettings);
   };
 
   // Modals & Overlay Drawers
@@ -525,7 +611,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
   // Staff Management (EmpID & Password checks)
   const handleSaveStaffMember = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (role !== 'Hotel Manager') {
+    if (role !== 'Hotel Manager' && role !== 'Admin' && role !== 'Manager' && role !== '') {
       alert('Access Denied: Only Hotel Manager/Admin can add or update staff members.');
       return;
     }
@@ -559,7 +645,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
   };
 
   const handleDeleteStaffMember = async (id: string, name: string) => {
-    if (role !== 'Hotel Manager') {
+    if (role !== 'Hotel Manager' && role !== 'Admin' && role !== 'Manager' && role !== '') {
       alert('Access Denied: Only Hotel Manager/Admin can remove staff members.');
       return;
     }
@@ -568,6 +654,41 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
       await fetchData();
       logActivity(`Removed staff member: ${name}`);
     }
+  };
+
+  const handleOpenEditStaff = (emp: Employee) => {
+    setEditingStaff(emp);
+    setStaffFormState({
+      name: emp.name,
+      mobile: emp.mobile || '',
+      email: emp.email || '',
+      photo: emp.photo || '',
+      role: emp.role || 'Waiter',
+      shift: emp.shift || 'Morning',
+      salary: emp.salary || 18000,
+      empid: emp.empid || '',
+      password: emp.password || '',
+      assignedTables: emp.assignedTables || []
+    });
+    setNewStaffForm(true);
+  };
+
+  const handleOpenAddStaff = () => {
+    setEditingStaff(null);
+    const randNum = Math.floor(1000 + Math.random() * 9000);
+    setStaffFormState({
+      name: '',
+      mobile: '',
+      email: '',
+      photo: '',
+      role: 'Waiter',
+      shift: 'Morning',
+      salary: 18000,
+      empid: `EMP${randNum}`,
+      password: `pass${Math.floor(1000 + Math.random() * 9000)}`,
+      assignedTables: []
+    });
+    setNewStaffForm(true);
   };
 
   const handleVerifyOTP = () => {
@@ -2150,12 +2271,76 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
               {/* Edit Pending Staff Modal (Always render if active) */}
               {editPendingStaffModal && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                  <div className={`w-full max-w-sm rounded-3xl p-6 shadow-2xl ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-white'}`}>
+                  <div className={`w-full max-w-md max-h-[90vh] overflow-y-auto rounded-3xl p-6 shadow-2xl ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-white'}`}>
                     <div className="flex justify-between items-center mb-4 pb-2 border-b">
                       <h4 className="font-extrabold text-sm">Edit Application</h4>
-                      <button className="cursor-pointer" onClick={() => setEditPendingStaffModal(null)}><X size={18} /></button>
+                      <button className="cursor-pointer text-gray-400 hover:text-gray-700" onClick={() => setEditPendingStaffModal(null)}><X size={18} /></button>
                     </div>
                     <form onSubmit={handleSavePendingStaff} className="space-y-4 text-xs font-semibold text-black">
+                      {/* Photo Section */}
+                      <div className="p-3 bg-gray-50 rounded-2xl border border-gray-100">
+                        <label className="block text-gray-500 mb-2 text-[10px] uppercase font-bold">Applicant Photo</label>
+                        <div className="flex gap-3 items-center mb-3">
+                          <StaffAvatar photo={editPendingStaffModal.photo} name={editPendingStaffModal.name || 'Applicant'} size="lg" />
+                          <div className="flex-1 space-y-1">
+                            <input
+                              type="text"
+                              value={editPendingStaffModal.photo || ''}
+                              onChange={(e) => setEditPendingStaffModal({...editPendingStaffModal, photo: e.target.value})}
+                              placeholder="Photo URL or Google Drive link"
+                              className="w-full p-2 border rounded-xl text-xs bg-white"
+                            />
+                            <div className="flex gap-2 items-center pt-1">
+                              <label className="cursor-pointer bg-white border border-gray-200 hover:bg-gray-100 text-gray-700 px-2.5 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 shadow-xs transition-all">
+                                <Upload size={11} /> Upload Device File
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                      const reader = new FileReader();
+                                      reader.onloadend = () => {
+                                        setEditPendingStaffModal(prev => prev ? ({ ...prev, photo: reader.result as string }) : null);
+                                      };
+                                      reader.readAsDataURL(file);
+                                    }
+                                  }}
+                                />
+                              </label>
+                              {editPendingStaffModal.photo && (
+                                <button
+                                  type="button"
+                                  onClick={() => setEditPendingStaffModal({...editPendingStaffModal, photo: ''})}
+                                  className="text-[10px] text-red-500 font-bold hover:underline cursor-pointer"
+                                >
+                                  Remove
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Preset Avatars */}
+                        <div>
+                          <p className="text-[9px] text-gray-400 mb-1 font-bold">Or pick preset avatar:</p>
+                          <div className="flex gap-1.5 overflow-x-auto pb-1">
+                            {PRESET_AVATARS.map((p, i) => (
+                              <button
+                                type="button"
+                                key={i}
+                                onClick={() => setEditPendingStaffModal({...editPendingStaffModal, photo: p.url})}
+                                title={p.name}
+                                className="w-7 h-7 rounded-lg overflow-hidden border border-gray-200 hover:border-orange-500 transition-all shrink-0 cursor-pointer"
+                              >
+                                <img src={p.url} alt={p.name} className="w-full h-full object-cover" />
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
                       <div>
                         <label className="block text-gray-400 mb-1 text-[10px] uppercase">Full Name</label>
                         <input
@@ -2198,7 +2383,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                           className="w-full p-2.5 border rounded-xl"
                         />
                       </div>
-                      <button type="submit" className="w-full bg-primary text-white font-bold py-3 rounded-xl mt-2 cursor-pointer">
+                      <button type="submit" className="w-full bg-primary text-white font-bold py-3 rounded-xl mt-2 cursor-pointer shadow-md hover:bg-orange-600 transition-all">
                         Save Changes
                       </button>
                     </form>
@@ -2206,124 +2391,221 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                 </div>
               )}
 
-              {/* Edit Staff Form Drawer */}
+              {/* Edit / Add Staff Form Drawer */}
               {newStaffForm && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                  <div className={`w-full max-w-sm rounded-3xl p-6 shadow-2xl ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-white'}`}>
+                  <div className={`w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-3xl p-6 shadow-2xl ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-white'}`}>
                     <div className="flex justify-between items-center mb-4 pb-2 border-b">
-                      <h4 className="font-extrabold text-sm">Edit Staff Member</h4>
-                      <button className="cursor-pointer" onClick={() => setNewStaffForm(false)}><X size={18} /></button>
-                    </div>
-                    <form onSubmit={handleSaveStaffMember} className="space-y-4 text-xs font-semibold text-black">
                       <div>
-                        <label className="block text-gray-400 mb-1 text-[10px] uppercase">Full Name</label>
+                        <h4 className="font-extrabold text-base text-slate-900">
+                          {editingStaff ? 'Edit Staff Member' : 'Add New Staff Member'}
+                        </h4>
+                        <p className="text-[10px] text-gray-400">
+                          {editingStaff ? `Updating details for ${editingStaff.name} (${editingStaff.empid})` : 'Register a new employee with terminal login credentials'}
+                        </p>
+                      </div>
+                      <button className="cursor-pointer text-gray-400 hover:text-gray-700 p-1 rounded-full hover:bg-gray-100 transition-all" onClick={() => setNewStaffForm(false)}>
+                        <X size={20} />
+                      </button>
+                    </div>
+
+                    <form onSubmit={handleSaveStaffMember} className="space-y-4 text-xs font-semibold text-black">
+                      {/* Photo Section */}
+                      <div className="p-3.5 bg-gradient-to-tr from-orange-50/60 to-amber-50/40 rounded-2xl border border-orange-100">
+                        <label className="block text-orange-950 mb-2 text-[10px] uppercase font-bold tracking-wider">
+                          Staff Photo / Avatar
+                        </label>
+                        <div className="flex gap-3 items-center mb-3">
+                          <StaffAvatar photo={staffFormState.photo} name={staffFormState.name || 'Staff'} size="lg" />
+                          <div className="flex-1 space-y-1.5">
+                            <input
+                              type="text"
+                              value={staffFormState.photo}
+                              onChange={(e) => setStaffFormState({...staffFormState, photo: e.target.value})}
+                              placeholder="Paste Photo URL or Google Drive link"
+                              className="w-full p-2 border border-orange-200 rounded-xl text-xs bg-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                            />
+                            <div className="flex gap-2 items-center flex-wrap pt-0.5">
+                              <label className="cursor-pointer bg-white border border-orange-200 hover:bg-orange-50 text-orange-800 px-3 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 shadow-xs transition-all">
+                                <Upload size={12} className="text-orange-500" /> Upload from Computer / Phone
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                      const reader = new FileReader();
+                                      reader.onloadend = () => {
+                                        setStaffFormState(prev => ({ ...prev, photo: reader.result as string }));
+                                      };
+                                      reader.readAsDataURL(file);
+                                    }
+                                  }}
+                                />
+                              </label>
+                              {staffFormState.photo && (
+                                <button
+                                  type="button"
+                                  onClick={() => setStaffFormState({...staffFormState, photo: ''})}
+                                  className="text-[10px] text-red-500 font-bold hover:underline cursor-pointer"
+                                >
+                                  Remove Photo
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Presets */}
+                        <div>
+                          <p className="text-[9px] text-gray-500 mb-1.5 font-bold">Or pick a quick professional avatar:</p>
+                          <div className="flex gap-2 overflow-x-auto pb-1">
+                            {PRESET_AVATARS.map((p, idx) => (
+                              <button
+                                type="button"
+                                key={idx}
+                                onClick={() => setStaffFormState({...staffFormState, photo: p.url})}
+                                title={p.name}
+                                className={`w-8 h-8 rounded-xl overflow-hidden border-2 transition-all shrink-0 cursor-pointer ${
+                                  staffFormState.photo === p.url ? 'border-orange-500 ring-2 ring-orange-400' : 'border-white hover:border-orange-300'
+                                }`}
+                              >
+                                <img src={p.url} alt={p.name} className="w-full h-full object-cover" />
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Full Name */}
+                      <div>
+                        <label className="block text-gray-500 mb-1 text-[10px] uppercase font-bold">Full Name</label>
                         <input
                           type="text"
                           value={staffFormState.name}
                           onChange={(e) => setStaffFormState({...staffFormState, name: e.target.value})}
+                          placeholder="e.g. John Doe"
                           required
-                          className="w-full p-2.5 border rounded-xl"
+                          className="w-full p-2.5 border rounded-xl bg-white"
                         />
                       </div>
+
+                      {/* Phone & Email */}
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <label className="block text-gray-400 mb-1 text-[10px] uppercase">Phone / Mobile</label>
+                          <label className="block text-gray-500 mb-1 text-[10px] uppercase font-bold">Phone / Mobile</label>
                           <input
                             type="text"
                             value={staffFormState.mobile}
                             onChange={(e) => setStaffFormState({...staffFormState, mobile: e.target.value})}
-                            className="w-full p-2.5 border rounded-xl"
+                            placeholder="+91 98765 43210"
+                            className="w-full p-2.5 border rounded-xl bg-white"
                           />
                         </div>
                         <div>
-                          <label className="block text-gray-400 mb-1 text-[10px] uppercase">Email</label>
+                          <label className="block text-gray-500 mb-1 text-[10px] uppercase font-bold">Email</label>
                           <input
                             type="email"
                             value={staffFormState.email}
                             onChange={(e) => setStaffFormState({...staffFormState, email: e.target.value})}
-                            className="w-full p-2.5 border rounded-xl"
+                            placeholder="staff@restaurant.com"
+                            className="w-full p-2.5 border rounded-xl bg-white"
                           />
                         </div>
                       </div>
-                      <div>
-                        <label className="block text-gray-400 mb-1 text-[10px] uppercase">Photo URL</label>
-                        <div className="flex gap-2 items-center">
-                          {staffFormState.photo && (
-                            <img
-                              src={staffFormState.photo}
-                              alt="Staff"
-                              className="w-9 h-9 rounded-xl object-cover border"
-                              onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
-                            />
-                          )}
-                          <input
-                            type="text"
-                            value={staffFormState.photo}
-                            onChange={(e) => setStaffFormState({...staffFormState, photo: e.target.value})}
-                            placeholder="https://drive.google.com/... or image URL"
-                            className="w-full p-2.5 border rounded-xl"
-                          />
-                        </div>
-                      </div>
+
+                      {/* Employee ID & Terminal Password */}
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <label className="block text-gray-400 mb-1 text-[10px] uppercase">Employee ID (EmpID)</label>
+                          <label className="block text-gray-500 mb-1 text-[10px] uppercase font-bold">Employee ID (EmpID)</label>
                           <input
                             type="text"
                             value={staffFormState.empid}
                             onChange={(e) => setStaffFormState({...staffFormState, empid: e.target.value})}
+                            placeholder="e.g. EMP1024"
                             required
-                            className="w-full p-2.5 border rounded-xl"
+                            className="w-full p-2.5 border rounded-xl font-mono uppercase bg-white"
                           />
                         </div>
                         <div>
-                          <label className="block text-gray-400 mb-1 text-[10px] uppercase">Password</label>
+                          <div className="flex justify-between items-center mb-1">
+                            <label className="block text-gray-500 text-[10px] uppercase font-bold">Password</label>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newPw = 'pass' + Math.floor(1000 + Math.random() * 9000);
+                                setStaffFormState(prev => ({ ...prev, password: newPw }));
+                              }}
+                              className="text-[9px] text-orange-600 font-bold hover:underline cursor-pointer"
+                            >
+                              Generate
+                            </button>
+                          </div>
                           <input
                             type="text"
                             value={staffFormState.password}
                             onChange={(e) => setStaffFormState({...staffFormState, password: e.target.value})}
+                            placeholder="Terminal login password"
                             required
-                            className="w-full p-2.5 border rounded-xl"
+                            className="w-full p-2.5 border rounded-xl font-mono bg-white"
                           />
                         </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-2">
+
+                      {/* Role & Salary */}
+                      <div className="grid grid-cols-3 gap-2">
                         <div>
-                          <label className="block text-gray-400 mb-1 text-[10px] uppercase">Role</label>
+                          <label className="block text-gray-500 mb-1 text-[10px] uppercase font-bold">Role</label>
                           <select
                             value={staffFormState.role}
                             onChange={(e) => setStaffFormState({...staffFormState, role: e.target.value as any})}
-                            className="w-full p-2.5 border rounded-xl"
+                            className="w-full p-2.5 border rounded-xl bg-white"
                           >
                             <option>Waiter</option>
                             <option>Chef</option>
                             <option>Manager</option>
                             <option>Cashier</option>
+                            <option>Cleaner</option>
+                            <option>Delivery Staff</option>
                           </select>
                         </div>
                         <div>
-                          <label className="block text-gray-400 mb-1 text-[10px] uppercase">Monthly Salary</label>
+                          <label className="block text-gray-500 mb-1 text-[10px] uppercase font-bold">Shift</label>
+                          <select
+                            value={staffFormState.shift}
+                            onChange={(e) => setStaffFormState({...staffFormState, shift: e.target.value as any})}
+                            className="w-full p-2.5 border rounded-xl bg-white"
+                          >
+                            <option>Morning</option>
+                            <option>Evening</option>
+                            <option>Night</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-gray-500 mb-1 text-[10px] uppercase font-bold">Monthly Salary</label>
                           <input
                             type="number"
                             value={staffFormState.salary}
-                            onChange={(e) => setStaffFormState({...staffFormState, salary: parseInt(e.target.value)})}
+                            onChange={(e) => setStaffFormState({...staffFormState, salary: parseInt(e.target.value) || 0})}
                             required
-                            className="w-full p-2.5 border rounded-xl"
+                            className="w-full p-2.5 border rounded-xl bg-white"
                           />
                         </div>
                       </div>
                       
+                      {/* Table routing (Waiters only) */}
                       {staffFormState.role === 'Waiter' && (
-                        <div>
+                        <div className="p-3 bg-gray-50 rounded-2xl border border-gray-100">
                           <div className="flex justify-between items-center mb-2">
-                            <label className="block text-gray-400 text-[10px] uppercase font-bold">Table Routing & Assignment</label>
+                            <label className="block text-gray-600 text-[10px] uppercase font-bold">Table Routing & Assignment</label>
                             <button
                               type="button"
                               onClick={() => setStaffFormState(prev => ({
                                 ...prev,
                                 assignedTables: prev.assignedTables.length === tables.length ? [] : tables.map(t => t.id)
                               }))}
-                              className="text-[10px] text-orange-500 font-bold hover:underline cursor-pointer"
+                              className="text-[10px] text-orange-600 font-bold hover:underline cursor-pointer"
                             >
                               {staffFormState.assignedTables.length === tables.length ? 'Clear All' : 'Select All Tables (Full Floor)'}
                             </button>
@@ -2362,9 +2644,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                         </div>
                       )}
 
-                      <button type="submit" className="w-full bg-primary text-white font-bold py-3 rounded-xl cursor-pointer">
-                        Save Changes
-                      </button>
+                      <div className="flex gap-2 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => setNewStaffForm(false)}
+                          className="w-1/3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 rounded-xl cursor-pointer transition-all"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          className="w-2/3 bg-primary hover:bg-orange-600 text-white font-bold py-3 rounded-xl cursor-pointer shadow-md transition-all flex items-center justify-center gap-1.5"
+                        >
+                          <Check size={16} /> Save Staff Member
+                        </button>
+                      </div>
                     </form>
                   </div>
                 </div>
@@ -2481,18 +2775,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                               <tr key={app.id} className={`border-b last:border-0 ${isDarkMode ? 'hover:bg-gray-700/50' : 'hover:bg-gray-50'}`}>
                                 <td className="py-3">
                                   <div className="flex items-center gap-2">
-                                    {app.photo ? (
-                                      <img
-                                        src={app.photo}
-                                        alt={app.name}
-                                        className="w-7 h-7 rounded-full object-cover border border-gray-200"
-                                        onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
-                                      />
-                                    ) : (
-                                      <div className="w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-[10px]">
-                                        {app.name ? app.name.charAt(0).toUpperCase() : 'W'}
-                                      </div>
-                                    )}
+                                    <StaffAvatar photo={app.photo} name={app.name || 'Applicant'} size="sm" />
                                     <span>{app.name}</span>
                                   </div>
                                 </td>
@@ -2536,18 +2819,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                   <div>
                     <div className="flex justify-between items-center mb-3">
                       <h4 className="font-bold text-xs flex items-center gap-1.5"><UserCheck size={14} /> Active Staff ({staff.length})</h4>
-                      <button
-                        onClick={fetchData}
-                        className="text-[11px] font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
-                        title="Refresh active staff"
-                      >
-                        <RefreshCw size={12} /> Refresh
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={handleOpenAddStaff}
+                          className="bg-primary hover:bg-orange-600 text-white text-[11px] font-bold px-3 py-1.5 rounded-xl transition-all flex items-center gap-1 cursor-pointer shadow-sm"
+                        >
+                          <Plus size={13} /> Add Staff
+                        </button>
+                        <button
+                          onClick={fetchData}
+                          className="text-[11px] font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
+                          title="Refresh active staff"
+                        >
+                          <RefreshCw size={12} /> Refresh
+                        </button>
+                      </div>
                     </div>
                     {staff.length === 0 ? (
                       <div className="text-center p-10 bg-gray-50 rounded-3xl border border-dashed border-gray-200">
                         <p className="text-xs text-gray-500 font-bold mb-2">No Active Staff Members.</p>
-                        <p className="text-[10px] text-gray-400">Approve pending applications or register staff members to view them here.</p>
+                        <p className="text-[10px] text-gray-400">Approve pending applications or click "+ Add Staff" to register team members.</p>
                       </div>
                     ) : (
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 text-xs font-semibold">
@@ -2559,18 +2850,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                                 {/* Header with Staff Photo, Name, and Role */}
                                 <div className="flex items-start justify-between border-b pb-3 mb-3 gap-3">
                                   <div className="flex items-center gap-3">
-                                    {emp.photo ? (
-                                      <img
-                                        src={emp.photo}
-                                        alt={emp.name}
-                                        className="w-14 h-14 rounded-2xl object-cover border-2 border-orange-500/20 shadow-sm"
-                                        onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
-                                      />
-                                    ) : (
-                                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-orange-400 to-amber-500 text-white flex items-center justify-center font-extrabold text-xl shadow-sm">
-                                        {emp.name ? emp.name.charAt(0).toUpperCase() : 'S'}
-                                      </div>
-                                    )}
+                                    <StaffAvatar photo={emp.photo} name={emp.name} size="lg" />
                                     <div>
                                       <div className="flex items-center gap-2">
                                         <h4 className="font-extrabold text-base">{emp.name}</h4>
@@ -2699,20 +2979,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                                 <span className="text-[10px] text-gray-400">
                                   Avg Serving: {emp.performance?.avgServingTime || 'N/A'}
                                 </span>
-                                {role === 'Hotel Manager' && (
+                                {(role === 'Hotel Manager' || role === 'Admin' || role === 'Manager' || !role) && (
                                   <div className="flex gap-2">
                                     <button
-                                      onClick={() => {
-                                        setPendingEditStaff(emp);
-                                        setOtpModal(true);
-                                      }}
-                                      className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-bold cursor-pointer flex items-center gap-1"
+                                      onClick={() => handleOpenEditStaff(emp)}
+                                      className="px-3 py-1 bg-orange-50 hover:bg-orange-100 text-orange-700 rounded-lg font-bold cursor-pointer flex items-center gap-1 transition-colors"
+                                      title="Edit Staff Member"
                                     >
                                       <Edit3 size={12} /> Edit
                                     </button>
                                     <button
                                       onClick={() => handleDeleteStaffMember(emp.id, emp.name)}
-                                      className="px-3 py-1 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg font-bold cursor-pointer flex items-center gap-1"
+                                      className="px-3 py-1 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg font-bold cursor-pointer flex items-center gap-1 transition-colors"
+                                      title="Delete Staff Member"
                                     >
                                       <Trash2 size={12} /> Delete
                                     </button>
@@ -2948,21 +3227,48 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
               <div className="border-t border-gray-100 my-2"></div>
 
               {/* Filter Section */}
-              <div className={`p-5 rounded-2xl border shadow-sm ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'} flex justify-between items-center relative z-20`}>
-                <div className="flex flex-col gap-2">
-                  <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Date Range</label>
-                  <div className="relative">
-                    <select className={`appearance-none border text-sm py-2 pl-4 pr-10 rounded-xl font-medium outline-none cursor-pointer transition-colors ${isDarkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-700 hover:border-gray-400'}`}>
-                      <option>Today</option>
-                      <option selected>This Week</option>
-                      <option>This Month</option>
-                      <option>Custom Range</option>
-                    </select>
-                    <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+              <div className={`p-5 rounded-2xl border shadow-sm ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'} flex flex-wrap gap-4 justify-between items-center relative z-20`}>
+                <div className="flex flex-wrap gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Date Range Filter</label>
+                    <div className="relative">
+                      <select 
+                        value={reportDateFilter}
+                        onChange={(e) => setReportDateFilter(e.target.value as any)}
+                        className={`appearance-none border text-xs py-2 pl-3.5 pr-9 rounded-xl font-bold outline-none cursor-pointer transition-colors ${isDarkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-700 hover:border-gray-400'}`}
+                      >
+                        <option value="Today">Today Only</option>
+                        <option value="This Week">This Week (Last 7 Days)</option>
+                        <option value="This Month">This Month (Last 30 Days)</option>
+                        <option value="All">All Time History</option>
+                      </select>
+                      <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Category Scope</label>
+                    <div className="relative">
+                      <select 
+                        value={reportCategoryFilter}
+                        onChange={(e) => setReportCategoryFilter(e.target.value)}
+                        className={`appearance-none border text-xs py-2 pl-3.5 pr-9 rounded-xl font-bold outline-none cursor-pointer transition-colors ${isDarkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-700 hover:border-gray-400'}`}
+                      >
+                        <option value="All">All Food Categories</option>
+                        <option value="Breakfast">Breakfast</option>
+                        <option value="Main Course">Main Course</option>
+                        <option value="Starters">Starters</option>
+                        <option value="Breads">Breads</option>
+                        <option value="Beverages">Beverages</option>
+                        <option value="Desserts">Desserts</option>
+                      </select>
+                      <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+                    </div>
                   </div>
                 </div>
-                <div className="text-sm text-gray-500 font-medium self-end pb-2">
-                  Reports are generated based on the selected filters.
+
+                <div className="text-xs text-orange-600 font-bold self-end pb-1 bg-orange-50 px-3 py-1.5 rounded-xl border border-orange-100">
+                  ✓ PDF & Excel exports will strictly contain records matching your active filters.
                 </div>
               </div>
 
