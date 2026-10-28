@@ -1,0 +1,622 @@
+{
+  "annualSummary": {
+    "totalRevenue": 8953131.5,
+    "totalOrders": 23708,
+    "avgDailyRevenue": 24529.13,
+    "avgDailyOrders": 65.0,
+    "avgOrderValue": 377.64,
+    "avgPrepTimeMinutes": 20.5,
+    "avgCustomerRating": 4.43,
+    "totalVegItemsSold": 55284,
+    "totalNonVegItemsSold": 11314,
+    "vegSalesSharePercent": 83.0,
+    "nonVegSalesSharePercent": 17.0,
+    "totalOperatingDays": 365
+  },
+  "peakAndLowPerformance": {
+    "peakRevenueDay": {
+      "date": "2026-05-01",
+      "day": "Friday",
+      "revenue": 46438.68,
+      "orders": 114,
+      "holiday": "May Day"
+    },
+    "lowestRevenueDay": {
+      "date": "2026-08-31",
+      "day": "Monday",
+      "revenue": 13189.19,
+      "orders": 40
+    },
+    "weekendVsWeekday": {
+      "weekendDailyAverage": 31437.2,
+      "weekdayDailyAverage": 19372.87,
+      "weekendSurgeMultiplier": 1.62
+    },
+    "holidayVsRegular": {
+      "holidayDailyAverage": 29287.82,
+      "regularDailyAverage": 24339.32,
+      "holidaySurgeMultiplier": 1.2,
+      "topHolidays": [
+        {
+          "holidayName": "May Day",
+          "date": "2026-05-01",
+          "revenue": 46438.68,
+          "orders": 114,
+          "day": "Friday"
+        },
+        {
+          "holidayName": "Independence Day",
+          "date": "2026-08-15",
+          "revenue": 41539.76,
+          "orders": 116,
+          "day": "Saturday"
+        },
+        {
+          "holidayName": "Republic Day",
+          "date": "2026-01-26",
+          "revenue": 31011.01,
+          "orders": 79,
+          "day": "Monday"
+        },
+        {
+          "holidayName": "Holi",
+          "date": "2026-03-04",
+          "revenue": 29580.21,
+          "orders": 72,
+          "day": "Wednesday"
+        },
+        {
+          "holidayName": "Diwali Season",
+          "date": "2025-10-20",
+          "revenue": 28791.6,
+          "orders": 74,
+          "day": "Monday"
+        },
+        {
+          "holidayName": "Christmas",
+          "date": "2025-12-25",
+          "revenue": 28567.14,
+          "orders": 72,
+          "day": "Thursday"
+        },
+        {
+          "holidayName": "Gandhi Jayanti",
+          "date": "2025-10-02",
+          "revenue": 28366.99,
+          "orders": 70,
+          "day": "Thursday"
+        },
+        {
+          "holidayName": "Pongal / Sankranti",
+          "date": "2026-01-14",
+          "revenue": 26905.51,
+          "orders": 64,
+          "day": "Wednesday"
+        }
+      ]
+    }
+  },
+  "dayOfWeekTrends": [
+    {
+      "day": "Monday",
+      "avgRevenue": 19283.01,
+      "avgOrders": 51.5,
+      "avgAOV": 373.07,
+      "occurrences": 52
+    },
+    {
+      "day": "Tuesday",
+      "avgRevenue": 19131.66,
+      "avgOrders": 50.9,
+      "avgAOV": 376.25,
+      "occurrences": 52
+    },
+    {
+      "day": "Wednesday",
+      "avgRevenue": 19244.65,
+      "avgOrders": 51.1,
+      "avgAOV": 376.67,
+      "occurrences": 53
+    },
+    {
+      "day": "Thursday",
+      "avgRevenue": 19834.6,
+      "avgOrders": 52.1,
+      "avgAOV": 380.74,
+      "occurrences": 52
+    },
+    {
+      "day": "Friday",
+      "avgRevenue": 31353.62,
+      "avgOrders": 82.5,
+      "avgAOV": 379.71,
+      "occurrences": 52
+    },
+    {
+      "day": "Saturday",
+      "avgRevenue": 31504.53,
+      "avgOrders": 83.9,
+      "avgAOV": 375.93,
+      "occurrences": 52
+    },
+    {
+      "day": "Sunday",
+      "avgRevenue": 31453.44,
+      "avgOrders": 82.9,
+      "avgAOV": 379.56,
+      "occurrences": 52
+    }
+  ],
+  "monthlyTrends": [
+    {
+      "month": "January",
+      "totalRevenue": 819209.12,
+      "totalOrders": 2124,
+      "avgDailyRevenue": 26426.1,
+      "avgPrepTime": 20.5,
+      "avgRating": 4.44
+    },
+    {
+      "month": "February",
+      "totalRevenue": 700910.52,
+      "totalOrders": 1829,
+      "avgDailyRevenue": 25032.52,
+      "avgPrepTime": 20.4,
+      "avgRating": 4.45
+    },
+    {
+      "month": "March",
+      "totalRevenue": 770021.06,
+      "totalOrders": 1995,
+      "avgDailyRevenue": 24839.39,
+      "avgPrepTime": 20.7,
+      "avgRating": 4.42
+    },
+    {
+      "month": "April",
+      "totalRevenue": 711137.8,
+      "totalOrders": 1892,
+      "avgDailyRevenue": 23704.59,
+      "avgPrepTime": 20.6,
+      "avgRating": 4.43
+    },
+    {
+      "month": "May",
+      "totalRevenue": 786731.37,
+      "totalOrders": 2104,
+      "avgDailyRevenue": 25378.43,
+      "avgPrepTime": 20.6,
+      "avgRating": 4.43
+    },
+    {
+      "month": "June",
+      "totalRevenue": 712801.88,
+      "totalOrders": 1945,
+      "avgDailyRevenue": 23760.06,
+      "avgPrepTime": 20.6,
+      "avgRating": 4.45
+    },
+    {
+      "month": "July",
+      "totalRevenue": 692663.89,
+      "totalOrders": 1924,
+      "avgDailyRevenue": 22344.0,
+      "avgPrepTime": 20.3,
+      "avgRating": 4.41
+    },
+    {
+      "month": "August",
+      "totalRevenue": 762621.25,
+      "totalOrders": 2067,
+      "avgDailyRevenue": 24600.69,
+      "avgPrepTime": 20.6,
+      "avgRating": 4.43
+    },
+    {
+      "month": "September",
+      "totalRevenue": 693534.82,
+      "totalOrders": 1907,
+      "avgDailyRevenue": 23117.83,
+      "avgPrepTime": 20.6,
+      "avgRating": 4.42
+    },
+    {
+      "month": "October",
+      "totalRevenue": 783290.67,
+      "totalOrders": 1994,
+      "avgDailyRevenue": 25267.44,
+      "avgPrepTime": 20.3,
+      "avgRating": 4.44
+    },
+    {
+      "month": "November",
+      "totalRevenue": 768103.86,
+      "totalOrders": 1975,
+      "avgDailyRevenue": 25603.46,
+      "avgPrepTime": 20.4,
+      "avgRating": 4.42
+    },
+    {
+      "month": "December",
+      "totalRevenue": 752105.26,
+      "totalOrders": 1952,
+      "avgDailyRevenue": 24261.46,
+      "avgPrepTime": 20.5,
+      "avgRating": 4.44
+    }
+  ],
+  "rushHourAnalysis": [
+    {
+      "hour": 8,
+      "daysAsPeak": 4
+    },
+    {
+      "hour": 9,
+      "daysAsPeak": 9
+    },
+    {
+      "hour": 10,
+      "daysAsPeak": 4
+    },
+    {
+      "hour": 12,
+      "daysAsPeak": 91
+    },
+    {
+      "hour": 13,
+      "daysAsPeak": 99
+    },
+    {
+      "hour": 14,
+      "daysAsPeak": 88
+    },
+    {
+      "hour": 16,
+      "daysAsPeak": 2
+    },
+    {
+      "hour": 17,
+      "daysAsPeak": 1
+    },
+    {
+      "hour": 18,
+      "daysAsPeak": 2
+    },
+    {
+      "hour": 19,
+      "daysAsPeak": 15
+    },
+    {
+      "hour": 20,
+      "daysAsPeak": 12
+    },
+    {
+      "hour": 21,
+      "daysAsPeak": 25
+    },
+    {
+      "hour": 22,
+      "daysAsPeak": 13
+    }
+  ],
+  "topBestInHotelDishes": [
+    {
+      "id": "m_2",
+      "name": "French Fries",
+      "category": "Main Course",
+      "price": 220,
+      "compositeScore": 87.8,
+      "avgRating": 4.56,
+      "ordersCount": 4936,
+      "avgPrepDelayMin": 4.2,
+      "estimatedRevenue": 535536.5,
+      "primarySession": "Breakfast",
+      "recommendationBadge": "Chef Signature \u2022 Best in Hotel",
+      "isBestInHotel": true
+    },
+    {
+      "id": "m_1",
+      "name": "Veg Sandwich",
+      "category": "Main Course",
+      "price": 220,
+      "compositeScore": 87.7,
+      "avgRating": 4.56,
+      "ordersCount": 5008,
+      "avgPrepDelayMin": 4.3,
+      "estimatedRevenue": 598271.0,
+      "primarySession": "Breakfast",
+      "recommendationBadge": "Chef Signature \u2022 Best in Hotel",
+      "isBestInHotel": true
+    },
+    {
+      "id": "m_10",
+      "name": "Masala Dosa",
+      "category": "Breakfast",
+      "price": 90,
+      "compositeScore": 87.7,
+      "avgRating": 4.57,
+      "ordersCount": 4844,
+      "avgPrepDelayMin": 4.3,
+      "estimatedRevenue": 510492.67,
+      "primarySession": "Breakfast",
+      "recommendationBadge": "Chef Signature \u2022 Best in Hotel",
+      "isBestInHotel": true
+    },
+    {
+      "id": "m_11",
+      "name": "Cheese Pizza",
+      "category": "Main Course",
+      "price": 220,
+      "compositeScore": 87.6,
+      "avgRating": 4.56,
+      "ordersCount": 4887,
+      "avgPrepDelayMin": 4.3,
+      "estimatedRevenue": 688711.67,
+      "primarySession": "Breakfast",
+      "recommendationBadge": "Chef Signature \u2022 Best in Hotel",
+      "isBestInHotel": true
+    },
+    {
+      "id": "m_4",
+      "name": "Lemon Ice Tea",
+      "category": "Main Course",
+      "price": 220,
+      "compositeScore": 87.0,
+      "avgRating": 4.47,
+      "ordersCount": 6892,
+      "avgPrepDelayMin": 5.0,
+      "estimatedRevenue": 767601.17,
+      "primarySession": "Lunch",
+      "recommendationBadge": "Chef Signature \u2022 Best in Hotel",
+      "isBestInHotel": true
+    },
+    {
+      "id": "m_9",
+      "name": "Cold Coffee",
+      "category": "Beverages",
+      "price": 90,
+      "compositeScore": 87.0,
+      "avgRating": 4.47,
+      "ordersCount": 7228,
+      "avgPrepDelayMin": 5.1,
+      "estimatedRevenue": 910453.33,
+      "primarySession": "Lunch",
+      "recommendationBadge": "Chef Signature \u2022 Best in Hotel",
+      "isBestInHotel": true
+    },
+    {
+      "id": "m_5",
+      "name": "Gulab Jamun",
+      "category": "Desserts",
+      "price": 80,
+      "compositeScore": 84.3,
+      "avgRating": 4.41,
+      "ordersCount": 5004,
+      "avgPrepDelayMin": 5.6,
+      "estimatedRevenue": 540504.17,
+      "primarySession": "Lunch",
+      "recommendationBadge": "Bestseller",
+      "isBestInHotel": true
+    },
+    {
+      "id": "m_6",
+      "name": "Chocolate Brownie",
+      "category": "Main Course",
+      "price": 220,
+      "compositeScore": 84.1,
+      "avgRating": 4.41,
+      "ordersCount": 5015,
+      "avgPrepDelayMin": 5.7,
+      "estimatedRevenue": 653263.17,
+      "primarySession": "Lunch",
+      "recommendationBadge": "Bestseller",
+      "isBestInHotel": true
+    },
+    {
+      "id": "m_7",
+      "name": "Paneer Butter Masala",
+      "category": "Main Course",
+      "price": 210,
+      "compositeScore": 81.4,
+      "avgRating": 4.34,
+      "ordersCount": 3821,
+      "avgPrepDelayMin": 6.3,
+      "estimatedRevenue": 600863.0,
+      "primarySession": "Lunch",
+      "recommendationBadge": "Bestseller",
+      "isBestInHotel": true
+    },
+    {
+      "id": "m_14",
+      "name": "Dal Tadka",
+      "category": "Main Course",
+      "price": 220,
+      "compositeScore": 81.2,
+      "avgRating": 4.33,
+      "ordersCount": 3809,
+      "avgPrepDelayMin": 6.4,
+      "estimatedRevenue": 548010.33,
+      "primarySession": "Lunch",
+      "recommendationBadge": "Bestseller",
+      "isBestInHotel": true
+    }
+  ],
+  "sampleDishAffinities": {
+    "Lemon Ice Tea": [
+      {
+        "pairedWith": "Cold Coffee",
+        "confidence": 28.9,
+        "coOrders": 1989
+      },
+      {
+        "pairedWith": "French Fries",
+        "confidence": 21.6,
+        "coOrders": 1492
+      },
+      {
+        "pairedWith": "Cheese Pizza",
+        "confidence": 21.3,
+        "coOrders": 1467
+      },
+      {
+        "pairedWith": "Veg Sandwich",
+        "confidence": 21.3,
+        "coOrders": 1468
+      }
+    ],
+    "Gulab Jamun": [
+      {
+        "pairedWith": "Cold Coffee",
+        "confidence": 24.5,
+        "coOrders": 1225
+      },
+      {
+        "pairedWith": "Lemon Ice Tea",
+        "confidence": 23.7,
+        "coOrders": 1187
+      },
+      {
+        "pairedWith": "Chocolate Brownie",
+        "confidence": 23.1,
+        "coOrders": 1156
+      },
+      {
+        "pairedWith": "Paneer Butter Masala",
+        "confidence": 16.3,
+        "coOrders": 814
+      }
+    ],
+    "Chocolate Brownie": [
+      {
+        "pairedWith": "Lemon Ice Tea",
+        "confidence": 23.4,
+        "coOrders": 1172
+      },
+      {
+        "pairedWith": "Gulab Jamun",
+        "confidence": 23.1,
+        "coOrders": 1156
+      },
+      {
+        "pairedWith": "Cold Coffee",
+        "confidence": 23.1,
+        "coOrders": 1159
+      },
+      {
+        "pairedWith": "Paneer Butter Masala",
+        "confidence": 17.3,
+        "coOrders": 867
+      }
+    ],
+    "Paneer Butter Masala": [
+      {
+        "pairedWith": "Chocolate Brownie",
+        "confidence": 22.7,
+        "coOrders": 867
+      },
+      {
+        "pairedWith": "Chilli Chicken",
+        "confidence": 22.5,
+        "coOrders": 860
+      },
+      {
+        "pairedWith": "Cold Coffee",
+        "confidence": 22.3,
+        "coOrders": 852
+      },
+      {
+        "pairedWith": "Veg Pulao",
+        "confidence": 22.1,
+        "coOrders": 843
+      }
+    ],
+    "French Fries": [
+      {
+        "pairedWith": "Veg Sandwich",
+        "confidence": 31.4,
+        "coOrders": 1548
+      },
+      {
+        "pairedWith": "Cold Coffee",
+        "confidence": 30.6,
+        "coOrders": 1511
+      },
+      {
+        "pairedWith": "Lemon Ice Tea",
+        "confidence": 30.2,
+        "coOrders": 1492
+      },
+      {
+        "pairedWith": "Cheese Pizza",
+        "confidence": 30.2,
+        "coOrders": 1490
+      }
+    ],
+    "Cold Coffee": [
+      {
+        "pairedWith": "Lemon Ice Tea",
+        "confidence": 27.5,
+        "coOrders": 1989
+      },
+      {
+        "pairedWith": "Veg Sandwich",
+        "confidence": 21.2,
+        "coOrders": 1532
+      },
+      {
+        "pairedWith": "Cheese Pizza",
+        "confidence": 21.0,
+        "coOrders": 1517
+      },
+      {
+        "pairedWith": "French Fries",
+        "confidence": 20.9,
+        "coOrders": 1511
+      }
+    ],
+    "Masala Dosa": [
+      {
+        "pairedWith": "Cheese Pizza",
+        "confidence": 30.8,
+        "coOrders": 1493
+      },
+      {
+        "pairedWith": "Cold Coffee",
+        "confidence": 30.6,
+        "coOrders": 1481
+      },
+      {
+        "pairedWith": "Veg Sandwich",
+        "confidence": 30.5,
+        "coOrders": 1476
+      },
+      {
+        "pairedWith": "French Fries",
+        "confidence": 30.1,
+        "coOrders": 1457
+      }
+    ],
+    "Cheese Pizza": [
+      {
+        "pairedWith": "Veg Sandwich",
+        "confidence": 31.3,
+        "coOrders": 1532
+      },
+      {
+        "pairedWith": "Cold Coffee",
+        "confidence": 31.0,
+        "coOrders": 1517
+      },
+      {
+        "pairedWith": "Masala Dosa",
+        "confidence": 30.6,
+        "coOrders": 1493
+      },
+      {
+        "pairedWith": "French Fries",
+        "confidence": 30.5,
+        "coOrders": 1490
+      }
+    ]
+  }
+}
