@@ -23,6 +23,216 @@ export const SimpleAIAvatar = ({ size = 32 }: { size?: number }) => (
   </div>
 );
 
+interface FormattedBotMessageProps {
+  text: string;
+}
+
+const renderInline = (str: string): React.ReactNode[] => {
+  if (!str) return [];
+  // Tokenize bold, italic, code, and citations
+  const tokenRegex = /(\*\*\*[\s\S]+?\*\*\*|\*\*[\s\S]+?\*\*|__[\s\S]+?__|`[^`]+`|\*[\s\S]+?\*|_[\s\S]+?_|\[(?:DS|CATALOG|SUPABASE)-[A-Z0-9-]+\])/g;
+  const parts = str.split(tokenRegex);
+
+  return parts.map((part, i) => {
+    if (!part) return null;
+
+    // Bold italic ***text***
+    if (part.startsWith('***') && part.endsWith('***') && part.length >= 6) {
+      const inner = part.slice(3, -3);
+      return <strong key={i} className="font-extrabold italic text-slate-900">{inner}</strong>;
+    }
+    // Bold **text** or __text__
+    if ((part.startsWith('**') && part.endsWith('**') && part.length >= 4) ||
+        (part.startsWith('__') && part.endsWith('__') && part.length >= 4)) {
+      const inner = part.slice(2, -2);
+      return <strong key={i} className="font-bold text-slate-900">{inner}</strong>;
+    }
+    // Italic *text* or _text_
+    if ((part.startsWith('*') && part.endsWith('*') && part.length >= 2) ||
+        (part.startsWith('_') && part.endsWith('_') && part.length >= 2)) {
+      const inner = part.slice(1, -1);
+      return <em key={i} className="italic text-slate-800">{inner}</em>;
+    }
+    // Inline code `code`
+    if (part.startsWith('`') && part.endsWith('`') && part.length >= 2) {
+      const inner = part.slice(1, -1);
+      return <code key={i} className="bg-orange-50 text-orange-600 px-1 py-0.5 rounded font-mono text-[11px] border border-orange-100">{inner}</code>;
+    }
+    // Citations [DS-ML-...]
+    if (part.startsWith('[') && part.endsWith(']')) {
+      return (
+        <span key={i} className="inline-block bg-orange-50 text-orange-700 font-semibold px-1.5 py-0.5 rounded text-[10px] border border-orange-200 mx-0.5">
+          {part}
+        </span>
+      );
+    }
+
+    // Clean any remaining unparsed stray symbols
+    const cleaned = part.replace(/\*\*/g, '').replace(/^#{1,6}\s*/, '');
+    return <span key={i}>{cleaned}</span>;
+  }).filter(Boolean);
+};
+
+export const FormattedBotMessage: React.FC<FormattedBotMessageProps> = ({ text }) => {
+  if (!text) return null;
+
+  // Clean ASCII borders and thinking tags if any
+  const cleanText = text
+    .replace(/<think>[\s\S]*?<\/think>/gi, '')
+    .replace(/[┌─│└┐┘├┤┬┴┼]/g, '')
+    .trim();
+
+  const rawLines = cleanText.split('\n');
+  const elements: React.ReactNode[] = [];
+  let i = 0;
+
+  while (i < rawLines.length) {
+    const line = rawLines[i].trimEnd();
+    const trimmed = line.trim();
+
+    if (!trimmed) {
+      i++;
+      continue;
+    }
+
+    // 1. Markdown Table Handling
+    if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
+      const tableRows: string[] = [];
+      while (i < rawLines.length && rawLines[i].trim().startsWith('|') && rawLines[i].trim().endsWith('|')) {
+        const row = rawLines[i].trim();
+        // Skip table separator line (| :--- | :--- |)
+        if (!/^[|\s:-]+$/.test(row)) {
+          tableRows.push(row);
+        }
+        i++;
+      }
+
+      if (tableRows.length > 0) {
+        const headerCols = tableRows[0]
+          .split('|')
+          .slice(1, -1)
+          .map(c => c.trim());
+        const bodyRows = tableRows.slice(1).map(r =>
+          r.split('|').slice(1, -1).map(c => c.trim())
+        );
+
+        elements.push(
+          <div key={`table-${i}`} className="my-2.5 overflow-x-auto rounded-xl border border-slate-200 shadow-xs">
+            <table className="w-full text-[11px] text-left border-collapse">
+              <thead className="bg-orange-50/70 border-b border-slate-200 text-slate-800">
+                <tr>
+                  {headerCols.map((h, colIdx) => (
+                    <th key={colIdx} className="p-2 font-bold text-slate-900 border-r border-slate-200 last:border-r-0">
+                      {renderInline(h)}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {bodyRows.map((row, rowIdx) => (
+                  <tr key={rowIdx} className="border-b border-slate-100 last:border-b-0 even:bg-slate-50/50">
+                    {row.map((cell, cellIdx) => (
+                      <td key={cellIdx} className="p-2 text-slate-700 border-r border-slate-100 last:border-r-0">
+                        {renderInline(cell)}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      }
+      continue;
+    }
+
+    // 2. Headings (#, ##, ###, ####) - Strip # completely and render bold styled header
+    const headingMatch = trimmed.match(/^(#{1,6})\s+(.*)$/);
+    if (headingMatch) {
+      const level = headingMatch[1].length;
+      const headingContent = headingMatch[2].replace(/\*\*/g, '').trim();
+
+      if (level <= 2) {
+        elements.push(
+          <div key={`h-${i}`} className="font-black text-sm text-slate-900 mt-2.5 mb-1.5 pb-1 border-b border-orange-200 tracking-tight">
+            {headingContent}
+          </div>
+        );
+      } else if (level === 3) {
+        elements.push(
+          <div key={`h-${i}`} className="font-extrabold text-[13px] text-slate-900 mt-2 mb-1 pb-0.5 border-b border-orange-100 tracking-tight flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-orange-500 shrink-0"></span>
+            <span>{headingContent}</span>
+          </div>
+        );
+      } else {
+        elements.push(
+          <div key={`h-${i}`} className="font-bold text-xs text-orange-600 mt-1.5 mb-1 uppercase tracking-wider">
+            {headingContent}
+          </div>
+        );
+      }
+      i++;
+      continue;
+    }
+
+    // 3. Bullet points (- or *)
+    const bulletMatch = trimmed.match(/^[-*]\s+(.*)$/);
+    if (bulletMatch) {
+      const content = bulletMatch[1];
+      elements.push(
+        <div key={`bullet-${i}`} className="flex items-start gap-2 my-0.5 text-slate-700 leading-relaxed pl-0.5">
+          <span className="text-orange-500 font-bold shrink-0 leading-5 text-sm">•</span>
+          <div className="flex-1 min-w-0">
+            {renderInline(content)}
+          </div>
+        </div>
+      );
+      i++;
+      continue;
+    }
+
+    // 4. Numbered list (1. , 2. )
+    const numberedMatch = trimmed.match(/^(\d+)\.\s+(.*)$/);
+    if (numberedMatch) {
+      const num = numberedMatch[1];
+      const content = numberedMatch[2];
+      elements.push(
+        <div key={`num-${i}`} className="flex items-start gap-2 my-0.5 text-slate-700 leading-relaxed pl-0.5">
+          <span className="font-bold text-orange-600 text-xs shrink-0 w-4 text-right">{num}.</span>
+          <div className="flex-1 min-w-0">
+            {renderInline(content)}
+          </div>
+        </div>
+      );
+      i++;
+      continue;
+    }
+
+    // 5. Blockquote (> Note)
+    if (trimmed.startsWith('>')) {
+      const quoteContent = trimmed.replace(/^>\s*/, '');
+      elements.push(
+        <div key={`quote-${i}`} className="my-1.5 pl-3 border-l-2 border-orange-400 text-slate-600 italic bg-orange-50/40 py-1 rounded-r-lg">
+          {renderInline(quoteContent)}
+        </div>
+      );
+      i++;
+      continue;
+    }
+
+    // 6. Regular Paragraph
+    elements.push(
+      <p key={`p-${i}`} className="my-1 text-slate-700 leading-relaxed">
+        {renderInline(trimmed)}
+      </p>
+    );
+    i++;
+  }
+
+  return <div className="space-y-0.5">{elements}</div>;
+};
+
 export default function BhakasuraChatBot({ contextData }: BhakasuraChatBotProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -68,7 +278,7 @@ export default function BhakasuraChatBot({ contextData }: BhakasuraChatBotProps)
         {
           id: (Date.now() + 1).toString(),
           sender: 'bot',
-          text: `┌─ Answer ────────────────────────────────────────┐\n│ I encountered a temporary connection issue.    │\n│ Please check your internet connection or verify │\n│ the Groq API key configuration in .env.         │\n│                                                 │\n│ Key Details:                                    │\n│ • System is operating in offline safe mode     │\n│                                                 │\n│ Next Steps:                                     │\n│ • Try asking again in a moment.                 │\n└─────────────────────────────────────────────────┘`
+          text: `### System Notice\n\nI am operating in offline safe mode. Please verify the connection or try your request again in a moment.\n\n- **Status**: Local verified dataset available\n- **Service Hours**: 7:00 AM – 11:30 PM daily\n- **Assistance**: You can ask about menu dishes, pricing, allergens, staff roster, or 1-year financial metrics.`
         }
       ]);
     } finally {
@@ -125,12 +335,16 @@ export default function BhakasuraChatBot({ contextData }: BhakasuraChatBotProps)
                 <SimpleAIAvatar size={24} />
               </div>
             )}
-            <div className={`max-w-[90%] p-3.5 rounded-2xl leading-relaxed whitespace-pre-wrap ${
+            <div className={`max-w-[90%] p-3.5 rounded-2xl leading-relaxed ${
               msg.sender === 'user'
-                ? 'bg-[#FF6B00] text-white font-sans font-semibold rounded-br-xs shadow-md shadow-orange-500/20'
+                ? 'bg-[#FF6B00] text-white font-sans font-semibold rounded-br-xs shadow-md shadow-orange-500/20 whitespace-pre-wrap'
                 : 'bg-white border border-orange-100 text-slate-800 font-sans text-xs rounded-bl-xs shadow-xs overflow-x-auto leading-relaxed'
             }`}>
-              {msg.text}
+              {msg.sender === 'user' ? (
+                msg.text
+              ) : (
+                <FormattedBotMessage text={msg.text} />
+              )}
             </div>
           </div>
         ))}

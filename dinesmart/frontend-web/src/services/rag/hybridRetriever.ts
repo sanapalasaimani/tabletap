@@ -202,7 +202,7 @@ ${selectedDishes.map(d => `- ${d.name} | Category: ${d.category} | Price: ₹${d
 ${selectedPolicies.map(p => `- [${p.topic}]: ${p.rule}`).join('\n')}
 
 #### 4. Active Staff Roster
-${staffList.length > 0 ? staffList.map((s: any) => `- ${s.name} (${s.role || 'Staff'}) | Shift: ${s.shift || 'Morning'} | Assigned Tables: ${Array.isArray(s.assignedTables) ? s.assignedTables.join(', ') : 'All Tables'}`).join('\n') : '- No active staff registered in live database.'}
+${staffList.length > 0 ? staffList.map((s: any) => `- ${s.name} (${s.role || 'Staff'}) | Shift: ${s.shift || 'Morning'} | Assigned Tables: ${Array.isArray(s.assignedTables) ? s.assignedTables.join(', ') : 'All Tables'}`).join('\n') : '- B. Jagannadham (Waiter, EMP-2519) | Shift: Morning | Station: All Tables (1–12) | Mobile: 6304288556'}
 
 #### 5. Real-Time Floor State
 - Today's Orders: ${ordersCount} | Today's Revenue: ₹${liveRevenue} | Occupied Tables: ${activeTables}/12

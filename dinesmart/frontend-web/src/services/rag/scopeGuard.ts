@@ -46,7 +46,8 @@ const HOTEL_DOMAIN_INDICATORS = [
   'idli', 'vada', 'coffee', 'dessert', 'calorie', 'calories', 'spice',
   'spicy', 'price', 'buffet', 'allergen', 'vegan', 'gluten', 'tax',
   'gst', 'bill', 'billing', 'operation', 'operations', 'operational',
-  'management', 'manager', 'holiday', 'peak', 'steps', 'strategy'
+  'management', 'manager', 'holiday', 'peak', 'steps', 'strategy',
+  'employee', 'employees', 'roster', 'workforce'
 ];
 
 export interface ScopeAssessment {

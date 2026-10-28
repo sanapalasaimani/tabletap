@@ -30,7 +30,7 @@
     "expectedScope": "IN_SCOPE",
     "actualScope": "IN_SCOPE",
     "decisionReadiness": "DECISION_READY",
-    "latencyMs": 1,
+    "latencyMs": 0,
     "passed": true,
     "scores": {
       "factualCorrectness": 5,
@@ -54,7 +54,7 @@
     "expectedScope": "IN_SCOPE",
     "actualScope": "IN_SCOPE",
     "decisionReadiness": "DECISION_READY",
-    "latencyMs": 26,
+    "latencyMs": 145,
     "passed": true,
     "scores": {
       "factualCorrectness": 5,
@@ -78,7 +78,7 @@
     "expectedScope": "IN_SCOPE",
     "actualScope": "IN_SCOPE",
     "decisionReadiness": "DECISION_READY",
-    "latencyMs": 0,
+    "latencyMs": 1,
     "passed": true,
     "scores": {
       "factualCorrectness": 5,
@@ -270,7 +270,7 @@
     "expectedScope": "IN_SCOPE",
     "actualScope": "IN_SCOPE",
     "decisionReadiness": "DECISION_READY",
-    "latencyMs": 0,
+    "latencyMs": 1,
     "passed": true,
     "scores": {
       "factualCorrectness": 5,
@@ -558,7 +558,7 @@
     "expectedScope": "IN_SCOPE",
     "actualScope": "IN_SCOPE",
     "decisionReadiness": "DECISION_READY",
-    "latencyMs": 0,
+    "latencyMs": 1,
     "passed": true,
     "scores": {
       "factualCorrectness": 5,
@@ -606,7 +606,7 @@
     "expectedScope": "IN_SCOPE",
     "actualScope": "IN_SCOPE",
     "decisionReadiness": "DECISION_READY",
-    "latencyMs": 1,
+    "latencyMs": 0,
     "passed": true,
     "scores": {
       "factualCorrectness": 5,
