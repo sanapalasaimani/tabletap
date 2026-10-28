@@ -271,6 +271,9 @@ ${evidence.formattedContext}
       finalAnswer = buildGroundedResponse(query, resolvedContext, evidence, calculations, liveData);
     }
 
+    // Clean headers: strip any leading markdown hashes (#, ##, ###, ####) so raw ### never appears in responses
+    finalAnswer = finalAnswer.replace(/^#{1,6}\s+/gm, '').trim();
+
     const inferenceLatency = Math.round(performance.now() - inferenceStart);
     const totalLatency = Math.round(performance.now() - startTime);
 
@@ -319,6 +322,20 @@ function buildGroundedResponse(
 ): string {
   const q = query.toLowerCase();
   const annual = evidence.relevantMetrics;
+
+  // 0. Greetings & Friendly Inquiries
+  if (/^(hi|hello|hey|hey there|greetings|good morning|good afternoon|good evening|help|sup)(\s.*)?$/i.test(q.trim())) {
+    return `TableTap Hotel & Restaurant Operations Assistant
+
+Hello! How can I assist you with TableTap hotel operations today?
+
+You can ask me about:
+• **Revenue & Analytics**: 1-Year revenue, daily sales average, weekend surge multiplier
+• **Menu & Culinary**: Dish pricing, ingredients, calories, allergens (e.g. Biryani, Masala Dosa, Paneer Butter Masala)
+• **Kitchen & KDS Operations**: Prep times, ML delay drivers, peak rush hours (1:00 PM lunch, 8:00 PM dinner)
+• **Staffing & Roster**: Employee counts, active waiters on duty, shift schedules, station routing
+• **Hotel Policies**: Dining GST (5%), order cancellation guidelines, service charge & tipping policy`;
+  }
 
   // 1. May Day & Holiday Peaks
   if (q.includes('may day') || q.includes('holiday peak')) {

@@ -146,38 +146,25 @@ export const FormattedBotMessage: React.FC<FormattedBotMessageProps> = ({ text }
       continue;
     }
 
-    // 2. Headings (#, ##, ###, ####) - Strip # completely and render bold styled header
+    // 2. Title detection: either Markdown heading (# Title) or the very first standalone title line
     const headingMatch = trimmed.match(/^(#{1,6})\s+(.*)$/);
-    if (headingMatch) {
-      const level = headingMatch[1].length;
-      const headingContent = headingMatch[2].replace(/\*\*/g, '').trim();
+    const isFirstLineTitle = i === 0 && trimmed.length < 80 && !trimmed.startsWith('-') && !trimmed.startsWith('*') && !trimmed.startsWith('•') && !/^\d+\./.test(trimmed) && !trimmed.includes(':');
 
-      if (level <= 2) {
-        elements.push(
-          <div key={`h-${i}`} className="font-black text-sm text-slate-900 mt-2.5 mb-1.5 pb-1 border-b border-orange-200 tracking-tight">
-            {headingContent}
-          </div>
-        );
-      } else if (level === 3) {
-        elements.push(
-          <div key={`h-${i}`} className="font-extrabold text-[13px] text-slate-900 mt-2 mb-1 pb-0.5 border-b border-orange-100 tracking-tight flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-orange-500 shrink-0"></span>
-            <span>{headingContent}</span>
-          </div>
-        );
-      } else {
-        elements.push(
-          <div key={`h-${i}`} className="font-bold text-xs text-orange-600 mt-1.5 mb-1 uppercase tracking-wider">
-            {headingContent}
-          </div>
-        );
-      }
+    if (headingMatch || isFirstLineTitle) {
+      const headingContent = (headingMatch ? headingMatch[2] : trimmed).replace(/\*\*/g, '').trim();
+
+      elements.push(
+        <div key={`h-${i}`} className="font-extrabold text-[13px] text-slate-900 mt-1 mb-1.5 pb-1 border-b border-orange-100 tracking-tight flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-orange-500 shrink-0"></span>
+          <span>{headingContent}</span>
+        </div>
+      );
       i++;
       continue;
     }
 
-    // 3. Bullet points (- or *)
-    const bulletMatch = trimmed.match(/^[-*]\s+(.*)$/);
+    // 3. Bullet points (-, *, or •)
+    const bulletMatch = trimmed.match(/^[-*•]\s+(.*)$/);
     if (bulletMatch) {
       const content = bulletMatch[1];
       elements.push(

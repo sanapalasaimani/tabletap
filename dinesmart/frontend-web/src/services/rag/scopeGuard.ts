@@ -20,6 +20,10 @@ const PROMPT_INJECTION_PATTERNS = [
   /employee\s+password/i
 ];
 
+const PROFANITY_PATTERNS = [
+  /\b(fuck|fucking|fucker|shit|bitch|bastard|asshole|cunt|dick|pussy)\b/i
+];
+
 // Sensitive or unintegrated data topics that trigger IN_SCOPE_WITH_LIMITATIONS
 const LIMITATION_PATTERNS = [
   /credit\s*card\s*(number|cvv|details)/i,
@@ -60,6 +64,18 @@ export interface ScopeAssessment {
 export function evaluateScopeAndSecurity(query: string, conversationContext?: string): ScopeAssessment {
   const securityFlags: string[] = [];
   const trimmed = (query || '').trim();
+
+  // 0. Check for profanity / abusive language
+  for (const pattern of PROFANITY_PATTERNS) {
+    if (pattern.test(trimmed)) {
+      return {
+        classification: 'OUT_OF_SCOPE',
+        reason: 'Inappropriate or abusive language detected.',
+        sanitizedQuery: trimmed,
+        securityFlags: ['PROFANITY_DETECTED']
+      };
+    }
+  }
 
   // 1. Check for prompt injection / jailbreak / unauthorized attempts
   for (const pattern of PROMPT_INJECTION_PATTERNS) {
@@ -105,7 +121,11 @@ export function evaluateScopeAndSecurity(query: string, conversationContext?: st
 
   // 5. Domain match verification
   const hasDomainKeyword = HOTEL_DOMAIN_INDICATORS.some(k => qLower.includes(k));
-  const hasContextDomain = conversationContext 
+  const isFollowUpPattern = 
+    /^(what about|how about|and|then|what is it|compare|details|which one|why|when|who|more|status|breakdown|expand|summarize|how many|show me)/i.test(qLower) ||
+    /\b(it|that|those|them|these|this|previous|following|next)\b/i.test(qLower);
+
+  const hasContextDomain = (conversationContext && isFollowUpPattern)
     ? HOTEL_DOMAIN_INDICATORS.some(k => conversationContext.toLowerCase().includes(k))
     : false;
 

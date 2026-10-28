@@ -6,7 +6,7 @@
     "expectedScope": "IN_SCOPE",
     "actualScope": "IN_SCOPE",
     "decisionReadiness": "DECISION_READY",
-    "latencyMs": 1,
+    "latencyMs": 9,
     "passed": true,
     "scores": {
       "factualCorrectness": 5,
@@ -30,7 +30,7 @@
     "expectedScope": "IN_SCOPE",
     "actualScope": "IN_SCOPE",
     "decisionReadiness": "DECISION_READY",
-    "latencyMs": 0,
+    "latencyMs": 3,
     "passed": true,
     "scores": {
       "factualCorrectness": 5,
@@ -54,7 +54,7 @@
     "expectedScope": "IN_SCOPE",
     "actualScope": "IN_SCOPE",
     "decisionReadiness": "DECISION_READY",
-    "latencyMs": 145,
+    "latencyMs": 144,
     "passed": true,
     "scores": {
       "factualCorrectness": 5,
@@ -78,7 +78,7 @@
     "expectedScope": "IN_SCOPE",
     "actualScope": "IN_SCOPE",
     "decisionReadiness": "DECISION_READY",
-    "latencyMs": 1,
+    "latencyMs": 0,
     "passed": true,
     "scores": {
       "factualCorrectness": 5,
@@ -270,7 +270,7 @@
     "expectedScope": "IN_SCOPE",
     "actualScope": "IN_SCOPE",
     "decisionReadiness": "DECISION_READY",
-    "latencyMs": 1,
+    "latencyMs": 0,
     "passed": true,
     "scores": {
       "factualCorrectness": 5,
@@ -534,7 +534,7 @@
     "expectedScope": "IN_SCOPE",
     "actualScope": "IN_SCOPE",
     "decisionReadiness": "DECISION_READY",
-    "latencyMs": 0,
+    "latencyMs": 1,
     "passed": true,
     "scores": {
       "factualCorrectness": 5,
@@ -558,7 +558,7 @@
     "expectedScope": "IN_SCOPE",
     "actualScope": "IN_SCOPE",
     "decisionReadiness": "DECISION_READY",
-    "latencyMs": 1,
+    "latencyMs": 0,
     "passed": true,
     "scores": {
       "factualCorrectness": 5,
@@ -654,7 +654,7 @@
     "expectedScope": "IN_SCOPE",
     "actualScope": "IN_SCOPE",
     "decisionReadiness": "DECISION_READY",
-    "latencyMs": 0,
+    "latencyMs": 1,
     "passed": true,
     "scores": {
       "factualCorrectness": 5,
@@ -918,7 +918,7 @@
     "expectedScope": "OUT_OF_SCOPE",
     "actualScope": "OUT_OF_SCOPE",
     "decisionReadiness": "NOT_DECISION_READY",
-    "latencyMs": 0,
+    "latencyMs": 1,
     "passed": true,
     "scores": {
       "factualCorrectness": 5,
@@ -1182,7 +1182,7 @@
     "expectedScope": "IN_SCOPE",
     "actualScope": "IN_SCOPE",
     "decisionReadiness": "DECISION_READY",
-    "latencyMs": 0,
+    "latencyMs": 1,
     "passed": true,
     "scores": {
       "factualCorrectness": 5,
