@@ -125,10 +125,10 @@ export default function BhakasuraChatBot({ contextData }: BhakasuraChatBotProps)
                 <SimpleAIAvatar size={24} />
               </div>
             )}
-            <div className={`max-w-[88%] p-3.5 rounded-2xl leading-relaxed whitespace-pre-wrap ${
+            <div className={`max-w-[90%] p-3.5 rounded-2xl leading-relaxed whitespace-pre-wrap ${
               msg.sender === 'user'
                 ? 'bg-[#FF6B00] text-white font-sans font-semibold rounded-br-xs shadow-md shadow-orange-500/20'
-                : 'bg-white border border-orange-100 text-slate-800 font-mono text-[11px] rounded-bl-xs shadow-xs overflow-x-auto'
+                : 'bg-white border border-orange-100 text-slate-800 font-sans text-xs rounded-bl-xs shadow-xs overflow-x-auto leading-relaxed'
             }`}>
               {msg.text}
             </div>

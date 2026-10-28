@@ -600,7 +600,7 @@ export const WaiterModule: React.FC = () => {
                 </div>
                 <div>
                   <h2 className="text-sm font-black text-slate-900 leading-none">TableTap</h2>
-                  <span className="text-[10px] font-semibold text-slate-400">Waiter Terminal</span>
+                  <span className="text-[10px] font-semibold text-slate-400">Waiter Terminal • Active Tasks</span>
                 </div>
               </div>
 
@@ -662,7 +662,7 @@ export const WaiterModule: React.FC = () => {
                     : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
                 }`}
               >
-                All ({allTasksList.length})
+                All Tasks ({allTasksList.length})
               </button>
               <button
                 onClick={() => setActiveTab('pending')}

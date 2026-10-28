@@ -1,5 +1,7 @@
 import { MENU_ITEMS } from '../../data/menu';
 import mlData from '../../data/ml_insights.json';
+import { ragOrchestrator } from '../../services/rag/ragOrchestrator';
+export { ragOrchestrator };
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const API_KEY = import.meta.env.VITE_GROQ_API_KEY || '';
@@ -502,200 +504,25 @@ ${operationalSummary}
 // ----------------------------------------------------
 export async function askBhakasuraAI(history: { role: string; content: string }[], contextData: any): Promise<string> {
   const latestUserQuery = history[history.length - 1]?.content || '';
-  const retrievedContext = retrieveRelevantContext(latestUserQuery, contextData);
+  const priorHistory = history.slice(0, -1).map(h => ({
+    role: (h.role === 'assistant' ? 'assistant' : 'user') as 'user' | 'assistant',
+    content: h.content
+  }));
 
-  // Determine dynamic temperature: low for factual lookup, moderate for recommendations
-  const isRecommendation = /recommend|suggest|what should|best combo|idea|special/i.test(latestUserQuery);
-  const temperature = isRecommendation ? 0.6 : 0.3;
+  try {
+    const result = await ragOrchestrator.processAdminQuery(latestUserQuery, priorHistory, contextData);
+    return result.answer;
+  } catch (error) {
+    console.error('RAG Orchestrator error in askBhakasuraAI:', error);
+    return `### Service Notice
 
-  const systemPrompt = `You are TableTap AI, an intelligent, warm, executive AI assistant for our hotel management, dining, and restaurant platform.
-You have been trained directly with the restaurant's actual 1-year historical dataset (23,708 orders, 365 daily analytics records, machine learning prep-time models, and market basket affinities).
+I am operating in verified safe mode with TableTap's 1-year historical dataset and live operations.
 
-Tone & Persona:
-• Warm, authoritative, executive, highly intelligent, engaging, professional, and delightfully conversational.
-• Deeply knowledgeable about all hotel & restaurant operations, verified 1-year financial metrics, dish performance, prices, prep times, rush hours, policies, and active staff.
-• Precise with numbers: Always quote exact figures when asked about revenues, orders, prep times, ratings, veg vs non-veg, peak days, and ML model stats.
+- **Verified Track Record**: ₹89,53,131.50 gross revenue across 23,708 dining orders.
+- **Operating Status**: 7:00 AM – 11:30 PM daily service.
+- **GST Standard**: 5% dining GST.
 
-Core Rules & Guidelines:
-1. TRUTHFULNESS & EXACT NUMBERS: Use the verified 1-year analytics data, ML models, menu items, prices, staff roster, and policies provided in the context below. Quote exact figures (e.g. ₹89,53,131.50 annual revenue, 23,708 orders, ₹24,529 avg daily revenue, ₹377.64 AOV, 83% veg preference, peak revenue day May Day ₹46,438.68, RandomForest R² = 0.957, MAE = 1.27 min). Never invent fake numbers or dishes.
-2. STAFF INQUIRIES: When asked about staff members or employees, provide the verified team members from the staff roster (names, roles, shifts, assigned tables). Only Waiter roles exist in our staff hierarchy.
-3. GENERAL KNOWLEDGE & CONVERSATION: If the user asks general knowledge, literature, science, or casual queries (e.g. "who is Romeo"), answer accurately and warmly, adding a charming hospitality touch if suitable.
-4. NO RAW CHAIN-OF-THOUGHT EXPOSURE: Internally reason step-by-step, but output ONLY the final answer in the structured format below. Never output raw reasoning tags (<think>...</think>).
-
-Formatting Requirement:
-You MUST format your response cleanly using visible borders and sections:
-┌─ Answer ────────────────────────────────────────┐
-│ [Direct, clear, human-like answer to the user] │
-│                                                 │
-│ Key Details:                                    │
-│ • [Bullet points of details, facts, or answers] │
-│                                                 │
-│ Next Steps:                                     │
-│ • [Helpful follow-up actions or suggestions]   │
-└─────────────────────────────────────────────────┘
-
-Few-Shot Examples:
-
-[Example 1 - Menu Item & Allergen Question]
-User: "How much is Masala Dosa, and is it gluten-free?"
-Assistant:
-┌─ Answer ────────────────────────────────────────┐
-│ Our Masala Dosa is priced at ₹90 and is freshly │
-│ prepared with potato masala and coconut chutney.│
-│                                                 │
-│ Key Details:                                    │
-│ • Price: ₹90 | Category: Breakfast (320 kcal)  │
-│ • Dietary: Vegetarian. Fermented rice & lentil  │
-│   batter. Contains dairy ghee/butter.           │
-│ • Allergen Note: For strict gluten-free diners, │
-│   we recommend Idli Sambar (₹70) or Medu Vada.  │
-│                                                 │
-│ Next Steps:                                     │
-│ • Would you like to place an order for Table 05?│
-└─────────────────────────────────────────────────┘
-
-[Example 2 - 1-Year Revenue Question]
-User: "What was our total revenue over the past year?"
-Assistant:
-┌─ Answer ────────────────────────────────────────┐
-│ Over the past 365 operating days, TableTap      │
-│ generated a total revenue of ₹89,53,131.50      │
-│ across 23,708 completed dining orders.          │
-│                                                 │
-│ Key Details:                                    │
-│ • Total Gross Revenue: ₹89,53,131.50            │
-│ • Total Orders: 23,708 (avg 65 orders/day)      │
-│ • Average Daily Revenue: ₹24,529.13             │
-│ • Average Order Value (AOV): ₹377.64            │
-│ • Peak Day: May Day (₹46,438.68, 114 orders)    │
-│                                                 │
-│ Next Steps:                                     │
-│ • Would you like a breakdown by day-of-week or  │
-│   a monthly revenue trend comparison?           │
-└─────────────────────────────────────────────────┘
-
-[VERIFIED RETRIEVED KNOWLEDGE BASE CONTEXT]
-${retrievedContext}
-`;
-
-  const candidateModels = getGroqModels();
-
-  for (const model of candidateModels) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 16000);
-
-    try {
-      if (!API_KEY) throw new Error('No Groq API key configured.');
-
-      const response = await fetch(GROQ_API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${API_KEY}`,
-        },
-        body: JSON.stringify({
-          model,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            ...history
-          ],
-          temperature,
-          max_tokens: 850,
-          top_p: 0.9,
-        }),
-        signal: controller.signal
-      });
-
-      clearTimeout(timeoutId);
-
-      if (response.ok) {
-        const data = await response.json();
-        let content = data.choices[0]?.message?.content;
-        if (content) {
-          // Sanitize any raw reasoning or thinking tags if model emitted them
-          content = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-          return content;
-        }
-      } else {
-        const errorText = await response.text();
-        console.warn(`Groq askBhakasuraAI HTTP ${response.status} with model ${model}:`, errorText);
-      }
-    } catch (error: any) {
-      clearTimeout(timeoutId);
-      console.warn(`Groq askBhakasuraAI model ${model} error:`, error);
-    }
+Please ask any specific question regarding menu items, kitchen preparation times, pricing, or hotel revenue metrics.`;
   }
-
-  // Grounded contextual fallback using verified 1-year data and local intelligence
-  const qLower = latestUserQuery.toLowerCase();
-  const annual = (mlData as any)?.annualAnalytics?.annualSummary || {};
-  const peak = (mlData as any)?.annualAnalytics?.peakAndLowPerformance || {};
-
-  if (qLower.includes('revenue') || qLower.includes('sales') || qLower.includes('turnover') || qLower.includes('earn')) {
-    return `┌─ Answer ────────────────────────────────────────┐
-│ Over the 365-day operating year, our restaurant │
-│ generated ₹${(annual.totalRevenue || 8953131.5).toLocaleString('en-IN')} across ${(annual.totalOrders || 23708).toLocaleString('en-IN')} orders.│
-│                                                 │
-│ Key Details:                                    │
-│ • Total 1-Year Revenue: ₹${(annual.totalRevenue || 8953131.5).toLocaleString('en-IN')}        │
-│ • Average Daily Revenue: ₹${(annual.avgDailyRevenue || 24529.13).toLocaleString('en-IN')}         │
-│ • Average Order Value (AOV): ₹${annual.avgOrderValue || 377.64}            │
-│ • Peak Day: May Day (₹46,438.68, 114 orders)    │
-│ • Weekend Daily Average: ₹31,437.20 (1.62x surge│
-│                                                 │
-│ Next Steps:                                     │
-│ • You can view full monthly trends in the Admin │
-│   Analytics dashboard tab.                      │
-└─────────────────────────────────────────────────┘`;
-  }
-
-  if (qLower.includes('prep') || qLower.includes('delay') || qLower.includes('kitchen') || qLower.includes('cook time')) {
-    return `┌─ Answer ────────────────────────────────────────┐
-│ Our kitchen operations maintain an average prep │
-│ time of ${annual.avgPrepTimeMinutes || 20.5} minutes across all dining sessions. │
-│                                                 │
-│ Key Details:                                    │
-│ • Average Prep Time: ${annual.avgPrepTimeMinutes || 20.5} minutes               │
-│ • ML RandomForest Model: R² = 0.957, MAE = 1.27m │
-│ • Primary Bottleneck: Kitchen Queue Length (42%)│
-│ • Peak Rush Hours: 1:00 PM (Lunch) & 8:00 PM    │
-│                                                 │
-│ Next Steps:                                     │
-│ • Monitor active KDS queue lengths to prevent   │
-│   rush-hour delays during peak dinner sessions. │
-└─────────────────────────────────────────────────┘`;
-  }
-
-  if (qLower.includes('veg') || qLower.includes('non-veg') || qLower.includes('dietary')) {
-    return `┌─ Answer ────────────────────────────────────────┐
-│ Our annual sales data shows that 83.0% of all   │
-│ items ordered are Vegetarian (${(annual.totalVegItemsSold || 55284).toLocaleString('en-IN')} items). │
-│                                                 │
-│ Key Details:                                    │
-│ • Vegetarian Share: 83.0% (55,284 items sold)   │
-│ • Non-Vegetarian Share: 17.0% (11,314 items)    │
-│ • Top Veg Dishes: Masala Dosa, Paneer Butter    │
-│   Masala, Veg Sandwich, French Fries            │
-│                                                 │
-│ Next Steps:                                     │
-│ • Consider featuring seasonal vegetarian combos │
-│   to capitalize on strong customer preference.  │
-└─────────────────────────────────────────────────┘`;
-  }
-
-  // Graceful, formatted fallback utilizing verified knowledge
-  return `┌─ Answer ────────────────────────────────────────┐
-│ I am operating with TableTap's verified 1-year  │
-│ dataset and live restaurant knowledge base.     │
-│                                                 │
-│ Key Details:                                    │
-│ • Operating Hours: 7:00 AM – 11:30 PM daily     │
-│ • 1-Year Revenue: ₹89,53,131.50 (23,708 orders) │
-│ • Customer Satisfaction: 4.43★ average rating   │
-│ • GST Policy: 5% standard dining GST            │
-│                                                 │
-│ Next Steps:                                     │
-│ • Ask me about revenue, dish pairings, prep     │
-│   times, staff roster, or menu recommendations. │
-└─────────────────────────────────────────────────┘`;
 }
+
