@@ -4,7 +4,8 @@ import { Order, WaiterRequest } from '../../types';
 import { 
   ArrowLeft, User, Lock, Eye, EyeOff, 
   Fingerprint, CheckCircle, Wallet, Sparkles, AlertTriangle,
-  Clock, ShieldCheck, Upload, Edit3, X, Check
+  Clock, ShieldCheck, Upload, Edit3, X, Check,
+  Smartphone, Download
 } from 'lucide-react';
 import { formatPhotoUrl, getInitials, PRESET_AVATARS } from '../../utils/photoHelper';
 
@@ -531,6 +532,25 @@ export const WaiterModule: React.FC = () => {
                 <ShieldCheck size={13} className="text-emerald-500" />
                 <span>30-minute inactivity session. Fingerprint unlock active inside session.</span>
               </p>
+
+              {/* Native Waiter Android Terminal APK Download */}
+              <div className="mt-5 p-4 rounded-2xl bg-orange-50/80 border border-orange-200/60 text-center shadow-xs">
+                <div className="flex items-center justify-center gap-2 mb-1.5">
+                  <Smartphone size={16} className="text-[#FF6B00]" />
+                  <span className="text-xs font-black text-slate-900">Waiter Android Terminal App</span>
+                </div>
+                <p className="text-[11px] text-slate-500 font-medium mb-3">
+                  Install on your Android device for instant notifications and faster order serving.
+                </p>
+                <a
+                  href="/downloads/WaiterApp.apk"
+                  download="TableTap-WaiterApp.apk"
+                  className="inline-flex items-center justify-center gap-2 w-full py-2.5 px-4 bg-[#FF6B00] hover:bg-orange-600 active:scale-98 text-white rounded-xl text-xs font-black shadow-xs transition-all cursor-pointer"
+                >
+                  <Download size={14} />
+                  <span>Download Waiter APK (v1.2)</span>
+                </a>
+              </div>
 
 
             </div>

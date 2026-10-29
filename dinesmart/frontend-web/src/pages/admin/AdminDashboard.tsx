@@ -11,7 +11,7 @@ import {
   AlertTriangle, Moon, Sun, RefreshCw, FileText, Mail, MessageCircle, 
   CornerDownRight, UserPlus, Heart, TrendingUp, DollarSign, Calendar,
   TrendingDown, ArrowUpRight, ArrowDownRight, Clock, Star, Eye, EyeOff, Phone, Copy, FileSpreadsheet, ChevronDown, ExternalLink,
-  Upload
+  Upload, Smartphone, Share2, CheckCircle2
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, CartesianGrid } from 'recharts';
 import { 
@@ -150,6 +150,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
   }, []);
   const [syncTime, setSyncTime] = useState('');
   const [alertSettings, setAlertSettings] = useState<any>({ tax: 5, currency: '₹', gstNo: '27AAAAA1111A1Z1', mapsLocation: '' });
+
+  // Waiter APK Download & Management State
+  const [showApkQr, setShowApkQr] = useState(false);
+  const [showApkGuide, setShowApkGuide] = useState(false);
+  const [copiedApkLink, setCopiedApkLink] = useState(false);
+  const [apkInfo, setApkInfo] = useState<{
+    version: string;
+    fileName: string;
+    fileSize: string;
+    downloadUrl: string;
+    updatedAt: string;
+    customUploaded: boolean;
+  }>(() => {
+    const saved = localStorage.getItem('dinesmart_waiter_apk_info');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { /* ignore */ }
+    }
+    return {
+      version: 'v1.2.0',
+      fileName: 'TableTap-WaiterApp.apk',
+      fileSize: '40.2 MB',
+      downloadUrl: '/downloads/WaiterApp.apk',
+      updatedAt: 'October 2026',
+      customUploaded: false
+    };
+  });
 
   const handleGetLocation = () => {
     if (navigator.geolocation) {
@@ -717,6 +743,49 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
     } catch (e) {
       alert('Failed to download QR code image.');
     }
+  };
+
+  // Waiter APK Download & Management Logic
+  const apkDownloadFullUrl = apkInfo.downloadUrl.startsWith('http') || apkInfo.downloadUrl.startsWith('blob:')
+    ? apkInfo.downloadUrl
+    : `${window.location.origin}${apkInfo.downloadUrl}`;
+  const apkQrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(apkDownloadFullUrl)}`;
+
+  const handleUploadNewApk = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith('.apk')) {
+      alert('Please select a valid Android package file (.apk)');
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    const sizeInMB = (file.size / (1024 * 1024)).toFixed(1) + ' MB';
+    const now = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+    const newApkData = {
+      version: 'v' + (parseFloat(apkInfo.version.replace('v', '')) + 0.1).toFixed(1) + '-custom',
+      fileName: file.name,
+      fileSize: sizeInMB,
+      downloadUrl: objectUrl,
+      updatedAt: now,
+      customUploaded: true
+    };
+
+    setApkInfo(newApkData);
+    localStorage.setItem('dinesmart_waiter_apk_info', JSON.stringify({
+      ...newApkData,
+      downloadUrl: '/downloads/WaiterApp.apk'
+    }));
+    logActivity(`Uploaded updated Waiter Terminal APK: ${file.name} (${sizeInMB})`);
+    alert(`Successfully loaded new Waiter APK: ${file.name} (${sizeInMB})`);
+  };
+
+  const handleCopyApkLink = () => {
+    navigator.clipboard.writeText(apkDownloadFullUrl);
+    setCopiedApkLink(true);
+    setTimeout(() => setCopiedApkLink(false), 2500);
   };
 
   // Coupon Campaigns
@@ -2187,7 +2256,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2.5 shrink-0">
+                <div className="flex items-center gap-2.5 shrink-0 flex-wrap sm:flex-nowrap">
+                  <a
+                    href={apkInfo.downloadUrl}
+                    download={apkInfo.fileName}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black px-4 py-2.5 rounded-2xl transition-all flex items-center gap-2 cursor-pointer shadow-sm hover:shadow-md shrink-0"
+                    title={`Download Waiter Android App APK (${apkInfo.fileSize})`}
+                  >
+                    <Smartphone size={15} />
+                    <span>Download Waiter APK</span>
+                    <Download size={13} className="opacity-90" />
+                  </a>
+
                   <button
                     onClick={fetchData}
                     className="p-2.5 border border-slate-200 text-slate-600 hover:text-primary hover:border-orange-300 rounded-2xl cursor-pointer bg-slate-50/70 hover:bg-white transition-all shadow-xs"
@@ -2198,11 +2278,199 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                   
                   <button
                     onClick={handleOpenAddStaff}
-                    className="bg-primary hover:bg-orange-600 text-white text-xs font-black px-5 py-2.5 rounded-2xl transition-all flex items-center gap-2 cursor-pointer shadow-sm hover:shadow-md"
+                    className="bg-primary hover:bg-orange-600 text-white text-xs font-black px-5 py-2.5 rounded-2xl transition-all flex items-center gap-2 cursor-pointer shadow-sm hover:shadow-md shrink-0"
                   >
                     <Plus size={16} />
                     <span>+ Add Waiter</span>
                   </button>
+                </div>
+              </div>
+
+              {/* Waiter Terminal Mobile APK Showcase & Installation Hub */}
+              <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-3xl p-6 text-white border border-slate-700/60 shadow-lg relative overflow-hidden">
+                {/* Decorative background ambient glows */}
+                <div className="absolute -right-16 -top-16 w-64 h-64 bg-orange-500/15 rounded-full blur-3xl pointer-events-none" />
+                <div className="absolute right-1/3 -bottom-16 w-48 h-48 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
+
+                <div className="relative z-10">
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                    {/* Left: App Identity & Description */}
+                    <div className="flex items-start gap-4">
+                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-orange-500 to-amber-500 text-white flex items-center justify-center shrink-0 shadow-lg shadow-orange-500/30">
+                        <Smartphone size={28} />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2.5 flex-wrap">
+                          <h4 className="text-lg font-black tracking-tight text-white">
+                            TableTap Waiter Android Terminal
+                          </h4>
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                            {apkInfo.version} Active Build
+                          </span>
+                          {apkInfo.customUploaded && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-orange-500/20 text-orange-300 border border-orange-500/30">
+                              Custom APK
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-300 mt-1 max-w-xl leading-relaxed">
+                          Equip floor staff with the standalone Android application. Instant kitchen order alerts, customer table calling buzzers, biometric fingerprint login, and table routing.
+                        </p>
+
+                        {/* Specs Badges */}
+                        <div className="flex items-center gap-2 mt-3 flex-wrap text-[11px]">
+                          <span className="px-2.5 py-1 rounded-xl bg-slate-800/80 border border-slate-700 text-slate-300 font-mono font-bold">
+                            📦 {apkInfo.fileSize}
+                          </span>
+                          <span className="px-2.5 py-1 rounded-xl bg-slate-800/80 border border-slate-700 text-slate-300 font-medium">
+                            🤖 Android 7.0+
+                          </span>
+                          <span className="px-2.5 py-1 rounded-xl bg-slate-800/80 border border-slate-700 text-slate-300 font-medium">
+                            ⚡ Low Latency FIFO Orders
+                          </span>
+                          <span className="px-2.5 py-1 rounded-xl bg-slate-800/80 border border-slate-700 text-slate-300 font-medium">
+                            🔒 30m Auto-Lock & Biometrics
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right: Download & Action Buttons */}
+                    <div className="flex flex-wrap lg:flex-nowrap items-center gap-2.5 shrink-0">
+                      {/* Direct APK Download Button */}
+                      <a
+                        href={apkInfo.downloadUrl}
+                        download={apkInfo.fileName}
+                        className="bg-primary hover:bg-orange-600 text-white text-xs font-black px-4 py-3 rounded-2xl transition-all flex items-center gap-2 cursor-pointer shadow-lg shadow-orange-500/25 hover:scale-102 active:scale-98"
+                      >
+                        <Download size={16} />
+                        <span>Download APK</span>
+                      </a>
+
+                      {/* Scan QR Code Button */}
+                      <button
+                        type="button"
+                        onClick={() => setShowApkQr(!showApkQr)}
+                        className={`text-xs font-bold px-3.5 py-3 rounded-2xl transition-all flex items-center gap-2 cursor-pointer border ${
+                          showApkQr 
+                            ? 'bg-orange-500/20 text-orange-300 border-orange-500/40' 
+                            : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+                        }`}
+                        title="Show scannable QR code for waiter's phone"
+                      >
+                        <QrCode size={16} />
+                        <span>{showApkQr ? 'Hide QR' : 'Scan to Install'}</span>
+                      </button>
+
+                      {/* Copy Link Button */}
+                      <button
+                        type="button"
+                        onClick={handleCopyApkLink}
+                        className="p-3 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 rounded-2xl cursor-pointer transition-all"
+                        title="Copy direct APK download link"
+                      >
+                        {copiedApkLink ? <Check size={16} className="text-emerald-400" /> : <Copy size={16} />}
+                      </button>
+
+                      {/* Upload / Replace APK Button */}
+                      <label 
+                        className="p-3 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 rounded-2xl cursor-pointer transition-all flex items-center justify-center"
+                        title="Upload/Select newer APK file"
+                      >
+                        <Upload size={16} />
+                        <input
+                          type="file"
+                          accept=".apk"
+                          onChange={handleUploadNewApk}
+                          className="hidden"
+                        />
+                      </label>
+
+                      {/* Guide Toggle */}
+                      <button
+                        type="button"
+                        onClick={() => setShowApkGuide(!showApkGuide)}
+                        className="text-xs font-bold px-3 py-3 rounded-2xl bg-slate-800/60 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700/60 transition-all cursor-pointer"
+                        title="How to install on Android"
+                      >
+                        {showApkGuide ? 'Hide Guide' : 'Install Guide'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Expandable Scannable QR Code Panel */}
+                  {showApkQr && (
+                    <div className="mt-5 pt-5 border-t border-slate-700/80 grid grid-cols-1 sm:grid-cols-3 gap-6 items-center animate-fade-in">
+                      <div className="sm:col-span-1 flex flex-col items-center p-3 bg-white rounded-2xl shadow-inner">
+                        <img
+                          src={apkQrCodeUrl}
+                          alt="Scan to download Waiter APK"
+                          className="w-40 h-40 object-contain rounded-lg"
+                        />
+                        <span className="text-[10px] text-slate-500 font-bold mt-2 text-center">
+                          Scan with Android Camera
+                        </span>
+                      </div>
+                      <div className="sm:col-span-2 space-y-2 text-xs">
+                        <h5 className="font-black text-sm text-white flex items-center gap-2">
+                          <span>Instant Phone Download via QR</span>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                            Wireless
+                          </span>
+                        </h5>
+                        <p className="text-slate-300 text-xs leading-relaxed">
+                          Have your waiter point their Android phone camera or QR scanner at the screen to start the APK download directly on their phone without needing a computer cable.
+                        </p>
+                        <div className="p-3 rounded-xl bg-slate-800/80 border border-slate-700 font-mono text-[11px] text-orange-300 break-all flex items-center justify-between gap-2">
+                          <span className="truncate">{apkDownloadFullUrl}</span>
+                          <button
+                            type="button"
+                            onClick={handleCopyApkLink}
+                            className="shrink-0 p-1 hover:text-white"
+                          >
+                            {copiedApkLink ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Expandable Step-by-Step Android Installation Guide */}
+                  {showApkGuide && (
+                    <div className="mt-5 pt-5 border-t border-slate-700/80 animate-fade-in">
+                      <h5 className="font-black text-xs uppercase tracking-wider text-slate-400 mb-3">
+                        Android Sideloading & Setup Guide (5 Easy Steps)
+                      </h5>
+                      <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 text-xs">
+                        <div className="p-3 rounded-2xl bg-slate-800/60 border border-slate-700/60">
+                          <span className="w-5 h-5 rounded-full bg-orange-500/20 text-orange-400 font-bold text-[10px] flex items-center justify-center mb-1.5">1</span>
+                          <strong className="block text-white text-[11px] mb-1">Download APK</strong>
+                          <p className="text-[10px] text-slate-400">Click Download or scan QR code on the waiter's Android device.</p>
+                        </div>
+                        <div className="p-3 rounded-2xl bg-slate-800/60 border border-slate-700/60">
+                          <span className="w-5 h-5 rounded-full bg-orange-500/20 text-orange-400 font-bold text-[10px] flex items-center justify-center mb-1.5">2</span>
+                          <strong className="block text-white text-[11px] mb-1">Accept Warning</strong>
+                          <p className="text-[10px] text-slate-400">Tap "Download anyway" when Android prompts about unknown file.</p>
+                        </div>
+                        <div className="p-3 rounded-2xl bg-slate-800/60 border border-slate-700/60">
+                          <span className="w-5 h-5 rounded-full bg-orange-500/20 text-orange-400 font-bold text-[10px] flex items-center justify-center mb-1.5">3</span>
+                          <strong className="block text-white text-[11px] mb-1">Allow Install</strong>
+                          <p className="text-[10px] text-slate-400">In Settings, toggle "Allow from this source" for Chrome/Files.</p>
+                        </div>
+                        <div className="p-3 rounded-2xl bg-slate-800/60 border border-slate-700/60">
+                          <span className="w-5 h-5 rounded-full bg-orange-500/20 text-orange-400 font-bold text-[10px] flex items-center justify-center mb-1.5">4</span>
+                          <strong className="block text-white text-[11px] mb-1">Tap Install</strong>
+                          <p className="text-[10px] text-slate-400">Complete installation and launch "TableTap Waiter" app.</p>
+                        </div>
+                        <div className="p-3 rounded-2xl bg-slate-800/60 border border-slate-700/60">
+                          <span className="w-5 h-5 rounded-full bg-orange-500/20 text-orange-400 font-bold text-[10px] flex items-center justify-center mb-1.5">5</span>
+                          <strong className="block text-white text-[11px] mb-1">Sign In</strong>
+                          <p className="text-[10px] text-slate-400">Log in using Waiter ID & Password configured in the roster below.</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -2312,17 +2580,31 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                                   {showPw ? <EyeOff size={13} /> : <Eye size={13} />}
                                 </button>
                                 {emp.password && (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      navigator.clipboard.writeText(emp.password || '');
-                                      alert(`Copied password for ${emp.name}`);
-                                    }}
-                                    className="text-slate-400 hover:text-slate-700 cursor-pointer p-0.5"
-                                    title="Copy Password"
-                                  >
-                                    <Copy size={13} />
-                                  </button>
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        navigator.clipboard.writeText(emp.password || '');
+                                        alert(`Copied password for ${emp.name}`);
+                                      }}
+                                      className="text-slate-400 hover:text-slate-700 cursor-pointer p-0.5"
+                                      title="Copy Password"
+                                    >
+                                      <Copy size={13} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const shareText = `🍽️ TableTap Waiter App Credentials\n👤 Name: ${emp.name}\n🆔 Employee ID: ${emp.empid}\n🔑 Password: ${emp.password || 'Contact Admin'}\n📲 Download Waiter APK: ${apkDownloadFullUrl}`;
+                                        navigator.clipboard.writeText(shareText);
+                                        alert(`Copied credentials & APK link for ${emp.name} to clipboard! Ready to share via WhatsApp.`);
+                                      }}
+                                      className="text-slate-400 hover:text-emerald-600 cursor-pointer p-0.5"
+                                      title="Copy Credentials + APK Download Link to Share via WhatsApp"
+                                    >
+                                      <Share2 size={13} />
+                                    </button>
+                                  </>
                                 )}
                               </div>
                             </div>
