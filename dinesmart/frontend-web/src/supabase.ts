@@ -553,21 +553,31 @@ export const db = {
 
   // 6. STAFF
   getStaff: async (): Promise<any[]> => {
+    let localStaff = getMockData<any[]>('staff', []);
     if (isRealSupabase) {
-      const { data, error } = await supabaseClient
-        .from('staff')
-        .select('*')
-        .order('name');
-      if (!error && data) {
-        return data.map((emp: any) => ({
-          ...emp,
-          photo: emp.photo || emp.performance?.photo || '',
-          email: emp.email || emp.performance?.email || '',
-          assignedTables: emp.assignedTables || emp.performance?.assignedTables || []
-        }));
+      try {
+        const { data, error } = await Promise.race([
+          supabaseClient
+            .from('staff')
+            .select('*')
+            .order('name'),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000))
+        ]) as any;
+        if (!error && data && data.length > 0) {
+          const enriched = data.map((emp: any) => ({
+            ...emp,
+            photo: emp.photo || emp.performance?.photo || '',
+            email: emp.email || emp.performance?.email || '',
+            assignedTables: emp.assignedTables || emp.performance?.assignedTables || []
+          }));
+          saveMockData('staff', enriched);
+          return enriched;
+        }
+      } catch (err) {
+        console.warn('getStaff fallback to local storage:', err);
       }
     }
-    return getMockData<any[]>('staff', []);
+    return localStaff;
   },
 
   saveStaffMember: async (member: any): Promise<any> => {
@@ -591,34 +601,65 @@ export const db = {
       performance: perf
     };
 
+    // Instant local-first save
+    const currentStaff = getMockData<any[]>('staff', []);
+    const existingIdx = currentStaff.findIndex(s => s.id === member.id || s.empid === member.empid);
+    if (existingIdx !== -1) {
+      currentStaff[existingIdx] = { ...currentStaff[existingIdx], ...dbPayload, ...member, performance: perf };
+    } else {
+      currentStaff.push({ ...dbPayload, ...member, performance: perf });
+    }
+    saveMockData('staff', currentStaff);
+
+    // Sync to active waiter session in localStorage if matching
+    try {
+      const activeWaiterStr = localStorage.getItem('tabletap_waiter_staff');
+      if (activeWaiterStr) {
+        const activeWaiter = JSON.parse(activeWaiterStr);
+        if (activeWaiter.empid === member.empid || activeWaiter.empid === member.id || activeWaiter.id === member.id) {
+          const updatedActive = {
+            ...activeWaiter,
+            name: member.name,
+            empid: member.empid,
+            mobile: member.mobile || '',
+            role: member.role || 'Waiter',
+            assignedTables: member.assignedTables || [],
+            photo: member.photo || ''
+          };
+          localStorage.setItem('tabletap_waiter_staff', JSON.stringify(updatedActive));
+        }
+      }
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('staff_updated', { detail: member }));
+      }
+    } catch (e) {
+      /* ignore */
+    }
+
     if (isRealSupabase) {
-      const { data, error } = await supabaseClient
-        .from('staff')
-        .upsert(dbPayload)
-        .select()
-        .single();
-      if (!error && data) {
-        const enriched = {
-          ...data,
-          photo: data.photo || data.performance?.photo || member.photo || '',
-          email: data.email || data.performance?.email || member.email || '',
-          assignedTables: data.assignedTables || data.performance?.assignedTables || member.assignedTables || []
-        };
-        const staff = getMockData<any[]>('staff', []);
-        const idx = staff.findIndex(s => s.id === member.id);
-        if (idx !== -1) staff[idx] = enriched; else staff.push(enriched);
-        saveMockData('staff', staff);
-        return enriched;
+      try {
+        const { data, error } = await supabaseClient
+          .from('staff')
+          .upsert(dbPayload)
+          .select()
+          .single();
+        if (!error && data) {
+          const enriched = {
+            ...data,
+            photo: data.photo || data.performance?.photo || member.photo || '',
+            email: data.email || data.performance?.email || member.email || '',
+            assignedTables: data.assignedTables || data.performance?.assignedTables || member.assignedTables || []
+          };
+          const staff = getMockData<any[]>('staff', []);
+          const idx = staff.findIndex(s => s.id === member.id || s.empid === member.empid);
+          if (idx !== -1) staff[idx] = enriched; else staff.push(enriched);
+          saveMockData('staff', staff);
+          return enriched;
+        }
+      } catch (err) {
+        console.warn('Supabase upsert staff error:', err);
       }
     }
-    const staff = getMockData<any[]>('staff', []);
-    const idx = staff.findIndex(s => s.id === member.id);
-    if (idx !== -1) {
-      staff[idx] = member;
-    } else {
-      staff.push(member);
-    }
-    saveMockData('staff', staff);
     return member;
   },
 

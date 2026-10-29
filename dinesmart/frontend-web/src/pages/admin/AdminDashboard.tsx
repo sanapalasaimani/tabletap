@@ -170,7 +170,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
     return {
       version: 'v1.2.0',
       fileName: 'TableTap-WaiterApp.apk',
-      fileSize: '40.2 MB',
+      fileSize: '86.5 MB',
       downloadUrl: '/downloads/WaiterApp.apk',
       updatedAt: 'October 2026',
       customUploaded: false

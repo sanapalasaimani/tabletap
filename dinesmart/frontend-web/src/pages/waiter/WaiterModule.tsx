@@ -3,9 +3,9 @@ import { db } from '../../supabase';
 import { Order, WaiterRequest } from '../../types';
 import { 
   ArrowLeft, User, Lock, Eye, EyeOff, 
-  Fingerprint, CheckCircle, Wallet, Sparkles, AlertTriangle,
+  CheckCircle, Wallet, Sparkles, AlertTriangle,
   Clock, ShieldCheck, Upload, Edit3, X, Check,
-  Smartphone, Download
+  Smartphone, Download, LogOut
 } from 'lucide-react';
 import { formatPhotoUrl, getInitials, PRESET_AVATARS } from '../../utils/photoHelper';
 
@@ -15,8 +15,19 @@ export const ClocheIcon = ({ size = 20, className = '' }: { size?: number; class
   </svg>
 );
 
-type WaiterView = 'login' | 'biometric_lock' | 'tasks' | 'profile' | 'employee_details' | 'tip_earnings';
+type WaiterView = 'login' | 'tasks' | 'profile' | 'employee_details' | 'tip_earnings';
 type TaskTab = 'all' | 'pending' | 'accepted';
+
+export interface TipRecord {
+  id: string;
+  orderId: string;
+  tableId: string;
+  amount: number;
+  dateStr: string;
+  timeStr: string;
+  displayDate: string;
+  timestamp: number;
+}
 
 interface StaffProfile {
   empid: string;
@@ -35,21 +46,31 @@ export const WaiterModule: React.FC = () => {
 
   // Staff Credentials Form
   const [employeeId, setEmployeeId] = useState('');
-  
-
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [sessionExpiredNotice, setSessionExpiredNotice] = useState<string | null>(null);
 
-  // Active Waiter Profile
-  const [staffInfo, setStaffInfo] = useState<StaffProfile>({
-    empid: 'EMP001',
-    name: 'Staff Member',
-    mobile: '',
-    role: 'Waiter',
-    assignedTables: [],
-    initials: 'SM'
+  // Active Waiter Profile (loaded dynamically from authenticated session)
+  const [staffInfo, setStaffInfo] = useState<StaffProfile>(() => {
+    const saved = localStorage.getItem('tabletap_waiter_staff');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return {
+          ...parsed,
+          initials: getInitials(parsed.name)
+        };
+      } catch (e) { /* ignore */ }
+    }
+    return {
+      empid: '',
+      name: '',
+      mobile: '',
+      role: 'Waiter',
+      assignedTables: [],
+      initials: ''
+    };
   });
 
   // Tasks State
@@ -105,14 +126,13 @@ export const WaiterModule: React.FC = () => {
     }
   };
 
-  // Tips State
-  const [todayTips, setTodayTips] = useState<number>(() => {
-    const saved = localStorage.getItem('tabletap_waiter_today_tips');
-    return saved ? Number(saved) : 0;
-  });
-  const [monthTips, setMonthTips] = useState<number>(() => {
-    const saved = localStorage.getItem('tabletap_waiter_month_tips');
-    return saved ? Number(saved) : 0;
+  // Tip Records State
+  const [tipRecords, setTipRecords] = useState<TipRecord[]>(() => {
+    const saved = localStorage.getItem('tabletap_waiter_tip_records');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { /* ignore */ }
+    }
+    return [];
   });
 
   const lastActivityRef = useRef<number>(Date.now());
@@ -190,15 +210,52 @@ export const WaiterModule: React.FC = () => {
     localStorage.setItem('tabletap_waiter_accepted_tasks', JSON.stringify(acceptedTaskIds));
   }, [acceptedTaskIds]);
 
-  // Synchronize Orders and Service Requests from Supabase
+  // Synchronize Orders, Service Requests, and Staff Details
   const fetchTasks = async () => {
     try {
-      const [allOrders, allReqs] = await Promise.all([
+      const [allOrders, allReqs, staffList] = await Promise.all([
         db.getAllOrders(),
-        db.getWaiterRequests()
+        db.getWaiterRequests(),
+        db.getStaff()
       ]);
       setOrders(allOrders);
       setWaiterRequests(allReqs);
+
+      // Real-time synchronization of logged-in staff profile
+      if (staffInfo.empid) {
+        const currentStaff = staffList.find((s: any) => 
+          (s.empid && s.empid.trim().toUpperCase() === staffInfo.empid.trim().toUpperCase()) || 
+          (s.id && s.id === staffInfo.empid)
+        );
+
+        if (currentStaff) {
+          const freshName = currentStaff.name || staffInfo.name;
+          const freshEmpid = currentStaff.empid || currentStaff.id;
+          const freshMobile = currentStaff.mobile || '';
+          const freshPhoto = currentStaff.photo || '';
+          const freshTables = Array.isArray(currentStaff.assignedTables) ? currentStaff.assignedTables : [];
+
+          if (
+            freshName !== staffInfo.name ||
+            freshEmpid !== staffInfo.empid ||
+            freshPhoto !== staffInfo.photo ||
+            freshMobile !== staffInfo.mobile ||
+            JSON.stringify(freshTables) !== JSON.stringify(staffInfo.assignedTables)
+          ) {
+            const updatedProfile: StaffProfile = {
+              empid: freshEmpid,
+              name: freshName,
+              mobile: freshMobile,
+              role: currentStaff.role || 'Waiter',
+              assignedTables: freshTables,
+              initials: getInitials(freshName),
+              photo: freshPhoto
+            };
+            setStaffInfo(updatedProfile);
+            localStorage.setItem('tabletap_waiter_staff', JSON.stringify(updatedProfile));
+          }
+        }
+      }
     } catch (err) {
       console.warn('WaiterModule: sync error:', err);
     }
@@ -207,10 +264,79 @@ export const WaiterModule: React.FC = () => {
   useEffect(() => {
     fetchTasks();
     const interval = setInterval(fetchTasks, 3000);
-    return () => clearInterval(interval);
-  }, []);
 
-  // Handle Staff Login with Credentials given by Admin in Staff Scorecard
+    // Instant local event listener when admin updates staff in Waiter Management
+    const handleStaffUpdated = (e: any) => {
+      const updated = e?.detail;
+      if (!updated) return;
+      if (
+        (staffInfo.empid && (updated.empid === staffInfo.empid || updated.id === staffInfo.empid)) ||
+        (staffInfo.name && updated.name === staffInfo.name)
+      ) {
+        const refreshed: StaffProfile = {
+          empid: updated.empid || updated.id,
+          name: updated.name,
+          mobile: updated.mobile || '',
+          role: updated.role || 'Waiter',
+          assignedTables: Array.isArray(updated.assignedTables) ? updated.assignedTables : [],
+          initials: getInitials(updated.name),
+          photo: updated.photo || ''
+        };
+        setStaffInfo(refreshed);
+        localStorage.setItem('tabletap_waiter_staff', JSON.stringify(refreshed));
+      }
+    };
+
+    window.addEventListener('staff_updated', handleStaffUpdated);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('staff_updated', handleStaffUpdated);
+    };
+  }, [staffInfo.empid, staffInfo.name]);
+
+  // Synchronize historical tips from delivered orders
+  useEffect(() => {
+    if (orders.length === 0) return;
+    const deliveredWithTip = orders.filter(o => 
+      o.status === 'Delivered' && 
+      o.tip && o.tip > 0 && 
+      isTableAssigned(o.tableId)
+    );
+
+    if (deliveredWithTip.length > 0) {
+      setTipRecords(prev => {
+        let updated = false;
+        const currentList = [...prev];
+
+        deliveredWithTip.forEach(o => {
+          if (!currentList.some(r => r.orderId === o.id)) {
+            const orderDate = o.createdAt ? new Date(o.createdAt) : new Date();
+            currentList.push({
+              id: `tip_${o.id}`,
+              orderId: o.id,
+              tableId: o.tableId,
+              amount: o.tip,
+              dateStr: orderDate.toISOString().split('T')[0],
+              timeStr: orderDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),
+              displayDate: orderDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+              timestamp: orderDate.getTime()
+            });
+            updated = true;
+          }
+        });
+
+        if (updated) {
+          currentList.sort((a, b) => b.timestamp - a.timestamp);
+          localStorage.setItem('tabletap_waiter_tip_records', JSON.stringify(currentList));
+          return currentList;
+        }
+        return prev;
+      });
+    }
+  }, [orders, staffInfo.assignedTables]);
+
+  // Handle Staff Login strictly verifying registered Waiter Management accounts
   const handleLogin = async () => {
     setAuthError(null);
     setSessionExpiredNotice(null);
@@ -226,88 +352,47 @@ export const WaiterModule: React.FC = () => {
     try {
       const staffList = await db.getStaff();
 
-      // Find staff in database matching empid (case-insensitive)
+      // Find staff in database matching empid or id
       const foundStaff = staffList.find((s: any) => 
-        (s.empid && s.empid.toUpperCase() === enteredId) || 
-        (s.id && s.id.toUpperCase() === enteredId)
+        (s.empid && s.empid.trim().toUpperCase() === enteredId) || 
+        (s.id && s.id.trim().toUpperCase() === enteredId)
       );
 
-      // Verify Password against Admin Scorecard Credentials
-      if (foundStaff) {
-        if (foundStaff.password !== enteredPassword) {
-          setAuthError('Invalid credentials. Password does not match the one configured in Admin Staff Scorecard.');
-          return;
-        }
-
-        if (foundStaff.role && foundStaff.role !== 'Waiter' && foundStaff.role !== 'Manager') {
-          setAuthError(`Access Denied: Role "${foundStaff.role}" cannot access the Waiter console.`);
-          return;
-        }
-
-        const profile: StaffProfile = {
-          empid: foundStaff.empid || foundStaff.id,
-          name: foundStaff.name,
-          mobile: foundStaff.mobile || '',
-          role: foundStaff.role || 'Waiter',
-          assignedTables: Array.isArray(foundStaff.assignedTables) ? foundStaff.assignedTables : [],
-          initials: (foundStaff.name.split(' ').map((n: string) => n[0]).join('')).substring(0, 3).toUpperCase(),
-          photo: foundStaff.photo
-        };
-
-        setStaffInfo(profile);
-        localStorage.setItem('tabletap_waiter_staff', JSON.stringify(profile));
-        localStorage.setItem('tabletap_waiter_logged_in', 'true');
-        recordActivity();
-        setActiveView('tasks');
+      // Strict Authentication: Must be configured in Waiter Management
+      if (!foundStaff) {
+        setAuthError('Access Denied: Staff ID not registered. Only employees added in Waiter Management can log in.');
         return;
       }
 
-      // Default fallback demo credentials if no database staff exists yet
-      if (enteredId === 'EMP001' && enteredPassword === 'password123') {
-        const demoProfile: StaffProfile = {
-          empid: 'EMP001',
-          name: 'Demo Waiter',
-          mobile: '+91 98765 43210',
-          role: 'Waiter',
-          assignedTables: [],
-          initials: 'DW'
-        };
-        setStaffInfo(demoProfile);
-        localStorage.setItem('tabletap_waiter_staff', JSON.stringify(demoProfile));
-        localStorage.setItem('tabletap_waiter_logged_in', 'true');
-        recordActivity();
-        setActiveView('tasks');
+      // Strict Password Verification against Admin Scorecard Credentials
+      if ((foundStaff.password || '').trim() !== enteredPassword) {
+        setAuthError('Invalid credentials. Password does not match the one configured in Admin Staff Scorecard.');
         return;
       }
 
-      setAuthError('Access Denied: Staff ID not registered. Admin must approve application in Staff Scorecard.');
+      if (foundStaff.role && foundStaff.role !== 'Waiter' && foundStaff.role !== 'Manager' && foundStaff.role !== 'Hotel Manager') {
+        setAuthError(`Access Denied: Staff role "${foundStaff.role}" cannot access the Waiter console.`);
+        return;
+      }
+
+      const profile: StaffProfile = {
+        empid: foundStaff.empid || foundStaff.id,
+        name: foundStaff.name,
+        mobile: foundStaff.mobile || '',
+        role: foundStaff.role || 'Waiter',
+        assignedTables: Array.isArray(foundStaff.assignedTables) ? foundStaff.assignedTables : [],
+        initials: getInitials(foundStaff.name),
+        photo: foundStaff.photo
+      };
+
+      setStaffInfo(profile);
+      localStorage.setItem('tabletap_waiter_staff', JSON.stringify(profile));
+      localStorage.setItem('tabletap_waiter_logged_in', 'true');
+      localStorage.setItem('tabletap_waiter_last_active', String(Date.now()));
+      recordActivity();
+      setActiveView('tasks');
     } catch (e: any) {
-      setAuthError(e?.message || 'Authentication error connecting to server.');
-    }
-  };
-
-  // Quick Android Fingerprint Unlock within active 30-min session
-  const handleFingerprintUnlock = async () => {
-    setAuthError(null);
-    try {
-      // If WebAuthn Biometric API is available on Android / browser
-      if (window.PublicKeyCredential && PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable) {
-        const isAvailable = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
-        if (isAvailable && navigator.credentials) {
-          // Attempt biometric authentication challenge
-          // If succeeds or in test simulation, restore session:
-        }
-      }
-
-      // Restore active session with fingerprint
-      recordActivity();
-      setActiveView('tasks');
-      setFeedbackMessage('Fingerprint verified successfully! Welcome back.');
-      setTimeout(() => setFeedbackMessage(null), 3000);
-    } catch (err) {
-      // Fallback
-      recordActivity();
-      setActiveView('tasks');
+      setAuthError(e?.message || 'Authentication error connecting to database.');
     }
   };
 
@@ -322,21 +407,34 @@ export const WaiterModule: React.FC = () => {
     await db.updateOrderStatus(order.id, 'Delivered');
     setAcceptedTaskIds(prev => prev.filter(id => id !== order.id));
 
+    // Record detailed tip history
     if (order.tip && order.tip > 0) {
-      setTodayTips(prev => {
-        const next = prev + order.tip;
-        localStorage.setItem('tabletap_waiter_today_tips', String(next));
-        return next;
-      });
-      setMonthTips(prev => {
-        const next = prev + order.tip;
-        localStorage.setItem('tabletap_waiter_month_tips', String(next));
+      const now = new Date();
+      const dateStr = now.toISOString().split('T')[0];
+      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+      const displayDate = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+      const newRecord: TipRecord = {
+        id: `tip_${order.id}_${Date.now()}`,
+        orderId: order.id,
+        tableId: order.tableId,
+        amount: order.tip,
+        dateStr,
+        timeStr,
+        displayDate,
+        timestamp: now.getTime()
+      };
+
+      setTipRecords(prev => {
+        if (prev.some(r => r.orderId === order.id)) return prev;
+        const next = [newRecord, ...prev];
+        localStorage.setItem('tabletap_waiter_tip_records', JSON.stringify(next));
         return next;
       });
     }
 
     setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: 'Delivered' } : o));
-    setFeedbackMessage(`Order #${order.id} delivered to Table ${order.tableId}`);
+    setFeedbackMessage(`Order #${order.id} delivered to Table ${order.tableId}${order.tip ? ` (Tip: +₹${order.tip})` : ''}`);
     setTimeout(() => setFeedbackMessage(null), 3000);
   };
 
@@ -414,6 +512,44 @@ export const WaiterModule: React.FC = () => {
   const displayedTasks = 
     activeTab === 'all' ? allTasksList :
     activeTab === 'pending' ? pendingTasks : acceptedTasks;
+
+  // Tip Calculations & Daily Grouping
+  const now = new Date();
+  const todayStr = now.toISOString().split('T')[0];
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+
+  // Cumulative Total Tips (All-Time)
+  const cumulativeTips = tipRecords.reduce((sum, r) => sum + r.amount, 0);
+
+  // Today's Tips
+  const todayTipsTotal = tipRecords
+    .filter(r => r.dateStr === todayStr)
+    .reduce((sum, r) => sum + r.amount, 0);
+
+  // This Month's Tips
+  const monthTipsTotal = tipRecords
+    .filter(r => {
+      const d = new Date(r.timestamp);
+      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    })
+    .reduce((sum, r) => sum + r.amount, 0);
+
+  // Group tips by date for detailed day-by-day view
+  const tipsByDay = tipRecords.reduce<Record<string, { displayDate: string; records: TipRecord[]; total: number }>>((acc, r) => {
+    if (!acc[r.dateStr]) {
+      acc[r.dateStr] = {
+        displayDate: r.displayDate,
+        records: [],
+        total: 0
+      };
+    }
+    acc[r.dateStr].records.push(r);
+    acc[r.dateStr].total += r.amount;
+    return acc;
+  }, {});
+
+  const sortedDays = Object.keys(tipsByDay).sort((a, b) => b.localeCompare(a));
 
   return (
     <div className="min-h-screen bg-[#FCFAF7] flex justify-center items-start text-slate-800 font-sans selection:bg-orange-500 selection:text-white">
@@ -530,7 +666,7 @@ export const WaiterModule: React.FC = () => {
               {/* Security Hint */}
               <p className="text-[11px] text-slate-400 font-medium text-center mt-5 flex items-center justify-center gap-1.5">
                 <ShieldCheck size={13} className="text-emerald-500" />
-                <span>30-minute inactivity session. Fingerprint unlock active inside session.</span>
+                <span>Auto-locks after 30 minutes of inactivity. Requires ID & Password to resume.</span>
               </p>
 
               {/* Native Waiter Android Terminal APK Download */}
@@ -558,56 +694,6 @@ export const WaiterModule: React.FC = () => {
         )}
 
         {/* ====================================================
-            VIEW 1.5: QUICK ANDROID FINGERPRINT LOCK (IN-SESSION)
-            ==================================================== */}
-        {activeView === 'biometric_lock' && (
-          <div className="flex-1 p-6 flex flex-col justify-between items-center text-center animate-fade-in py-12">
-            <div>
-              <div className="w-16 h-16 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center mx-auto mb-4 border border-amber-500/20">
-                <Fingerprint size={36} className="animate-pulse" />
-              </div>
-              <h2 className="text-xl font-black text-slate-900">Fingerprint Verification</h2>
-              <p className="text-xs text-slate-500 mt-2 max-w-xs leading-relaxed">
-                Welcome back, <strong className="text-slate-800">{staffInfo.name}</strong>. Scan your Android fingerprint sensor to unlock this session.
-              </p>
-              <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 rounded-full text-[11px] font-bold text-amber-700">
-                <Clock size={12} />
-                <span>Session active: {remainingMinutes}m remaining</span>
-              </div>
-            </div>
-
-            {/* Fingerprint Touch Button */}
-            <div className="my-8">
-              <button
-                type="button"
-                onClick={handleFingerprintUnlock}
-                className="w-28 h-28 rounded-full bg-gradient-to-tr from-orange-500 to-amber-500 text-white flex flex-col items-center justify-center shadow-xl shadow-orange-500/30 hover:scale-105 active:scale-95 transition-all cursor-pointer mx-auto"
-              >
-                <Fingerprint size={48} />
-                <span className="text-[9px] font-black uppercase mt-1 tracking-wider">Touch Sensor</span>
-              </button>
-            </div>
-
-            <div className="w-full space-y-2">
-              <button
-                type="button"
-                onClick={handleFingerprintUnlock}
-                className="w-full py-3 rounded-2xl bg-slate-900 text-white font-bold text-xs hover:bg-slate-800 transition-all cursor-pointer"
-              >
-                Verify Fingerprint
-              </button>
-              <button
-                type="button"
-                onClick={() => handleLogout()}
-                className="text-xs text-red-500 font-bold hover:underline cursor-pointer"
-              >
-                Sign In with Different ID
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ====================================================
             VIEW 2: ACTIVE TASKS (SERVICE BOARD WITH ROUTING)
             ==================================================== */}
         {activeView === 'tasks' && (
@@ -615,23 +701,28 @@ export const WaiterModule: React.FC = () => {
             {/* Top Navigation Bar */}
             <div className="flex justify-between items-center pt-2">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-2xl bg-[#FF6B00] text-white flex items-center justify-center shadow-md shadow-orange-500/20">
+                <div className="w-9 h-9 rounded-2xl bg-[#FF6B00] text-white flex items-center justify-center shadow-md shadow-orange-500/20 shrink-0">
                   <ClocheIcon size={18} />
                 </div>
                 <div>
-                  <h2 className="text-sm font-black text-slate-900 leading-none">TableTap</h2>
-                  <span className="text-[10px] font-semibold text-slate-400">Waiter Terminal • Active Tasks</span>
+                  <h2 className="text-sm font-black text-slate-900 leading-tight">
+                    {staffInfo.name ? staffInfo.name : 'Waiter Terminal'}
+                  </h2>
+                  <span className="text-[10px] font-semibold text-slate-400 font-mono block mt-0.5">
+                    {staffInfo.empid ? `ID: ${staffInfo.empid} • ${staffInfo.role}` : 'Floor Staff'}
+                  </span>
                 </div>
               </div>
 
               <div className="flex items-center gap-2">
-                {/* Biometric Quick Lock button */}
+                {/* Logout Button */}
                 <button
-                  onClick={() => setActiveView('biometric_lock')}
-                  title="Lock with Android Fingerprint"
-                  className="p-2 rounded-xl bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors cursor-pointer"
+                  onClick={() => handleLogout()}
+                  title="Logout"
+                  className="px-3 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5"
                 >
-                  <Fingerprint size={16} />
+                  <LogOut size={13} />
+                  <span>Logout</span>
                 </button>
 
                 {/* Profile Circle */}
@@ -648,7 +739,7 @@ export const WaiterModule: React.FC = () => {
                       onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
                     />
                   ) : (
-                    staffInfo.initials || getInitials(staffInfo.name)
+                    getInitials(staffInfo.name)
                   )}
                 </button>
               </div>
@@ -811,7 +902,7 @@ export const WaiterModule: React.FC = () => {
                       onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
                     />
                   ) : (
-                    staffInfo.initials || getInitials(staffInfo.name)
+                    getInitials(staffInfo.name)
                   )}
                 </div>
                 <h2 className="text-lg font-black text-slate-900 mt-3">{staffInfo.name}</h2>
@@ -972,76 +1063,180 @@ export const WaiterModule: React.FC = () => {
               {/* Quick Options */}
               <div className="mt-4 space-y-2">
                 <button
-                  onClick={() => setActiveView('biometric_lock')}
-                  className="w-full bg-white p-4 rounded-2xl border border-orange-100 text-left flex items-center justify-between text-xs font-bold text-slate-800 hover:border-orange-500 transition-all cursor-pointer"
-                >
-                  <div className="flex items-center gap-3">
-                    <Fingerprint size={18} className="text-amber-500" />
-                    <span>Android Fingerprint Lock</span>
-                  </div>
-                  <span className="text-slate-400 text-[10px]">Lock Screen</span>
-                </button>
-
-                <button
                   onClick={() => setActiveView('tip_earnings')}
-                  className="w-full bg-white p-4 rounded-2xl border border-orange-100 text-left flex items-center justify-between text-xs font-bold text-slate-800 hover:border-orange-500 transition-all cursor-pointer"
+                  className="w-full bg-white p-4 rounded-2xl border border-orange-100 text-left flex items-center justify-between text-xs font-bold text-slate-800 hover:border-orange-500 transition-all cursor-pointer shadow-xs"
                 >
                   <div className="flex items-center gap-3">
                     <Wallet size={18} className="text-emerald-500" />
-                    <span>Tip Earnings</span>
+                    <div>
+                      <span className="block text-slate-900 font-bold">Tip Earnings & History</span>
+                      <span className="text-[10px] text-slate-400 font-normal">View cumulative & in-detail daily earnings</span>
+                    </div>
                   </div>
-                  <span className="text-emerald-600 font-black">₹{todayTips}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-emerald-600 font-black">₹{cumulativeTips}</span>
+                    <span className="text-[10px] text-orange-600 bg-orange-50 px-2 py-0.5 rounded-lg font-bold">View</span>
+                  </div>
                 </button>
               </div>
             </div>
 
             <button
               onClick={() => handleLogout()}
-              className="w-full py-3.5 rounded-2xl bg-red-50 text-red-600 font-bold text-xs hover:bg-red-100 transition-all cursor-pointer mt-6"
+              className="w-full py-3.5 rounded-2xl bg-red-50 text-red-600 font-bold text-xs hover:bg-red-100 transition-all cursor-pointer mt-6 flex items-center justify-center gap-2"
             >
-              Sign Out from Terminal
+              <LogOut size={15} />
+              <span>Logout</span>
             </button>
           </div>
         )}
 
         {/* ====================================================
-            VIEW 5: TIP EARNINGS
+            VIEW 5: TIP EARNINGS & IN-DETAIL DAY-BY-DAY BREAKDOWN
             ==================================================== */}
         {activeView === 'tip_earnings' && (
           <div className="flex-1 p-5 flex flex-col justify-between animate-fade-in">
             <div>
-              <div className="flex items-center gap-3 pt-2">
-                <button
-                  onClick={() => setActiveView('profile')}
-                  className="w-9 h-9 rounded-full bg-white border border-slate-200 text-slate-700 flex items-center justify-center shadow-sm hover:bg-slate-50 transition-all cursor-pointer"
-                >
-                  <ArrowLeft size={16} />
-                </button>
-                <h1 className="text-lg font-black text-slate-900">Tip Earnings</h1>
+              {/* Header */}
+              <div className="flex items-center justify-between pt-2">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setActiveView('profile')}
+                    className="w-9 h-9 rounded-full bg-white border border-slate-200 text-slate-700 flex items-center justify-center shadow-sm hover:bg-slate-50 transition-all cursor-pointer"
+                  >
+                    <ArrowLeft size={16} />
+                  </button>
+                  <div>
+                    <h1 className="text-lg font-black text-slate-900 leading-tight">Tip Earnings</h1>
+                    <p className="text-[10px] text-slate-400 font-bold">{staffInfo.name || 'Staff'} &bull; {staffInfo.empid}</p>
+                  </div>
+                </div>
+
+                <span className="text-[10px] px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-bold border border-emerald-200">
+                  {tipRecords.length} Tips Recorded
+                </span>
               </div>
 
-              <div className="mt-6 space-y-4">
-                <div className="bg-gradient-to-br from-emerald-500 to-teal-700 rounded-3xl p-6 text-white shadow-lg">
-                  <span className="text-emerald-100 text-xs font-bold uppercase tracking-wider block">Today's Total Tips</span>
-                  <h2 className="text-3xl font-black mt-2">₹{todayTips}</h2>
-                  <p className="text-[11px] text-emerald-100 mt-1">Directly credited to your staff account</p>
+              {/* Cumulative & Sub KPI Cards */}
+              <div className="mt-5 space-y-3">
+                {/* Cumulative All-Time Total Card */}
+                <div className="bg-gradient-to-br from-emerald-600 via-teal-700 to-emerald-800 rounded-3xl p-5 text-white shadow-lg relative overflow-hidden">
+                  <div className="absolute -right-6 -bottom-6 w-28 h-28 bg-white/10 rounded-full blur-xl pointer-events-none" />
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="text-emerald-100 text-[10px] font-black uppercase tracking-wider block">
+                        Cumulative Total Tips
+                      </span>
+                      <h2 className="text-3xl font-black mt-1">₹{cumulativeTips}</h2>
+                      <p className="text-[11px] text-emerald-100/90 mt-1">
+                        All-time cumulative tips credited to your account
+                      </p>
+                    </div>
+                    <div className="w-12 h-12 rounded-2xl bg-white/15 backdrop-blur-xs flex items-center justify-center text-white shrink-0">
+                      <Wallet size={24} />
+                    </div>
+                  </div>
                 </div>
 
-                <div className="bg-white rounded-3xl p-5 border border-orange-100 shadow-sm flex items-center justify-between">
-                  <div>
-                    <span className="text-slate-400 text-[10px] font-bold uppercase">This Month</span>
-                    <p className="text-lg font-black text-slate-900 mt-0.5">₹{monthTips}</p>
+                {/* Sub KPI Row: Today vs This Month */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-white rounded-2xl p-4 border border-orange-100 shadow-xs">
+                    <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider block">Today's Tips</span>
+                    <strong className="text-xl font-black text-emerald-600 mt-1 block">₹{todayTipsTotal}</strong>
+                    <span className="text-[10px] text-slate-400 mt-0.5 block">
+                      {tipRecords.filter(r => r.dateStr === todayStr).length} orders today
+                    </span>
                   </div>
-                  <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                    <Wallet size={20} />
+
+                  <div className="bg-white rounded-2xl p-4 border border-orange-100 shadow-xs">
+                    <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider block">This Month</span>
+                    <strong className="text-xl font-black text-slate-900 mt-1 block">₹{monthTipsTotal}</strong>
+                    <span className="text-[10px] text-slate-400 mt-0.5 block">
+                      {now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                    </span>
                   </div>
                 </div>
+              </div>
+
+              {/* In-Detail Day-by-Day Earnings List */}
+              <div className="mt-6">
+                <div className="flex justify-between items-center mb-3">
+                  <h3 className="text-xs font-black uppercase tracking-wider text-slate-500">
+                    Day-by-Day Tip History
+                  </h3>
+                  <span className="text-[10px] text-slate-400 font-bold">
+                    {sortedDays.length} {sortedDays.length === 1 ? 'Day' : 'Days'} with earnings
+                  </span>
+                </div>
+
+                {sortedDays.length === 0 ? (
+                  <div className="p-8 text-center bg-white rounded-2xl border border-dashed border-orange-200">
+                    <Wallet size={32} className="text-slate-300 mx-auto mb-2" />
+                    <h4 className="text-xs font-bold text-slate-700">No Tips Recorded Yet</h4>
+                    <p className="text-[11px] text-slate-400 mt-1 max-w-xs mx-auto">
+                      Tips added by customers during checkout will appear here in detail with date, order ID, and table number once served.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4 max-h-[44vh] overflow-y-auto pr-1 no-scrollbar">
+                    {sortedDays.map(dateKey => {
+                      const dayGroup = tipsByDay[dateKey];
+                      const isToday = dateKey === todayStr;
+
+                      return (
+                        <div key={dateKey} className="bg-white rounded-2xl border border-orange-100 shadow-xs overflow-hidden">
+                          {/* Day Header */}
+                          <div className="bg-slate-50/80 px-4 py-2.5 border-b border-slate-100 flex justify-between items-center">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-black text-slate-800">
+                                {isToday ? 'Today' : dayGroup.displayDate}
+                              </span>
+                              {isToday && (
+                                <span className="text-[9px] px-2 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-800">
+                                  Live
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-xs font-black text-emerald-600">
+                              Day Total: ₹{dayGroup.total}
+                            </span>
+                          </div>
+
+                          {/* List of tip orders on this day */}
+                          <div className="divide-y divide-slate-100">
+                            {dayGroup.records.map((rec) => (
+                              <div key={rec.id} className="p-3.5 flex items-center justify-between text-xs hover:bg-orange-50/30 transition-colors">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-[11px]">
+                                    ₹
+                                  </div>
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-bold text-slate-900">Order #{rec.orderId}</span>
+                                      <span className="px-2 py-0.5 rounded-md bg-orange-50 text-orange-700 font-bold text-[10px]">
+                                        Table #{rec.tableId}
+                                      </span>
+                                    </div>
+                                    <span className="text-[10px] text-slate-400 mt-0.5 block">{rec.timeStr}</span>
+                                  </div>
+                                </div>
+                                <span className="font-black text-sm text-emerald-600">
+                                  +₹{rec.amount}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
 
             <button
               onClick={() => setActiveView('profile')}
-              className="w-full py-3.5 rounded-2xl bg-slate-900 text-white font-bold text-xs hover:bg-slate-800 transition-all cursor-pointer"
+              className="w-full mt-4 py-3.5 rounded-2xl bg-slate-900 text-white font-bold text-xs hover:bg-slate-800 transition-all cursor-pointer shadow-sm"
             >
               Back to Profile
             </button>

@@ -95,9 +95,9 @@ export function getDriveThumbnailFallback(url: string): string | null {
  * Returns initials from a full name (e.g., "John Doe" => "JD", "Alex" => "AL")
  */
 export function getInitials(name?: string): string {
-  if (!name || typeof name !== 'string') return 'S';
+  if (!name || typeof name !== 'string') return 'W';
   const clean = name.trim().split(/\s+/).filter(Boolean);
-  if (clean.length === 0) return 'S';
+  if (clean.length === 0) return 'W';
   if (clean.length === 1) {
     return clean[0].substring(0, 2).toUpperCase();
   }
