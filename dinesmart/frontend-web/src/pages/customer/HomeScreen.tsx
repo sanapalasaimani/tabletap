@@ -19,7 +19,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectDish, onNavigate
     db.getMenuItems().then(setMenuItems);
   }, []);
 
-  const specialDish = menuItems.find(item => item.isSpecial) || menuItems[0] || MENU_ITEMS[0];
+  const specialDish = menuItems.find(item => item.isSpecial) || menuItems[0];
   const recommendedDishes = menuItems.filter(item => item.isSpecial || item.rating >= 4.8).slice(0, 5);
 
   // Determine greeting based on current time
@@ -70,33 +70,35 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectDish, onNavigate
         </div>
 
         {/* Today's Special Banner */}
-        <div 
-          onClick={() => onSelectDish(specialDish)}
-          className="relative bg-brand-text rounded-3xl overflow-hidden shadow-xl text-white cursor-pointer group transition-transform active:scale-[0.99] border border-black"
-        >
-          <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent z-10"></div>
-          <img 
-            src={specialDish.image} 
-            alt={specialDish.name} 
-            className="absolute right-0 top-0 h-full w-[60%] object-cover group-hover:scale-105 transition-transform duration-500"
-          />
-          <div className="relative p-5 z-20 w-[65%] flex flex-col justify-between min-h-[160px]">
-            <div>
-              <span className="inline-flex items-center gap-1 bg-primary text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full mb-3">
-                <Sparkles size={10} fill="#fff" />
-                Today's Special
-              </span>
-              <h3 className="text-lg font-bold leading-snug">{specialDish.name}</h3>
-              <div className="flex items-center gap-2 mt-1.5 text-xs text-gray-300">
-                <span className="flex items-center text-yellow-400">
-                  ★ <span className="ml-0.5 font-bold">{specialDish.rating}</span>
+        {specialDish && (
+          <div 
+            onClick={() => onSelectDish(specialDish)}
+            className="relative bg-brand-text rounded-3xl overflow-hidden shadow-xl text-white cursor-pointer group transition-transform active:scale-[0.99] border border-black"
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent z-10"></div>
+            <img 
+              src={specialDish.image} 
+              alt={specialDish.name} 
+              className="absolute right-0 top-0 h-full w-[60%] object-cover group-hover:scale-105 transition-transform duration-500"
+            />
+            <div className="relative p-5 z-20 w-[65%] flex flex-col justify-between min-h-[160px]">
+              <div>
+                <span className="inline-flex items-center gap-1 bg-primary text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full mb-3">
+                  <Sparkles size={10} fill="#fff" />
+                  Today's Special
                 </span>
-                <span>({specialDish.reviewsCount})</span>
+                <h3 className="text-lg font-bold leading-snug">{specialDish.name}</h3>
+                <div className="flex items-center gap-2 mt-1.5 text-xs text-gray-300">
+                  <span className="flex items-center text-yellow-400">
+                    ★ <span className="ml-0.5 font-bold">{specialDish.rating}</span>
+                  </span>
+                  <span>({specialDish.reviewsCount})</span>
+                </div>
               </div>
+              <p className="text-xl font-black text-primary mt-2">₹{specialDish.price}</p>
             </div>
-            <p className="text-xl font-black text-primary mt-2">₹{specialDish.price}</p>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Categories Grid */}
@@ -147,6 +149,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectDish, onNavigate
         <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
           {mlService.getBestForCurrentSession().dishes.map((mlDish) => {
             const matchedItem = menuItems.find(m => m.name.toLowerCase() === mlDish.name.toLowerCase()) || menuItems[0];
+            if (!matchedItem) return null;
             return (
               <div
                 key={mlDish.name}
@@ -190,55 +193,61 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectDish, onNavigate
       {/* Recommended for You */}
       <div className="px-5">
         <h3 className="font-bold text-brand-text text-base mb-3">Recommended for You</h3>
-        <div className="space-y-4">
-          {recommendedDishes.map((dish) => {
-            const isSoldOut = !dish.isUnlimited && dish.dailyLimit !== undefined && (dish.soldCount || 0) >= dish.dailyLimit;
-            return (
-              <div
-                key={dish.id}
-                onClick={() => onSelectDish(dish)}
-                className="flex bg-white rounded-2xl border border-gray-100/80 p-3 shadow-sm hover:shadow-md transition-all cursor-pointer items-center justify-between group active:scale-[0.99]"
-              >
-                <div className="flex items-center gap-3.5 flex-1">
-                  <div className="relative">
-                    <img 
-                      src={dish.image} 
-                      alt={dish.name} 
-                      className="w-16 h-16 rounded-xl object-cover shadow-sm bg-gray-50"
-                    />
-                    {isSoldOut && (
-                      <div className="absolute inset-0 bg-black/60 rounded-xl flex items-center justify-center">
-                        <span className="text-[8px] text-white font-extrabold uppercase tracking-wider">Sold Out</span>
-                      </div>
-                    )}
+        {recommendedDishes.length === 0 ? (
+          <div className="p-8 text-center bg-white rounded-2xl border border-gray-100 text-gray-400 text-xs">
+            No dishes available in the menu currently.
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {recommendedDishes.map((dish) => {
+              const isSoldOut = !dish.isUnlimited && dish.dailyLimit !== undefined && (dish.soldCount || 0) >= dish.dailyLimit;
+              return (
+                <div
+                  key={dish.id}
+                  onClick={() => onSelectDish(dish)}
+                  className="flex bg-white rounded-2xl border border-gray-100/80 p-3 shadow-sm hover:shadow-md transition-all cursor-pointer items-center justify-between group active:scale-[0.99]"
+                >
+                  <div className="flex items-center gap-3.5 flex-1">
+                    <div className="relative">
+                      <img 
+                        src={dish.image} 
+                        alt={dish.name} 
+                        className="w-16 h-16 rounded-xl object-cover shadow-sm bg-gray-50"
+                      />
+                      {isSoldOut && (
+                        <div className="absolute inset-0 bg-black/60 rounded-xl flex items-center justify-center">
+                          <span className="text-[8px] text-white font-extrabold uppercase tracking-wider">Sold Out</span>
+                        </div>
+                      )}
+                    </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-bold text-brand-text text-sm truncate group-hover:text-primary transition-colors">
+                      {dish.name}
+                    </h4>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="flex items-center text-xs text-yellow-500 font-semibold">
+                        ★ {dish.rating}
+                      </span>
+                      <span className="text-[10px] text-gray-400">({dish.reviewsCount} orders)</span>
+                    </div>
+                    <p className="text-sm font-bold text-brand-text mt-1">₹{dish.price}</p>
                   </div>
-                <div className="flex-1 min-w-0">
-                  <h4 className="font-bold text-brand-text text-sm truncate group-hover:text-primary transition-colors">
-                    {dish.name}
-                  </h4>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="flex items-center text-xs text-yellow-500 font-semibold">
-                      ★ {dish.rating}
-                    </span>
-                    <span className="text-[10px] text-gray-400">({dish.reviewsCount} orders)</span>
-                  </div>
-                  <p className="text-sm font-bold text-brand-text mt-1">₹{dish.price}</p>
                 </div>
+                
+                {/* Plus Button */}
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSelectDish(dish);
+                  }}
+                  className="w-9 h-9 rounded-xl bg-primary/10 hover:bg-primary text-primary hover:text-white flex items-center justify-center font-bold transition-all shadow-sm"
+                >
+                  +
+                </button>
               </div>
-              
-              {/* Plus Button */}
-              <button 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onSelectDish(dish);
-                }}
-                className="w-9 h-9 rounded-xl bg-primary/10 hover:bg-primary text-primary hover:text-white flex items-center justify-center font-bold transition-all shadow-sm"
-              >
-                +
-              </button>
-            </div>
-          );})}
-        </div>
+            );})}
+          </div>
+        )}
       </div>
     </div>
   );

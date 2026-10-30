@@ -111,33 +111,18 @@ export const db = {
           .order('id')
           .limit(1000);
 
-        if (!error && data && data.length > 0) {
+        if (!error && data) {
           items = data.map(mapSupabaseToMenuItem);
-
-          // If Supabase somehow has less than 40 dishes, automatically seed the 40 curated dishes
-          if (items.length < 40 && MENU_ITEMS.length >= 40) {
-            console.log(`DineSmart: Supabase returned ${items.length} items. Syncing full ${MENU_ITEMS.length} dishes...`);
-            const payload = MENU_ITEMS.map(mapMenuItemToSupabase);
-            await supabaseClient.from('menu_items').upsert(payload);
-            items = MENU_ITEMS;
-          }
           saveMockData('menu', items);
         } else {
-          items = getMockData<MenuItem[]>('menu', MENU_ITEMS);
-          if (items.length < 40) items = MENU_ITEMS;
-          saveMockData('menu', items);
+          items = getMockData<MenuItem[]>('menu', []);
         }
       } catch (err) {
         console.warn('DineSmart: Error retrieving menu from Supabase, fallback to cache:', err);
-        items = getMockData<MenuItem[]>('menu', MENU_ITEMS);
-        if (items.length < 40) items = MENU_ITEMS;
+        items = getMockData<MenuItem[]>('menu', []);
       }
     } else {
       items = getMockData<MenuItem[]>('menu', []);
-      if (items.length < 40) {
-        items = MENU_ITEMS;
-        saveMockData('menu', items);
-      }
     }
 
     // Merge availability configurations and calculate sold count dynamically
@@ -234,6 +219,22 @@ export const db = {
     const menu = getMockData<MenuItem[]>('menu', []);
     const updated = menu.filter(m => m.id !== id);
     saveMockData('menu', updated);
+    return true;
+  },
+
+  deleteAllMenuItems: async (): Promise<boolean> => {
+    if (isRealSupabase) {
+      try {
+        const { data } = await supabaseClient.from('menu_items').select('id');
+        if (data && data.length > 0) {
+          const ids = data.map((d: any) => d.id);
+          await supabaseClient.from('menu_items').delete().in('id', ids);
+        }
+      } catch (err) {
+        console.error('Error deleting all items from Supabase:', err);
+      }
+    }
+    saveMockData('menu', []);
     return true;
   },
 
