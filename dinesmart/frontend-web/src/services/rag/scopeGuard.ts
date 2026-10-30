@@ -13,8 +13,6 @@ const PROMPT_INJECTION_PATTERNS = [
   /disregard\s+(all\s+)?(instructions|system\s+policies)/i,
   /repeat\s+(everything|the\s+text)\s+above/i,
   /<script[\s\S]*?>/i,
-  /SELECT\s+.*\s+FROM\s+.*\s+WHERE/i,
-  /UNION\s+SELECT/i,
   /DROP\s+TABLE/i,
   /password\s*(hash|dump|extract)/i,
   /employee\s+password/i

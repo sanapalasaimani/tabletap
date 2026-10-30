@@ -95,6 +95,70 @@ export const FormattedBotMessage: React.FC<FormattedBotMessageProps> = ({ text }
       continue;
     }
 
+    // 0. Collapsible <details> block handling for Executed SQL & Provenance
+    if (trimmed.startsWith('<details>')) {
+      const detailsLines: string[] = [];
+      while (i < rawLines.length && !rawLines[i].includes('</details>')) {
+        detailsLines.push(rawLines[i]);
+        i++;
+      }
+      if (i < rawLines.length) {
+        detailsLines.push(rawLines[i]);
+        i++;
+      }
+      const fullDetails = detailsLines.join('\n');
+      const summaryMatch = fullDetails.match(/<summary>([\s\S]*?)<\/summary>/i);
+      const summaryText = summaryMatch 
+        ? summaryMatch[1].replace(/<[^>]+>/g, '').trim() 
+        : 'View Executed SQL & Provenance';
+      
+      const bodyContent = fullDetails
+        .replace(/<details>/i, '')
+        .replace(/<\/details>/i, '')
+        .replace(/<summary>[\s\S]*?<\/summary>/i, '')
+        .trim();
+
+      elements.push(
+        <details key={`details-${i}`} className="my-2 bg-slate-900 text-slate-200 border border-slate-800 rounded-lg p-2.5 text-[11px] font-mono group">
+          <summary className="cursor-pointer font-bold text-amber-400 hover:text-amber-300 select-none flex items-center gap-1.5">
+            <span>⚡</span>
+            <span>{summaryText}</span>
+          </summary>
+          <div className="mt-2 pt-2 border-t border-slate-800 text-slate-300 overflow-x-auto whitespace-pre-wrap leading-relaxed">
+            {bodyContent}
+          </div>
+        </details>
+      );
+      continue;
+    }
+
+    // 0b. Fenced Code Block handling (```sql ... ```)
+    if (trimmed.startsWith('```')) {
+      const codeLines: string[] = [];
+      const lang = trimmed.replace(/^```/, '').trim();
+      i++;
+      while (i < rawLines.length && !rawLines[i].trim().startsWith('```')) {
+        codeLines.push(rawLines[i]);
+        i++;
+      }
+      if (i < rawLines.length && rawLines[i].trim().startsWith('```')) {
+        i++;
+      }
+      elements.push(
+        <div key={`code-${i}`} className="my-2 rounded-lg bg-slate-900 border border-slate-800 overflow-hidden text-[11px] font-mono shadow-inner">
+          {lang && (
+            <div className="bg-slate-800/80 px-2.5 py-1 text-[10px] font-semibold text-slate-400 border-b border-slate-700/60 uppercase">
+              {lang}
+            </div>
+          )}
+          <pre className="p-2.5 text-amber-300 overflow-x-auto">
+            <code>{codeLines.join('\n')}</code>
+          </pre>
+        </div>
+      );
+      continue;
+    }
+
     // 1. Markdown Table Handling
     if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
       const tableRows: string[] = [];
