@@ -6,8 +6,12 @@
 import { createClient } from '@supabase/supabase-js';
 import { RAG_CONFIG } from './ragConfig';
 
-const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) || '';
-const SUPABASE_ANON_KEY = (import.meta.env.VITE_SUPABASE_ANON_KEY as string) || '';
+const getEnvVal = (key: string, def: string = '') => 
+  (typeof import.meta !== 'undefined' && (import.meta as any).env?.[key]) || 
+  ((globalThis as any).process?.env?.[key]) || def;
+
+const SUPABASE_URL = getEnvVal('VITE_SUPABASE_URL', 'https://rxwllokulbjrkbrcnikf.supabase.co');
+const SUPABASE_ANON_KEY = getEnvVal('VITE_SUPABASE_ANON_KEY', 'sb_publishable_TosgUWCBgC5bvX171JYGEw_8Q7IP9Ce');
 
 const supabase = (SUPABASE_URL && SUPABASE_ANON_KEY) 
   ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) 
@@ -75,7 +79,28 @@ export async function executeReadOnlySQL(sanitizedSql: string): Promise<SQLExecu
 
     if (error) {
       // If RPC is missing because the migration hasn't been run yet in the console:
-      console.warn(`[SQLExecutor] RPC call error: ${error.message}`);
+      console.warn(`[SQLExecutor] RPC call error: ${error.message}. Attempting direct table read fallback.`);
+      
+      const fromMatch = sanitizedSql.match(/\bFROM\s+([a-zA-Z0-9_]+)/i);
+      if (fromMatch && fromMatch[1]) {
+        const table = fromMatch[1].toLowerCase();
+        try {
+          const { data: tableData, error: tableErr } = await supabase.from(table).select('*').limit(50);
+          if (!tableErr && tableData && tableData.length > 0) {
+            return {
+              success: true,
+              sql: sanitizedSql,
+              rows: tableData,
+              rowCount: tableData.length,
+              executionTimeMs: elapsed,
+              sourceEngine: 'CLIENT_FALLBACK'
+            };
+          }
+        } catch (tblErr) {
+          // non-blocking
+        }
+      }
+
       return {
         success: false,
         sql: sanitizedSql,

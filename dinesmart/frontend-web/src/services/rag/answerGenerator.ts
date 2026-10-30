@@ -43,8 +43,10 @@ CRITICAL OPERATIONAL RULES:
 `.trim();
 }
 
+const getGroqKey = () => (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_GROQ_API_KEY) || ((globalThis as any).process?.env?.VITE_GROQ_API_KEY) || '';
+
 export async function generateGroundedAnswer(input: AnswerGenerationInput): Promise<GroundedAnswerResult> {
-  const apiKey = (import.meta.env.VITE_GROQ_API_KEY as string) || '';
+  const apiKey = getGroqKey();
   const isStrategic = Boolean(input.isStrategic);
   const temperature = isStrategic 
     ? RAG_CONFIG.temperatures.answerStrategy 
@@ -183,7 +185,7 @@ ${input.sql}
  * Generates an executive natural-language answer grounded strictly in retrieved SOPs and menu documentation.
  */
 export async function generateSemanticAnswer(userQuery: string, evidenceContext: string): Promise<string> {
-  const apiKey = (import.meta.env.VITE_GROQ_API_KEY as string) || '';
+  const apiKey = getGroqKey();
   if (!apiKey || apiKey === 'YOUR_KEY_HERE') {
     return evidenceContext;
   }

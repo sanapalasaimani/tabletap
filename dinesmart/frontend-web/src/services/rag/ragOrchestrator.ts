@@ -16,6 +16,7 @@ import { executeReadOnlySQL } from './sqlExecutor';
 import { generateGroundedAnswer, generateSemanticAnswer, formatRowsAsMarkdownTable } from './answerGenerator';
 import { verifyAnswerGrounding } from './verifier';
 import { RAG_CONFIG } from './ragConfig';
+import { operationsAnalytics, AnalyticalAnswer } from './operationsAnalytics';
 
 function generateRequestId(): string {
   return 'req_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now().toString(36);
@@ -34,6 +35,40 @@ export const ragOrchestrator = {
     // STEP 1: Intent Routing & Guardrails
     // =========================================================================
     const route = routeQuery(query);
+
+    // Case 0: Greeting
+    if (route.intent === 'GREETING') {
+      const totalLatency = Math.round(performance.now() - startTime);
+      return {
+        answer: `### DineSmart Operations Intelligence Terminal
+
+Hello! How can I assist you with TableTap hotel & restaurant operations today?
+
+You can ask me about:
+• **Financial & Revenue**: Today's revenue, this month's revenue, month-over-month growth, and average order value.
+• **Menu & Culinary**: Top 5 best-selling dishes, gross margins (Stars vs Dogs), category breakdown, and veg/non-veg split.
+• **Operations & Cost Control**: Food cost percentage vs target, weekend vs weekday surge, beverage attach rate, and order voids.
+• **Table Service & Floor**: Table reservation allocations, waiter scorecards, tip earnings, and kitchen prep SLA.`,
+        scope: 'IN_SCOPE',
+        citations: [],
+        decisionReadiness: 'DECISION_READY',
+        telemetry: {
+          requestId,
+          timestamp: new Date().toISOString(),
+          userQuery: query,
+          scope: 'IN_SCOPE',
+          retrievalHitCount: 0,
+          retrievalLatencyMs: 0,
+          inferenceLatencyMs: 0,
+          totalLatencyMs: totalLatency,
+          provider: 'GROUNDED_LOCAL_ENGINE',
+          modelUsed: 'GreetingHandler',
+          citationsCount: 0,
+          decisionReadiness: 'DECISION_READY',
+          securityFlags: []
+        }
+      };
+    }
 
     // Case 1A: Adversarial / Security Violation
     if (route.intent === 'UNSAFE') {
@@ -157,6 +192,52 @@ The system detected an adversarial request or unauthorized instruction override 
 
     const rewrittenQuery = resolvedContext.rewrittenQuery || query;
     const citations: Citation[] = [];
+
+    // Direct Operational Intelligence Match (Guarantees deterministic, unhallucinated answers)
+    const directOps = matchOperationsQuery(rewrittenQuery);
+    if (directOps) {
+      const totalLatency = Math.round(performance.now() - startTime);
+      const provenanceBlock = directOps.sqlUsed ? `\n\n<details>
+<summary><b>View Executed SQL & Provenance</b></summary>
+
+\`\`\`sql
+${directOps.sqlUsed}
+\`\`\`
+
+- **Execution Time**: ${directOps.provenance.executionTimeMs}ms
+- **Rows Verified**: ${directOps.provenance.recordCount.toLocaleString('en-IN')} records
+- **Data Source**: ${directOps.provenance.sourceId} (${directOps.provenance.sourceType})
+</details>` : '';
+
+      return {
+        answer: `${directOps.answer}${provenanceBlock}`,
+        scope: 'IN_SCOPE',
+        citations: [{
+          sourceId: directOps.provenance.sourceId,
+          sourceType: directOps.provenance.sourceType,
+          title: directOps.title,
+          verifiedClaim: directOps.title,
+          confidence: 0.99,
+          timestamp: new Date().toISOString()
+        }],
+        decisionReadiness: 'DECISION_READY',
+        telemetry: {
+          requestId,
+          timestamp: new Date().toISOString(),
+          userQuery: query,
+          scope: 'IN_SCOPE',
+          retrievalHitCount: 1,
+          retrievalLatencyMs: directOps.provenance.executionTimeMs,
+          inferenceLatencyMs: 0,
+          totalLatencyMs: totalLatency,
+          provider: 'GROUNDED_LOCAL_ENGINE',
+          modelUsed: 'OperationsAnalyticsEngine',
+          citationsCount: 1,
+          decisionReadiness: 'DECISION_READY',
+          securityFlags: []
+        }
+      };
+    }
 
     // =========================================================================
     // STEP 3: Branch A — Deterministic Text-to-SQL Pipeline
@@ -358,6 +439,50 @@ ${sqlResult.sanitizedSql}
   }
 };
 
+function matchOperationsQuery(q: string): AnalyticalAnswer | null {
+  const clean = q.toLowerCase().trim();
+  if (clean.includes('booking') || clean.includes('table reservation') || clean.includes('table allocation') || clean === 'today bookings' || (clean.includes('today') && clean.includes('booking'))) {
+    return operationsAnalytics.getTableBookingsStatus();
+  }
+  if ((clean.includes('this month') || clean.includes('october') || clean.includes('current month')) && clean.includes('revenue') && !clean.includes('last month') && !clean.includes('veg')) {
+    return operationsAnalytics.getTotalRevenue(true);
+  }
+  if (clean.includes('total revenue') || clean.includes('gross revenue') || (clean.includes('revenue') && !clean.includes('month') && !clean.includes('split') && !clean.includes('categor') && !clean.includes('last month'))) {
+    return operationsAnalytics.getTotalRevenue(false);
+  }
+  if (clean.includes('top 5') || clean.includes('best-selling') || clean.includes('best selling') || clean.includes('top dishes')) {
+    return operationsAnalytics.getTopSellingDishes();
+  }
+  if (clean.includes('margin') && (clean.includes('highest') || clean.includes('gross margin') || clean.includes('best margin'))) {
+    return operationsAnalytics.getMenuEngineering('MARGIN');
+  }
+  if (clean.includes('dog') || clean.includes('low-selling') || clean.includes('low selling') || clean.includes('low margin')) {
+    return operationsAnalytics.getMenuEngineering('DOGS');
+  }
+  if (clean.includes('food cost')) {
+    return operationsAnalytics.getFoodCostComparison();
+  }
+  if (clean.includes('weekend') && clean.includes('weekday')) {
+    return operationsAnalytics.getWeekendVsWeekday();
+  }
+  if (clean.includes('categor') && clean.includes('revenue')) {
+    return operationsAnalytics.getCategoryRevenueBreakdown();
+  }
+  if (clean.includes('beverage') || clean.includes('drink')) {
+    return operationsAnalytics.getBeverageAttachRate();
+  }
+  if (clean.includes('void') || clean.includes('cancel') || clean.includes('cancellation')) {
+    return operationsAnalytics.getCancellationsAndVoids();
+  }
+  if (clean.includes('last month') && (clean.includes('this month') || clean.includes('compare') || clean.includes('so far'))) {
+    return operationsAnalytics.getMonthOverMonthComparison();
+  }
+  if ((clean.includes('veg') || clean.includes('vegetarian')) && (clean.includes('split') || clean.includes('share') || clean.includes('revenue'))) {
+    return operationsAnalytics.getVegNonVegSplit();
+  }
+  return null;
+}
+
 /**
  * Fallback execution for known glossary questions if LLM key is offline
  */
@@ -368,6 +493,53 @@ async function handleGlossaryFallback(
   requestId: string
 ): Promise<RAGResponse> {
   const q = cleanQuery.toLowerCase();
+
+  // 1. Direct Operational Intelligence Match
+  const directOps = matchOperationsQuery(originalQuery || cleanQuery);
+  if (directOps) {
+    const totalLatency = Math.round(performance.now() - startTime);
+    const provenanceBlock = directOps.sqlUsed ? `\n\n<details>
+<summary><b>View Executed SQL & Provenance</b></summary>
+
+\`\`\`sql
+${directOps.sqlUsed}
+\`\`\`
+
+- **Execution Time**: ${directOps.provenance.executionTimeMs}ms
+- **Rows Verified**: ${directOps.provenance.recordCount.toLocaleString('en-IN')} records
+- **Data Source**: ${directOps.provenance.sourceId} (${directOps.provenance.sourceType})
+</details>` : '';
+
+    return {
+      answer: `${directOps.answer}${provenanceBlock}`,
+      scope: 'IN_SCOPE',
+      citations: [{
+        sourceId: directOps.provenance.sourceId,
+        sourceType: directOps.provenance.sourceType,
+        title: directOps.title,
+        verifiedClaim: directOps.title,
+        confidence: 0.99,
+        timestamp: new Date().toISOString()
+      }],
+      decisionReadiness: 'DECISION_READY',
+      telemetry: {
+        requestId,
+        timestamp: new Date().toISOString(),
+        userQuery: originalQuery,
+        scope: 'IN_SCOPE',
+        retrievalHitCount: 1,
+        retrievalLatencyMs: directOps.provenance.executionTimeMs,
+        inferenceLatencyMs: 0,
+        totalLatencyMs: totalLatency,
+        provider: 'GROUNDED_LOCAL_ENGINE',
+        modelUsed: 'OperationsAnalyticsEngine',
+        citationsCount: 1,
+        decisionReadiness: 'DECISION_READY',
+        securityFlags: []
+      }
+    };
+  }
+
   let matchedMetric = null;
 
   for (const metric of Object.values(BUSINESS_GLOSSARY)) {

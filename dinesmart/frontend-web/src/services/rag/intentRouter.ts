@@ -6,6 +6,7 @@
 import { RAG_CONFIG } from './ragConfig';
 
 export type RouterIntent = 
+  | 'GREETING'
   | 'TEXT_TO_SQL'
   | 'SEMANTIC_DOC'
   | 'HYBRID'
@@ -21,12 +22,22 @@ export interface RouteClassification {
   requiresHistoricalData?: boolean;
 }
 
-// Rooms-specific keywords for fast deterministic intercept
-const ROOM_METRIC_KEYWORDS = [
-  'occupancy', 'occupancy rate', 'adr', 'average daily rate', 'revpar',
-  'revenue per available room', 'room booking', 'room bookings', 'hotel rooms',
-  'check-in', 'check-out', 'length of stay', 'los', 'room night', 'room revenue',
-  'suite', 'deluxe room', 'bed nights'
+// Strict word-boundary patterns for Hotel Lodging (avoids false positives like 'lost' matching 'los')
+const ROOM_METRIC_PATTERNS = [
+  /\boccupancy\b/i,
+  /\boccupancy\s*rate\b/i,
+  /\brevpar\b/i,
+  /\baverage\s*daily\s*rate\b/i,
+  /\bhotel\s*rooms?\b/i,
+  /\broom\s*bookings?\b/i,
+  /\blength\s*of\s*stay\b/i,
+  /\balos\b/i,
+  /\broom\s*nights?\b/i,
+  /\broom\s*revenue\b/i,
+  /\bhotel\s*check-?in\b/i,
+  /\bhotel\s*check-?out\b/i,
+  /\bdeluxe\s*room\b/i,
+  /\bbed\s*nights\b/i
 ];
 
 // Factual / Numerical / Aggregation keywords for SQL routing
@@ -58,7 +69,16 @@ const STRATEGIC_KEYWORDS = [
 export function routeQuery(query: string): RouteClassification {
   const clean = query.toLowerCase().trim();
 
-  // 1. Security / Prompt Injection check
+  // 1. Greetings Intercept
+  if (/^(hi|hello|hey|hey there|greetings|good morning|good afternoon|good evening|help|sup)\b/i.test(clean)) {
+    return {
+      intent: 'GREETING',
+      confidence: 1.0,
+      reason: 'Standard conversational greeting.'
+    };
+  }
+
+  // 2. Security / Prompt Injection check
   if (
     clean.includes('ignore previous instructions') ||
     clean.includes('system prompt') ||
@@ -75,15 +95,19 @@ export function routeQuery(query: string): RouteClassification {
     };
   }
 
-  // 2. Hotel Rooms Check (Strictly blocked / Missing data boundary)
+  // 3. Hotel Lodging Rooms Check (Word-boundary matching, never false positives like 'lost')
+  // Note: 'table booking' or 'today bookings' in a restaurant context is Table Management, not lodging rooms.
   if (!RAG_CONFIG.features.roomsDataEnabled) {
-    for (const kw of ROOM_METRIC_KEYWORDS) {
-      if (clean.includes(kw)) {
-        return {
-          intent: 'ROOMS_UNAVAILABLE',
-          confidence: 0.99,
-          reason: `Query requests hotel room metric "${kw}" which is not connected to live tables.`
-        };
+    const isTableContext = clean.includes('table') || clean.includes('dining') || clean.includes('restaurant') || clean === 'today bookings';
+    if (!isTableContext) {
+      for (const pattern of ROOM_METRIC_PATTERNS) {
+        if (pattern.test(clean)) {
+          return {
+            intent: 'ROOMS_UNAVAILABLE',
+            confidence: 0.99,
+            reason: `Query requests hotel room lodging metric matching ${pattern} which is not connected to live tables.`
+          };
+        }
       }
     }
   }

@@ -41,13 +41,28 @@ export interface RAGConfig {
   databaseAllowlist: Record<string, string[]>;
 }
 
+function getEnv(key: string, defaultValue: string = ''): string {
+  try {
+    if (typeof import.meta !== 'undefined' && import.meta && (import.meta as any).env) {
+      return ((import.meta as any).env[key] as string) || defaultValue;
+    }
+    const proc = (globalThis as any).process;
+    if (proc && proc.env) {
+      return proc.env[key] || defaultValue;
+    }
+  } catch (e) {
+    // ignore
+  }
+  return defaultValue;
+}
+
 // Active Groq flagship & fast inference models (Verified 2026)
 export const RAG_CONFIG: RAGConfig = {
   models: {
-    sql: (import.meta.env.VITE_LLM_MODEL_SQL as string) || (import.meta.env.VITE_GROQ_MODEL as string) || 'openai/gpt-oss-120b',
-    answer: (import.meta.env.VITE_LLM_MODEL_ANSWER as string) || (import.meta.env.VITE_GROQ_MODEL as string) || 'openai/gpt-oss-120b',
-    router: (import.meta.env.VITE_LLM_MODEL_ROUTER as string) || 'openai/gpt-oss-20b',
-    verifier: (import.meta.env.VITE_LLM_MODEL_VERIFIER as string) || 'openai/gpt-oss-20b',
+    sql: getEnv('VITE_LLM_MODEL_SQL') || getEnv('VITE_GROQ_MODEL') || 'openai/gpt-oss-120b',
+    answer: getEnv('VITE_LLM_MODEL_ANSWER') || getEnv('VITE_GROQ_MODEL') || 'openai/gpt-oss-120b',
+    router: getEnv('VITE_LLM_MODEL_ROUTER') || 'openai/gpt-oss-20b',
+    verifier: getEnv('VITE_LLM_MODEL_VERIFIER') || 'openai/gpt-oss-20b',
   },
   temperatures: {
     sql: 0.0,             // Zero temperature for deterministic SQL generation

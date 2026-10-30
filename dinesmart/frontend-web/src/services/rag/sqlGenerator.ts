@@ -8,7 +8,7 @@ import { pruneSchemaForQuery, formatSchemaForPrompt } from './schemaIntrospector
 import { validateAndSanitizeSQL } from './sqlValidator';
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const GROQ_API_KEY = (import.meta.env.VITE_GROQ_API_KEY as string) || '';
+const getGroqApiKey = () => (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_GROQ_API_KEY) || ((globalThis as any).process?.env?.VITE_GROQ_API_KEY) || '';
 
 /**
  * 6 High-Quality Few-Shot Examples ground the LLM in real table schemas and JSONB syntax
@@ -99,7 +99,7 @@ export interface SQLGenerationResult {
  * Invokes Groq Chat Completion API for Text-to-SQL
  */
 async function callGroqChat(messages: Array<{ role: string; content: string }>, model: string, temperature: number): Promise<string> {
-  const apiKey = (import.meta.env.VITE_GROQ_API_KEY as string) || '';
+  const apiKey = getGroqApiKey();
   if (!apiKey) {
     throw new Error('VITE_GROQ_API_KEY is not configured.');
   }
