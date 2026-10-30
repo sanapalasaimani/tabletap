@@ -23,7 +23,7 @@ import {
 import BhakasuraChatBot from './BhakasuraChatBot';
 import { generateComprehensivePDF, generateComprehensiveExcel } from '../../utils/reportGenerator';
 import { mlService } from '../../services/mlService';
-import { formatPhotoUrl, getInitials, PRESET_AVATARS, getDriveThumbnailFallback } from '../../utils/photoHelper';
+import { formatPhotoUrl, getInitials, compressImageFile, getDriveThumbnailFallback } from '../../utils/photoHelper';
 
 interface AdminDashboardProps {
   role: string;
@@ -169,9 +169,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
     }
     return {
       version: 'v1.2.0',
-      fileName: 'TableTap-WaiterApp.apk',
+      fileName: 'TableTap_Waiter.apk',
       fileSize: '86.5 MB',
-      downloadUrl: '/downloads/WaiterApp.apk',
+      downloadUrl: '/downloads/TableTap_Waiter.apk',
       updatedAt: 'October 2026',
       customUploaded: false
     };
@@ -3506,14 +3506,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                           type="file"
                           accept="image/*"
                           className="hidden"
-                          onChange={(e) => {
+                          onChange={async (e) => {
                             const file = e.target.files?.[0];
                             if (file) {
-                              const reader = new FileReader();
-                              reader.onloadend = () => {
-                                setStaffFormState(prev => ({ ...prev, photo: reader.result as string }));
-                              };
-                              reader.readAsDataURL(file);
+                              const compressed = await compressImageFile(file, 360, 0.85);
+                              if (compressed) {
+                                setStaffFormState(prev => ({ ...prev, photo: compressed }));
+                              }
                             }
                           }}
                         />
@@ -3528,26 +3527,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                         </button>
                       )}
                     </div>
-                  </div>
-                </div>
-
-                {/* Presets */}
-                <div>
-                  <p className="text-[9px] text-slate-500 mb-1.5 font-bold">Or pick a quick professional avatar:</p>
-                  <div className="flex gap-2 overflow-x-auto pb-1">
-                    {PRESET_AVATARS.map((p, idx) => (
-                      <button
-                        type="button"
-                        key={idx}
-                        onClick={() => setStaffFormState({...staffFormState, photo: p.url})}
-                        title={p.name}
-                        className={`w-8 h-8 rounded-xl overflow-hidden border-2 transition-all shrink-0 cursor-pointer ${
-                          staffFormState.photo === p.url ? 'border-orange-500 ring-2 ring-orange-400' : 'border-white hover:border-orange-300'
-                        }`}
-                      >
-                        <img src={p.url} alt={p.name} className="w-full h-full object-cover" />
-                      </button>
-                    ))}
                   </div>
                 </div>
               </div>

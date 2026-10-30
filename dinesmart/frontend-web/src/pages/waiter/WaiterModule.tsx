@@ -7,7 +7,7 @@ import {
   Clock, ShieldCheck, Upload, Edit3, X, Check,
   Smartphone, Download, LogOut
 } from 'lucide-react';
-import { formatPhotoUrl, getInitials, PRESET_AVATARS } from '../../utils/photoHelper';
+import { formatPhotoUrl, getInitials, compressImageFile } from '../../utils/photoHelper';
 
 export const ClocheIcon = ({ size = 20, className = '' }: { size?: number; className?: string }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}>
@@ -48,8 +48,27 @@ export const WaiterModule: React.FC = () => {
   const [employeeId, setEmployeeId] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [activeKeypadTarget, setActiveKeypadTarget] = useState<'id' | 'password'>('id');
   const [authError, setAuthError] = useState<string | null>(null);
   const [sessionExpiredNotice, setSessionExpiredNotice] = useState<string | null>(null);
+
+  const handleKeypadPress = (val: string) => {
+    if (val === 'CLEAR') {
+      if (activeKeypadTarget === 'id') setEmployeeId('');
+      else setPassword('');
+      return;
+    }
+    if (val === 'BACK') {
+      if (activeKeypadTarget === 'id') setEmployeeId(prev => prev.slice(0, -1));
+      else setPassword(prev => prev.slice(0, -1));
+      return;
+    }
+    if (activeKeypadTarget === 'id') {
+      setEmployeeId(prev => prev + val);
+    } else {
+      setPassword(prev => prev + val);
+    }
+  };
 
   // Active Waiter Profile (loaded dynamically from authenticated session)
   const [staffInfo, setStaffInfo] = useState<StaffProfile>(() => {
@@ -106,7 +125,11 @@ export const WaiterModule: React.FC = () => {
 
       // Also persist to Supabase / Mock database if possible
       const allStaff = await db.getStaff();
-      const existing = allStaff.find((s: any) => s.empid === staffInfo.empid || s.name === staffInfo.name);
+      const existing = allStaff.find((s: any) => 
+        (s.empid && s.empid.trim().toUpperCase() === (staffInfo.empid || '').trim().toUpperCase()) || 
+        (s.id && s.id === staffInfo.empid) ||
+        s.name === staffInfo.name
+      );
       if (existing) {
         await db.saveStaffMember({
           ...existing,
@@ -116,7 +139,7 @@ export const WaiterModule: React.FC = () => {
       }
 
       setIsEditingProfile(false);
-      setFeedbackMessage('Profile updated successfully!');
+      setFeedbackMessage('Profile photo & details updated and synced successfully!');
       setTimeout(() => setFeedbackMessage(null), 3000);
     } catch (err) {
       console.error('Failed to save waiter profile:', err);
@@ -565,130 +588,159 @@ export const WaiterModule: React.FC = () => {
         )}
 
         {/* ====================================================
-            VIEW 1: WAITER AUTHENTICATION (LOGIN)
+            VIEW 1: WAITER AUTHENTICATION (OLD-STYLE POS TERMINAL)
             ==================================================== */}
         {activeView === 'login' && (
-          <div className="flex-1 p-6 flex flex-col justify-between animate-fade-in">
+          <div className="flex-1 p-5 flex flex-col justify-between bg-[#0F172A] text-slate-100 min-h-screen animate-fade-in font-sans">
             <div>
-              {/* Header */}
-              <div className="flex items-center gap-3 pt-4">
-                <div className="w-12 h-12 rounded-2xl bg-[#FF6B00] text-white flex items-center justify-center shadow-md shadow-orange-500/25">
-                  <ClocheIcon size={24} />
+              {/* POS Top Terminal Header */}
+              <div className="bg-[#1E293B] p-3.5 rounded-xl border border-slate-700/80 shadow-md flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-[#FF6B00] text-white flex items-center justify-center font-bold shadow-sm">
+                    <ClocheIcon size={18} />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-mono uppercase tracking-widest text-orange-400 font-bold block">
+                      TableTap_Waiter
+                    </span>
+                    <h2 className="text-xs font-black text-white tracking-wider font-mono uppercase">
+                      POS TERMINAL #01
+                    </h2>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="text-lg font-black text-slate-900 leading-none">TableTap</h2>
-                  <span className="text-[11px] font-semibold text-slate-400">Waiter Terminal</span>
+
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-950/80 border border-emerald-500/40 text-[10px] text-emerald-400 font-mono font-bold">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>ONLINE</span>
                 </div>
               </div>
 
-              {/* Title */}
-              <div className="mt-8">
-                <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-                  <span>Staff Sign In</span>
-                  <span className="text-xl">🔒</span>
+              {/* Station Identity Title */}
+              <div className="mt-5 text-center">
+                <h1 className="text-xl font-black text-white tracking-tight uppercase font-mono">
+                  SERVER SIGN IN
                 </h1>
-                <p className="text-xs text-slate-500 font-medium mt-2 leading-relaxed">
-                  Enter the credentials issued in Admin Staff Scorecard.
+                <p className="text-[11px] text-slate-400 font-mono mt-1">
+                  ENTER SERVER ID &amp; PASSCODE
                 </p>
               </div>
 
               {/* Session Notice */}
               {sessionExpiredNotice && (
-                <div className="mt-4 p-3.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl text-xs font-bold flex items-center gap-2">
-                  <Clock size={16} className="text-amber-600 shrink-0" />
+                <div className="mt-3 p-3 bg-amber-950/60 border border-amber-600/50 text-amber-300 rounded-xl text-xs font-mono flex items-center gap-2">
+                  <Clock size={15} className="text-amber-400 shrink-0" />
                   <span>{sessionExpiredNotice}</span>
                 </div>
               )}
 
-              {/* Form Card */}
-              <div className="mt-6 bg-white rounded-3xl p-6 shadow-sm border border-orange-100/60">
-                {/* Employee ID */}
+              {/* Terminal Inputs Box */}
+              <div className="mt-4 bg-[#1E293B] rounded-2xl p-4 border border-slate-700/80 shadow-lg space-y-3">
+                {/* Server Employee ID */}
                 <div>
-                  <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-2">
-                    EMPLOYEE ID (EMPID)
-                  </label>
-                  <div className="flex items-center gap-3 bg-[#FFF9F5] border border-orange-100/70 rounded-2xl px-4 py-3.5 focus-within:border-orange-500 transition-all">
-                    <User size={18} className="text-[#FF6B00]" />
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="text-[10px] font-mono font-black uppercase tracking-wider text-slate-300">
+                      SERVER ID
+                    </label>
+                    <span className="text-[9px] font-mono text-slate-400">TOUCH TO TYPE</span>
+                  </div>
+                  <div 
+                    onClick={() => setActiveKeypadTarget('id')}
+                    className={`flex items-center gap-2.5 bg-[#0F172A] border rounded-xl px-3.5 py-2.5 transition-all cursor-text ${
+                      activeKeypadTarget === 'id' ? 'border-[#FF6B00] ring-1 ring-[#FF6B00]' : 'border-slate-700'
+                    }`}
+                  >
+                    <User size={16} className="text-[#FF6B00]" />
                     <input 
                       type="text"
                       value={employeeId}
+                      onFocus={() => setActiveKeypadTarget('id')}
                       onChange={(e) => setEmployeeId(e.target.value)}
-                      placeholder="e.g. EMP-1042 or EMP001"
-                      className="w-full bg-transparent text-sm font-bold text-slate-800 outline-none"
+                      placeholder="e.g. EMP101"
+                      className="w-full bg-transparent text-sm font-mono font-bold text-white outline-none tracking-wider uppercase placeholder:text-slate-600"
                     />
                   </div>
                 </div>
 
-                {/* Password */}
-                <div className="mt-4">
-                  <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-2">
-                    PASSWORD
-                  </label>
-                  <div className="flex items-center justify-between bg-[#FFF9F5] border border-orange-100/70 rounded-2xl px-4 py-3.5 focus-within:border-orange-500 transition-all">
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <Lock size={18} className="text-[#FF6B00]" />
+                {/* Password / Access Pin */}
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="text-[10px] font-mono font-black uppercase tracking-wider text-slate-300">
+                      ACCESS CODE / PIN
+                    </label>
+                    <span className="text-[9px] font-mono text-slate-400">TOUCH TO TYPE</span>
+                  </div>
+                  <div 
+                    onClick={() => setActiveKeypadTarget('password')}
+                    className={`flex items-center justify-between bg-[#0F172A] border rounded-xl px-3.5 py-2.5 transition-all cursor-text ${
+                      activeKeypadTarget === 'password' ? 'border-[#FF6B00] ring-1 ring-[#FF6B00]' : 'border-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                      <Lock size={16} className="text-[#FF6B00]" />
                       <input 
                         type={showPassword ? 'text' : 'password'}
                         value={password}
+                        onFocus={() => setActiveKeypadTarget('password')}
                         onChange={(e) => setPassword(e.target.value)}
                         placeholder="••••••••"
-                        className="w-full bg-transparent text-sm font-bold text-slate-800 outline-none"
+                        className="w-full bg-transparent text-sm font-mono font-bold text-white outline-none tracking-widest placeholder:text-slate-600"
                       />
                     </div>
                     <button 
                       type="button" 
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="text-slate-400 hover:text-slate-600 transition-colors p-1 cursor-pointer"
+                      onClick={(e) => { e.stopPropagation(); setShowPassword(!showPassword); }}
+                      className="text-slate-400 hover:text-slate-200 p-1 cursor-pointer"
                     >
-                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                     </button>
                   </div>
                 </div>
 
                 {/* Auth Error Banner */}
                 {authError && (
-                  <div className="mt-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs font-bold flex items-center gap-2">
-                    <AlertTriangle size={15} className="shrink-0" />
+                  <div className="p-2.5 rounded-xl bg-red-950/70 border border-red-500/50 text-red-300 text-xs font-mono flex items-center gap-2">
+                    <AlertTriangle size={15} className="shrink-0 text-red-400" />
                     <span>{authError}</span>
                   </div>
                 )}
 
-                {/* Continue Button */}
+                {/* Classic POS Tactile Keypad */}
+                <div className="pt-2 border-t border-slate-700/80">
+                  <div className="grid grid-cols-3 gap-2">
+                    {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'CLEAR', '0', 'BACK'].map((keyVal) => (
+                      <button
+                        type="button"
+                        key={keyVal}
+                        onClick={() => handleKeypadPress(keyVal)}
+                        className={`py-2.5 rounded-xl text-sm font-mono font-black transition-all active:scale-95 cursor-pointer shadow-sm border ${
+                          keyVal === 'CLEAR' 
+                            ? 'bg-rose-950/60 hover:bg-rose-900 border-rose-800 text-rose-300 text-xs' 
+                            : keyVal === 'BACK'
+                              ? 'bg-amber-950/60 hover:bg-amber-900 border-amber-800 text-amber-300 text-xs'
+                              : 'bg-slate-800 hover:bg-slate-700 border-slate-600 text-slate-100 hover:text-white'
+                        }`}
+                      >
+                        {keyVal === 'BACK' ? '⌫ BACK' : keyVal}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Submit Sign In Button */}
                 <button
                   type="button"
                   onClick={handleLogin}
-                  className="w-full mt-6 py-3.5 rounded-2xl bg-[#FF6B00] hover:bg-orange-600 active:scale-98 text-white font-bold text-sm shadow-lg shadow-orange-500/25 transition-all text-center cursor-pointer"
+                  className="w-full mt-2 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-98 text-white font-mono font-black text-sm tracking-wider shadow-lg transition-all text-center cursor-pointer border border-emerald-400 uppercase"
                 >
-                  Verify Credentials & Sign In
+                  [ ENTER / SIGN IN ]
                 </button>
               </div>
 
-              {/* Security Hint */}
-              <p className="text-[11px] text-slate-400 font-medium text-center mt-5 flex items-center justify-center gap-1.5">
-                <ShieldCheck size={13} className="text-emerald-500" />
-                <span>Auto-locks after 30 minutes of inactivity. Requires ID & Password to resume.</span>
+              {/* Inactivity Security Badge */}
+              <p className="text-[10px] text-slate-400 font-mono text-center mt-4 flex items-center justify-center gap-1.5">
+                <ShieldCheck size={12} className="text-emerald-400" />
+                <span>30-MIN INACTIVITY AUTO-LOCK ACTIVE</span>
               </p>
-
-              {/* Native Waiter Android Terminal APK Download */}
-              <div className="mt-5 p-4 rounded-2xl bg-orange-50/80 border border-orange-200/60 text-center shadow-xs">
-                <div className="flex items-center justify-center gap-2 mb-1.5">
-                  <Smartphone size={16} className="text-[#FF6B00]" />
-                  <span className="text-xs font-black text-slate-900">Waiter Android Terminal App</span>
-                </div>
-                <p className="text-[11px] text-slate-500 font-medium mb-3">
-                  Install on your Android device for instant notifications and faster order serving.
-                </p>
-                <a
-                  href="/downloads/WaiterApp.apk"
-                  download="TableTap-WaiterApp.apk"
-                  className="inline-flex items-center justify-center gap-2 w-full py-2.5 px-4 bg-[#FF6B00] hover:bg-orange-600 active:scale-98 text-white rounded-xl text-xs font-black shadow-xs transition-all cursor-pointer"
-                >
-                  <Download size={14} />
-                  <span>Download Waiter APK (v1.2)</span>
-                </a>
-              </div>
-
-
             </div>
           </div>
         )}
@@ -986,14 +1038,13 @@ export const WaiterModule: React.FC = () => {
                                 type="file"
                                 accept="image/*"
                                 className="hidden"
-                                onChange={(e) => {
+                                onChange={async (e) => {
                                   const file = e.target.files?.[0];
                                   if (file) {
-                                    const reader = new FileReader();
-                                    reader.onloadend = () => {
-                                      setEditProfileForm(prev => ({ ...prev, photo: reader.result as string }));
-                                    };
-                                    reader.readAsDataURL(file);
+                                    const compressed = await compressImageFile(file, 360, 0.85);
+                                    if (compressed) {
+                                      setEditProfileForm(prev => ({ ...prev, photo: compressed }));
+                                    }
                                   }
                                 }}
                               />
@@ -1007,23 +1058,6 @@ export const WaiterModule: React.FC = () => {
                                 Remove
                               </button>
                             )}
-                          </div>
-
-                          <div>
-                            <p className="text-[9px] text-gray-400 mb-1 font-bold">Or pick preset avatar:</p>
-                            <div className="flex gap-1.5 overflow-x-auto pb-1">
-                              {PRESET_AVATARS.map((p, idx) => (
-                                <button
-                                  type="button"
-                                  key={idx}
-                                  onClick={() => setEditProfileForm({...editProfileForm, photo: p.url})}
-                                  title={p.name}
-                                  className="w-7 h-7 rounded-lg overflow-hidden border border-gray-200 hover:border-orange-500 transition-all shrink-0 cursor-pointer"
-                                >
-                                  <img src={p.url} alt={p.name} className="w-full h-full object-cover" />
-                                </button>
-                              ))}
-                            </div>
                           </div>
                         </div>
                       </div>

@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.dinesmart.app',
-  appName: 'dinesmart',
+  appName: 'TableTap_Waiter',
   webDir: 'dist'
 };
 
