@@ -3,7 +3,7 @@ import { db } from '../../supabase';
 import { Order, WaiterRequest } from '../../types';
 import { 
   ArrowLeft, User, Lock, Eye, EyeOff, 
-  CheckCircle, Wallet, Sparkles, AlertTriangle,
+  CheckCircle, Wallet, Sparkles, AlertTriangle, AlertCircle,
   Clock, ShieldCheck, Upload, Edit3, X, Check,
   Smartphone, Download, LogOut
 } from 'lucide-react';
@@ -48,27 +48,8 @@ export const WaiterModule: React.FC = () => {
   const [employeeId, setEmployeeId] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [activeKeypadTarget, setActiveKeypadTarget] = useState<'id' | 'password'>('id');
   const [authError, setAuthError] = useState<string | null>(null);
   const [sessionExpiredNotice, setSessionExpiredNotice] = useState<string | null>(null);
-
-  const handleKeypadPress = (val: string) => {
-    if (val === 'CLEAR') {
-      if (activeKeypadTarget === 'id') setEmployeeId('');
-      else setPassword('');
-      return;
-    }
-    if (val === 'BACK') {
-      if (activeKeypadTarget === 'id') setEmployeeId(prev => prev.slice(0, -1));
-      else setPassword(prev => prev.slice(0, -1));
-      return;
-    }
-    if (activeKeypadTarget === 'id') {
-      setEmployeeId(prev => prev + val);
-    } else {
-      setPassword(prev => prev + val);
-    }
-  };
 
   // Active Waiter Profile (loaded dynamically from authenticated session)
   const [staffInfo, setStaffInfo] = useState<StaffProfile>(() => {
@@ -191,7 +172,7 @@ export const WaiterModule: React.FC = () => {
         const diff = Date.now() - lastActive;
 
         if (diff > INACTIVITY_TIMEOUT_MS) {
-          handleLogout('Session expired after 30 minutes of inactivity. Please enter credentials to log back in.');
+          handleLogout('Session timed out. Please log in.');
         } else {
           lastActivityRef.current = Date.now();
           setActiveView('tasks');
@@ -218,7 +199,7 @@ export const WaiterModule: React.FC = () => {
       setRemainingMinutes(left);
 
       if (diff >= INACTIVITY_TIMEOUT_MS) {
-        handleLogout('Session expired after 30 minutes of inactivity. Please sign in with Employee ID & Password.');
+        handleLogout('Session timed out. Please log in.');
       }
     }, 5000);
 
@@ -368,7 +349,7 @@ export const WaiterModule: React.FC = () => {
     const enteredPassword = password.trim();
 
     if (!enteredId || !enteredPassword) {
-      setAuthError('Please enter both Employee ID and Password issued by Admin.');
+      setAuthError('Invalid Waiter ID or password. Please try again.');
       return;
     }
 
@@ -381,20 +362,20 @@ export const WaiterModule: React.FC = () => {
         (s.id && s.id.trim().toUpperCase() === enteredId)
       );
 
-      // Strict Authentication: Must be configured in Waiter Management
+      // Security requirement: Never specify whether ID or password was wrong to prevent enumeration attacks
       if (!foundStaff) {
-        setAuthError('Access Denied: Staff ID not registered. Only employees added in Waiter Management can log in.');
+        setAuthError('Invalid Waiter ID or password. Please try again.');
         return;
       }
 
-      // Strict Password Verification against Admin Scorecard Credentials
+      // Strict Password Verification
       if ((foundStaff.password || '').trim() !== enteredPassword) {
-        setAuthError('Invalid credentials. Password does not match the one configured in Admin Staff Scorecard.');
+        setAuthError('Invalid Waiter ID or password. Please try again.');
         return;
       }
 
       if (foundStaff.role && foundStaff.role !== 'Waiter' && foundStaff.role !== 'Manager' && foundStaff.role !== 'Hotel Manager') {
-        setAuthError(`Access Denied: Staff role "${foundStaff.role}" cannot access the Waiter console.`);
+        setAuthError('Invalid Waiter ID or password. Please try again.');
         return;
       }
 
@@ -575,9 +556,9 @@ export const WaiterModule: React.FC = () => {
   const sortedDays = Object.keys(tipsByDay).sort((a, b) => b.localeCompare(a));
 
   return (
-    <div className="min-h-screen bg-[#FCFAF7] flex justify-center items-start text-slate-800 font-sans selection:bg-orange-500 selection:text-white">
+    <div className={`min-h-screen flex justify-center items-start text-slate-800 font-sans selection:bg-orange-500 selection:text-white ${activeView === 'login' ? 'bg-[#FFF6EF]' : 'bg-[#FCFAF7]'}`}>
       {/* Mobile Frame Container */}
-      <div className="w-full max-w-md min-h-screen bg-[#FCFAF7] flex flex-col relative shadow-2xl border-x border-orange-100/60 pb-8">
+      <div className={`w-full max-w-md min-h-screen flex flex-col relative shadow-2xl border-x border-orange-100/60 overflow-hidden ${activeView === 'login' ? 'bg-[#FFF6EF] pb-0' : 'bg-[#FCFAF7] pb-8'}`}>
 
         {/* Feedback Toast */}
         {feedbackMessage && (
@@ -588,159 +569,161 @@ export const WaiterModule: React.FC = () => {
         )}
 
         {/* ====================================================
-            VIEW 1: WAITER AUTHENTICATION (OLD-STYLE POS TERMINAL)
+            VIEW 1: WAITER AUTHENTICATION (EXACT MOCKUP)
             ==================================================== */}
         {activeView === 'login' && (
-          <div className="flex-1 p-5 flex flex-col justify-between bg-[#0F172A] text-slate-100 min-h-screen animate-fade-in font-sans">
-            <div>
-              {/* POS Top Terminal Header */}
-              <div className="bg-[#1E293B] p-3.5 rounded-xl border border-slate-700/80 shadow-md flex items-center justify-between">
+          <div className="flex-1 px-8 pt-10 pb-6 flex flex-col justify-between relative bg-[#FFF6EF] min-h-screen animate-fade-in font-sans select-none overflow-hidden">
+            {/* Background Decorative Watermarks */}
+            <div className="absolute -top-8 -right-8 w-44 h-44 rounded-bl-full bg-[#FFE7D4]/60 pointer-events-none" />
+            
+            {/* Top-left dot matrix */}
+            <div className="absolute top-28 left-4 grid grid-cols-6 gap-2.5 opacity-35 pointer-events-none">
+              {Array.from({ length: 36 }).map((_, i) => (
+                <span key={i} className="w-1.5 h-1.5 rounded-full bg-[#E5A882]" />
+              ))}
+            </div>
+
+            {/* Bottom-left dotted circle & crosses */}
+            <div className="absolute bottom-16 left-3 opacity-30 pointer-events-none">
+              <svg width="65" height="65" viewBox="0 0 65 65" fill="none">
+                <circle cx="28" cy="38" r="22" stroke="#E5A882" strokeWidth="1.5" strokeDasharray="3 3" />
+                <path d="M16 38 H40 M28 26 V50" stroke="#E5A882" strokeWidth="1.5" />
+                <path d="M46 12 H54 M50 8 V16" stroke="#E5A882" strokeWidth="1.5" />
+              </svg>
+            </div>
+
+            {/* Bottom-right corner blob & wavy lines */}
+            <div className="absolute -bottom-10 -right-10 w-52 h-52 rounded-tl-full bg-[#FFE7D4]/60 pointer-events-none" />
+            <div className="absolute bottom-20 right-4 opacity-35 pointer-events-none">
+              <svg width="75" height="36" viewBox="0 0 75 36" fill="none">
+                <path d="M0 8 Q10 0 20 8 T40 8 T60 8 T80 8" stroke="#E5A882" strokeWidth="1.8" fill="none" />
+                <path d="M0 18 Q10 10 20 18 T40 18 T60 18 T80 18" stroke="#E5A882" strokeWidth="1.8" fill="none" />
+                <path d="M0 28 Q10 20 20 28 T40 28 T60 28 T80 28" stroke="#E5A882" strokeWidth="1.8" fill="none" />
+              </svg>
+            </div>
+
+            {/* Content Container */}
+            <div className="relative z-10 flex flex-col flex-1">
+              {/* Brand Logo & Header */}
+              <div className="flex flex-col items-center pt-2">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-[#FF6B00] text-white flex items-center justify-center font-bold shadow-sm">
-                    <ClocheIcon size={18} />
-                  </div>
-                  <div>
-                    <span className="text-[10px] font-mono uppercase tracking-widest text-orange-400 font-bold block">
-                      TableTap_Waiter
-                    </span>
-                    <h2 className="text-xs font-black text-white tracking-wider font-mono uppercase">
-                      POS TERMINAL #01
-                    </h2>
+                  {/* TableTap Serving Cloche with Tapping Finger */}
+                  <svg width="52" height="46" viewBox="0 0 100 85" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
+                    {/* Tray Base Bar */}
+                    <path d="M12 60 H88" stroke="#1E293B" strokeWidth="6" strokeLinecap="round" />
+                    {/* Cloche Dome */}
+                    <path d="M18 57 C20 33 38 21 50 21 C62 21 80 33 82 57 Z" fill="#FF5E00" />
+                    {/* Handle Ring Cutout */}
+                    <circle cx="50" cy="56" r="10" stroke="#FFF6EF" strokeWidth="5" fill="none" />
+                    {/* Hand with Pointing Finger tapping handle */}
+                    <path 
+                      d="M48 48 C46 48 45 50 45 52 V64 L41 68 C39 70 40 73 43 75 L48 78 C51 79 55 79 58 77 L62 74 C65 72 65 69 64 66 L62 58 C62 55 59 53 56 53 V52 C56 50 55 48 53 48 C51 48 50 48 48 48 Z" 
+                      fill="#FF5E00" 
+                    />
+                    <rect x="47" y="44" width="6" height="12" rx="3" fill="#FF5E00" stroke="#FFF6EF" strokeWidth="1.5" />
+                  </svg>
+                  {/* Brand Typography */}
+                  <div className="text-[34px] font-black tracking-tight leading-none font-sans">
+                    <span className="text-[#1E293B]">Table</span>
+                    <span className="text-[#FF5E00]">Tap</span>
                   </div>
                 </div>
-
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-950/80 border border-emerald-500/40 text-[10px] text-emerald-400 font-mono font-bold">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <span>ONLINE</span>
-                </div>
-              </div>
-
-              {/* Station Identity Title */}
-              <div className="mt-5 text-center">
-                <h1 className="text-xl font-black text-white tracking-tight uppercase font-mono">
-                  SERVER SIGN IN
-                </h1>
-                <p className="text-[11px] text-slate-400 font-mono mt-1">
-                  ENTER SERVER ID &amp; PASSCODE
+                <p className="text-[15px] font-semibold text-slate-800 mt-2 tracking-wide">
+                  Waiter App
                 </p>
               </div>
 
-              {/* Session Notice */}
-              {sessionExpiredNotice && (
-                <div className="mt-3 p-3 bg-amber-950/60 border border-amber-600/50 text-amber-300 rounded-xl text-xs font-mono flex items-center gap-2">
-                  <Clock size={15} className="text-amber-400 shrink-0" />
-                  <span>{sessionExpiredNotice}</span>
+              {/* Title Section */}
+              <div className="text-center mt-12 mb-6">
+                <h1 className="text-[28px] font-black text-[#1E293B] tracking-tight">
+                  Welcome back!
+                </h1>
+                <p className="text-[17px] text-slate-700 font-normal mt-1">
+                  Sign In
+                </p>
+              </div>
+
+              {/* Error or Session Timeout Banner */}
+              {(authError || sessionExpiredNotice) && (
+                <div className="mb-4 px-3.5 py-2.5 rounded-xl bg-[#FEEBED] border border-[#FCA5A5] text-[12.5px] text-[#B91C1C] flex items-center gap-2 shadow-xs animate-fade-in font-sans">
+                  <AlertCircle size={16} className="text-[#DC2626] shrink-0" />
+                  <span className="font-medium">
+                    {authError || sessionExpiredNotice}
+                  </span>
                 </div>
               )}
 
-              {/* Terminal Inputs Box */}
-              <div className="mt-4 bg-[#1E293B] rounded-2xl p-4 border border-slate-700/80 shadow-lg space-y-3">
-                {/* Server Employee ID */}
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="text-[10px] font-mono font-black uppercase tracking-wider text-slate-300">
-                      SERVER ID
-                    </label>
-                    <span className="text-[9px] font-mono text-slate-400">TOUCH TO TYPE</span>
-                  </div>
-                  <div 
-                    onClick={() => setActiveKeypadTarget('id')}
-                    className={`flex items-center gap-2.5 bg-[#0F172A] border rounded-xl px-3.5 py-2.5 transition-all cursor-text ${
-                      activeKeypadTarget === 'id' ? 'border-[#FF6B00] ring-1 ring-[#FF6B00]' : 'border-slate-700'
-                    }`}
+              {/* Credentials Form */}
+              <div className="space-y-4">
+                {/* Waiter ID Field */}
+                <div 
+                  className={`bg-white rounded-2xl h-14 px-4 flex items-center gap-3 border transition-all shadow-xs ${
+                    (authError || sessionExpiredNotice) 
+                      ? 'border-[#E57373]' 
+                      : 'border-[#F4A771]/70 focus-within:border-[#FF5E00] focus-within:ring-2 focus-within:ring-orange-200/50'
+                  }`}
+                >
+                  <User size={20} className="text-[#94A3B8] shrink-0" />
+                  <input
+                    type="text"
+                    placeholder="Waiter ID"
+                    value={employeeId}
+                    onChange={(e) => {
+                      setEmployeeId(e.target.value);
+                      if (authError) setAuthError(null);
+                      if (sessionExpiredNotice) setSessionExpiredNotice(null);
+                    }}
+                    onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+                    className="w-full bg-transparent text-[16px] text-slate-800 font-medium outline-none placeholder:text-[#94A3B8]"
+                  />
+                </div>
+
+                {/* Password Field */}
+                <div 
+                  className={`bg-white rounded-2xl h-14 px-4 flex items-center gap-3 border transition-all shadow-xs ${
+                    (authError || sessionExpiredNotice) 
+                      ? 'border-[#E57373]' 
+                      : 'border-[#F4A771]/70 focus-within:border-[#FF5E00] focus-within:ring-2 focus-within:ring-orange-200/50'
+                  }`}
+                >
+                  <Lock size={20} className="text-[#94A3B8] shrink-0" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Password"
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      if (authError) setAuthError(null);
+                      if (sessionExpiredNotice) setSessionExpiredNotice(null);
+                    }}
+                    onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+                    className="w-full bg-transparent text-[16px] text-slate-800 font-medium outline-none placeholder:text-[#94A3B8]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="text-[#94A3B8] hover:text-slate-600 p-1 cursor-pointer"
                   >
-                    <User size={16} className="text-[#FF6B00]" />
-                    <input 
-                      type="text"
-                      value={employeeId}
-                      onFocus={() => setActiveKeypadTarget('id')}
-                      onChange={(e) => setEmployeeId(e.target.value)}
-                      placeholder="e.g. EMP101"
-                      className="w-full bg-transparent text-sm font-mono font-bold text-white outline-none tracking-wider uppercase placeholder:text-slate-600"
-                    />
-                  </div>
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
                 </div>
 
-                {/* Password / Access Pin */}
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="text-[10px] font-mono font-black uppercase tracking-wider text-slate-300">
-                      ACCESS CODE / PIN
-                    </label>
-                    <span className="text-[9px] font-mono text-slate-400">TOUCH TO TYPE</span>
-                  </div>
-                  <div 
-                    onClick={() => setActiveKeypadTarget('password')}
-                    className={`flex items-center justify-between bg-[#0F172A] border rounded-xl px-3.5 py-2.5 transition-all cursor-text ${
-                      activeKeypadTarget === 'password' ? 'border-[#FF6B00] ring-1 ring-[#FF6B00]' : 'border-slate-700'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                      <Lock size={16} className="text-[#FF6B00]" />
-                      <input 
-                        type={showPassword ? 'text' : 'password'}
-                        value={password}
-                        onFocus={() => setActiveKeypadTarget('password')}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="••••••••"
-                        className="w-full bg-transparent text-sm font-mono font-bold text-white outline-none tracking-widest placeholder:text-slate-600"
-                      />
-                    </div>
-                    <button 
-                      type="button" 
-                      onClick={(e) => { e.stopPropagation(); setShowPassword(!showPassword); }}
-                      className="text-slate-400 hover:text-slate-200 p-1 cursor-pointer"
-                    >
-                      {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Auth Error Banner */}
-                {authError && (
-                  <div className="p-2.5 rounded-xl bg-red-950/70 border border-red-500/50 text-red-300 text-xs font-mono flex items-center gap-2">
-                    <AlertTriangle size={15} className="shrink-0 text-red-400" />
-                    <span>{authError}</span>
-                  </div>
-                )}
-
-                {/* Classic POS Tactile Keypad */}
-                <div className="pt-2 border-t border-slate-700/80">
-                  <div className="grid grid-cols-3 gap-2">
-                    {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'CLEAR', '0', 'BACK'].map((keyVal) => (
-                      <button
-                        type="button"
-                        key={keyVal}
-                        onClick={() => handleKeypadPress(keyVal)}
-                        className={`py-2.5 rounded-xl text-sm font-mono font-black transition-all active:scale-95 cursor-pointer shadow-sm border ${
-                          keyVal === 'CLEAR' 
-                            ? 'bg-rose-950/60 hover:bg-rose-900 border-rose-800 text-rose-300 text-xs' 
-                            : keyVal === 'BACK'
-                              ? 'bg-amber-950/60 hover:bg-amber-900 border-amber-800 text-amber-300 text-xs'
-                              : 'bg-slate-800 hover:bg-slate-700 border-slate-600 text-slate-100 hover:text-white'
-                        }`}
-                      >
-                        {keyVal === 'BACK' ? '⌫ BACK' : keyVal}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Submit Sign In Button */}
+                {/* LOG IN Button */}
                 <button
                   type="button"
                   onClick={handleLogin}
-                  className="w-full mt-2 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-98 text-white font-mono font-black text-sm tracking-wider shadow-lg transition-all text-center cursor-pointer border border-emerald-400 uppercase"
+                  className="w-full h-14 mt-6 rounded-[22px] bg-gradient-to-r from-[#FF5500] to-[#FF6B00] hover:from-[#E64D00] hover:to-[#FA5F00] active:scale-[0.99] text-white font-extrabold text-[16px] tracking-wider uppercase shadow-lg shadow-orange-500/30 flex items-center justify-center transition-all cursor-pointer"
                 >
-                  [ ENTER / SIGN IN ]
+                  LOG IN
                 </button>
               </div>
 
-              {/* Inactivity Security Badge */}
-              <p className="text-[10px] text-slate-400 font-mono text-center mt-4 flex items-center justify-center gap-1.5">
-                <ShieldCheck size={12} className="text-emerald-400" />
-                <span>30-MIN INACTIVITY AUTO-LOCK ACTIVE</span>
-              </p>
+              {/* App Version Footer */}
+              <div className="mt-auto pt-14 pb-4 text-center">
+                <span className="text-xs text-slate-700 font-medium tracking-wide">
+                  App Version 2.4.1
+                </span>
+              </div>
             </div>
           </div>
         )}
