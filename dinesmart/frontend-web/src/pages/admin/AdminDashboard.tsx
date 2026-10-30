@@ -1820,33 +1820,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
             return (
               <div className="space-y-6 animate-fade-in">
                 {/* Header */}
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b pb-4">
-                  <div>
-                    <h3 className="font-extrabold text-base">Dishes</h3>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => {
-                        setEditingMenuItem(null);
-                        setMenuFormState({
-                          name: '',
-                          price: 180,
-                          category: 'Main Course',
-                          image: '',
-                          description: '',
-                          calories: 320,
-                          prepTime: '15 mins',
-                          isVeg: true,
-                          isSpecial: false
-                        });
-                        setNewMenuItemForm(true);
-                      }}
-                      className="bg-primary text-white font-bold py-2.5 px-4 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer hover:bg-primary/90 transition-colors shadow-sm"
-                    >
-                      <Plus size={14} />
-                      <span>Add Menu Item</span>
-                    </button>
-                  </div>
+                <div className="border-b pb-4">
+                  <h3 className="font-extrabold text-base">Dishes</h3>
                 </div>
 
                 {/* Filter and Search Bar */}
@@ -1892,7 +1867,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                   <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
                     <div className={`relative my-auto w-full max-w-lg rounded-3xl p-6 shadow-2xl bg-white text-gray-900 max-h-[90vh] overflow-y-auto`}>
                       <div className="flex justify-between items-center mb-4 pb-3 border-b">
-                        <h4 className="font-extrabold text-sm">{editingMenuItem ? 'Edit Menu Item' : 'Create New Menu Item'}</h4>
+                        <h4 className="font-extrabold text-sm">Edit Dish Details &amp; Photo</h4>
                         <button onClick={() => setNewMenuItemForm(false)} className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer">
                           <X size={18} />
                         </button>
@@ -2072,7 +2047,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                           type="submit" 
                           className="w-full bg-primary text-white font-bold py-3 rounded-xl cursor-pointer hover:bg-primary/95 transition-colors shadow-sm"
                         >
-                          {editingMenuItem ? 'Update Menu Item' : 'Save New Item'}
+                          Update Dish Details &amp; Photo
                         </button>
                       </form>
                     </div>
