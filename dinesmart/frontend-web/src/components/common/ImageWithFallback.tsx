@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { COMING_SOON_IMAGE } from '../../data/menu';
 
 interface ImageWithFallbackProps extends React.ImgHTMLAttributes<HTMLImageElement> {
   fallbackSrc?: string;
@@ -11,7 +12,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   alt,
   className = '',
   wrapperClassName = '',
-  fallbackSrc = 'https://img.spoonacular.com/recipes/636488-636x393.jpg',
+  fallbackSrc = COMING_SOON_IMAGE,
   ...props
 }) => {
   const [loaded, setLoaded] = useState(false);

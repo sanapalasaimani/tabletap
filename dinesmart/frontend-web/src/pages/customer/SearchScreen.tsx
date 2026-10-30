@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MenuItem } from '../../types';
-import { MENU_ITEMS } from '../../data/menu';
+import { MENU_ITEMS, COMING_SOON_IMAGE } from '../../data/menu';
 import { db } from '../../supabase';
 import { Search, Star, Flame, Mic, MicOff, Sparkles, X, Clock, AlertTriangle } from 'lucide-react';
 import { ImageWithFallback } from '../../components/common/ImageWithFallback';
@@ -30,9 +30,20 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({ initialCategory, onS
 
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Fetch from database on mount
+  // Fetch from database on mount and listen to updates
   useEffect(() => {
-    db.getMenuItems().then(setMenuItems);
+    const loadMenu = () => {
+      db.getMenuItems().then(items => {
+        if (items && items.length > 0) setMenuItems(items);
+      });
+    };
+    loadMenu();
+    const interval = setInterval(loadMenu, 4000);
+    window.addEventListener('dinesmart_menu_updated', loadMenu);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('dinesmart_menu_updated', loadMenu);
+    };
   }, []);
 
   // Update selected category if initialCategory changes

@@ -11,8 +11,12 @@ export interface MenuItem {
   spicyLevel?: 0 | 1 | 2 | 3; // 0=none, 1=mild, 2=medium, 3=hot
   isSpecial?: boolean;
   calories: number;
+  caloriesApprox?: string;
   prepTime: string; // e.g. "20-25 mins"
   description: string;
+  dietaryTags?: string[];
+  allergens?: string;
+  customizationOptions?: string[];
   isUnlimited?: boolean;
   dailyLimit?: number;
   soldCount?: number;

@@ -43,15 +43,19 @@ const mapSupabaseToMenuItem = (row: any): MenuItem => {
     price: Number(row.price || 0),
     category: row.category || 'Main Course',
     subcategory: row.subcategory || undefined,
-    image: spoonacularService.getDishImage(dishId, dishName, row.image),
-    rating: Number(row.rating || 4.5),
-    reviewsCount: Number(row.reviews_count ?? row.reviewsCount ?? 50),
+    image: row.image || spoonacularService.getDishImage(dishId, dishName, row.image),
+    rating: Number(row.rating || 4.7),
+    reviewsCount: Number(row.reviews_count ?? row.reviewsCount ?? 65),
     isVeg: row.is_veg !== undefined ? Boolean(row.is_veg) : Boolean(row.isVeg),
     spicyLevel: row.spicy_level !== undefined ? (row.spicy_level as 0 | 1 | 2 | 3) : ((row.spicyLevel ?? 1) as 0 | 1 | 2 | 3),
     isSpecial: row.is_special !== undefined ? Boolean(row.is_special) : Boolean(row.isSpecial),
-    calories: Number(row.calories || 300),
+    calories: Number(row.calories || 250),
+    caloriesApprox: row.calories_approx || row.caloriesApprox,
     prepTime: row.prep_time || row.prepTime || '15 mins',
     description: row.description || '',
+    dietaryTags: row.dietary_tags || row.dietaryTags,
+    allergens: row.allergens,
+    customizationOptions: row.customization_options || row.customizationOptions,
   };
 };
 
@@ -61,12 +65,12 @@ const mapMenuItemToSupabase = (item: MenuItem): any => ({
   price: Number(item.price),
   category: item.category,
   image: item.image,
-  rating: Number(item.rating || 4.5),
-  reviews_count: Number(item.reviewsCount || 50),
+  rating: Number(item.rating || 4.7),
+  reviews_count: Number(item.reviewsCount || 65),
   is_veg: Boolean(item.isVeg),
-  spicy_level: Number(item.spicyLevel || 1),
+  spicy_level: Number(item.spicyLevel ?? 1),
   is_special: Boolean(item.isSpecial),
-  calories: Number(item.calories || 300),
+  calories: Number(item.calories || 250),
   prep_time: item.prepTime || '15 mins',
   description: item.description || '',
   available: true,
@@ -111,18 +115,22 @@ export const db = {
           .order('id')
           .limit(1000);
 
-        if (!error && data) {
+        if (!error && data && data.length > 0) {
           items = data.map(mapSupabaseToMenuItem);
           saveMockData('menu', items);
         } else {
-          items = getMockData<MenuItem[]>('menu', []);
+          items = getMockData<MenuItem[]>('menu', MENU_ITEMS);
+          if (items.length === 0) items = MENU_ITEMS;
+          saveMockData('menu', items);
         }
       } catch (err) {
         console.warn('DineSmart: Error retrieving menu from Supabase, fallback to cache:', err);
-        items = getMockData<MenuItem[]>('menu', []);
+        items = getMockData<MenuItem[]>('menu', MENU_ITEMS);
+        if (items.length === 0) items = MENU_ITEMS;
       }
     } else {
-      items = getMockData<MenuItem[]>('menu', []);
+      items = getMockData<MenuItem[]>('menu', MENU_ITEMS);
+      if (items.length === 0) items = MENU_ITEMS;
     }
 
     // Merge availability configurations and calculate sold count dynamically
@@ -160,6 +168,7 @@ export const db = {
   },
 
   saveMenuItem: async (item: MenuItem): Promise<MenuItem> => {
+    let result = item;
     if (isRealSupabase) {
       try {
         const payload = mapMenuItemToSupabase(item);
@@ -169,27 +178,26 @@ export const db = {
           .select()
           .single();
         if (!error && data) {
-          const saved = mapSupabaseToMenuItem(data);
-          const menu = getMockData<MenuItem[]>('menu', []);
-          const idx = menu.findIndex(m => m.id === saved.id);
-          if (idx !== -1) menu[idx] = saved; else menu.push(saved);
-          saveMockData('menu', menu);
-          return saved;
+          result = mapSupabaseToMenuItem(data);
+        } else if (error) {
+          console.error('Supabase error saving menu item:', error);
         }
-        if (error) console.error('Supabase error saving menu item:', error);
       } catch (err) {
         console.error('Exception saving menu item to Supabase:', err);
       }
     }
-    const menu = getMockData<MenuItem[]>('menu', []);
-    const idx = menu.findIndex(m => m.id === item.id);
+    const menu = getMockData<MenuItem[]>('menu', MENU_ITEMS);
+    const idx = menu.findIndex(m => m.id === result.id);
     if (idx !== -1) {
-      menu[idx] = item;
+      menu[idx] = result;
     } else {
-      menu.push(item);
+      menu.push(result);
     }
     saveMockData('menu', menu);
-    return item;
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('dinesmart_menu_updated', { detail: result }));
+    }
+    return result;
   },
 
   syncAllMenuToSupabase: async (): Promise<number> => {
@@ -204,6 +212,9 @@ export const db = {
       }
     }
     saveMockData('menu', MENU_ITEMS);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('dinesmart_menu_updated'));
+    }
     return MENU_ITEMS.length;
   },
 
@@ -213,12 +224,14 @@ export const db = {
         .from('menu_items')
         .delete()
         .eq('id', id);
-      if (!error) return true;
-      console.error('Supabase error deleting menu item:', error);
+      if (error) console.error('Supabase error deleting menu item:', error);
     }
-    const menu = getMockData<MenuItem[]>('menu', []);
+    const menu = getMockData<MenuItem[]>('menu', MENU_ITEMS);
     const updated = menu.filter(m => m.id !== id);
     saveMockData('menu', updated);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('dinesmart_menu_updated', { detail: { id } }));
+    }
     return true;
   },
 
@@ -235,6 +248,9 @@ export const db = {
       }
     }
     saveMockData('menu', []);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('dinesmart_menu_updated'));
+    }
     return true;
   },
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { db } from '../../supabase';
-import { MENU_ITEMS } from '../../data/menu';
+import { MENU_ITEMS, COMING_SOON_IMAGE } from '../../data/menu';
 import { MenuItem } from '../../types';
 import { Search, Star, Flame, Sparkles, Bell } from 'lucide-react';
 import { mlService } from '../../services/mlService';
@@ -16,7 +16,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectDish, onNavigate
   const [menuItems, setMenuItems] = useState<MenuItem[]>(MENU_ITEMS);
 
   useEffect(() => {
-    db.getMenuItems().then(setMenuItems);
+    const loadMenu = () => {
+      db.getMenuItems().then(items => {
+        if (items && items.length > 0) setMenuItems(items);
+      });
+    };
+    loadMenu();
+    const interval = setInterval(loadMenu, 4000);
+    window.addEventListener('dinesmart_menu_updated', loadMenu);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('dinesmart_menu_updated', loadMenu);
+    };
   }, []);
 
   const specialDish = menuItems.find(item => item.isSpecial) || menuItems[0];

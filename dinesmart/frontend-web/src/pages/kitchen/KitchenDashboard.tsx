@@ -116,7 +116,7 @@ export const KitchenDashboard: React.FC<KitchenDashboardProps> = ({ onLogout }) 
     }
   };
 
-  // Initial load and periodic polling (every 3 seconds)
+  // Initial load, live event listener, and periodic polling (every 3 seconds)
   useEffect(() => {
     fetchData(true);
 
@@ -124,7 +124,13 @@ export const KitchenDashboard: React.FC<KitchenDashboardProps> = ({ onLogout }) 
       fetchData(false);
     }, 3000);
 
-    return () => clearInterval(interval);
+    const handleMenuUpdated = () => fetchData(false);
+    window.addEventListener('dinesmart_menu_updated', handleMenuUpdated);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('dinesmart_menu_updated', handleMenuUpdated);
+    };
   }, []);
 
   // Check for new incoming pending cards to trigger audio alarm

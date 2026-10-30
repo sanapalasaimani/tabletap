@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { db } from '../../supabase';
 import { MenuItem, Order, UserProfile, WaiterRequest } from '../../types';
-import { MENU_ITEMS } from '../../data/menu';
+import { MENU_ITEMS, COMING_SOON_IMAGE } from '../../data/menu';
 import { 
   LayoutDashboard, ShoppingBag, ChefHat, Utensils, Layers, Users, 
   Map, CreditCard, Award, Megaphone, UserCheck, BarChart3, 
@@ -1822,39 +1822,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b pb-4">
                   <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-extrabold text-base">Dishes Menu Catalog</h3>
-                      <span className="bg-primary/10 text-primary font-bold text-xs px-2.5 py-0.5 rounded-full">
-                        {currentList.length} Dishes
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-gray-400 mt-0.5">
-                      Configure dishes and pricing. Click any image or link to open in full resolution.
-                    </p>
+                    <h3 className="font-extrabold text-base">Dishes</h3>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button
-                      onClick={async () => {
-                        setLoading(true);
-                        try {
-                          await db.syncAllMenuToSupabase();
-                          const freshMenu = await db.getMenuItems();
-                          setMenuItems(freshMenu);
-                          alert(`Synchronized & reloaded all ${freshMenu.length} dishes from Supabase successfully!`);
-                        } catch (e) {
-                          const freshMenu = await db.getMenuItems();
-                          setMenuItems(freshMenu && freshMenu.length >= 40 ? freshMenu : MENU_ITEMS);
-                          alert(`Retrieved ${freshMenu.length || MENU_ITEMS.length} dishes from database/catalog.`);
-                        } finally {
-                          setLoading(false);
-                        }
-                      }}
-                      className="border border-orange-200 bg-orange-50/50 hover:bg-orange-100/50 text-orange-600 dark:border-orange-800 dark:bg-orange-950/20 dark:text-orange-400 text-xs font-bold py-2.5 px-3 rounded-xl flex items-center gap-1.5 cursor-pointer transition-colors shadow-sm"
-                      title="Fast sync & reload 40 curated dishes from Supabase"
-                    >
-                      <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
-                      <span>Sync & Reload Menu ({MENU_ITEMS.length} Dishes)</span>
-                    </button>
                     <button
                       onClick={() => {
                         setEditingMenuItem(null);
@@ -1862,7 +1832,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                           name: '',
                           price: 180,
                           category: 'Main Course',
-                          image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500',
+                          image: '',
                           description: '',
                           calories: 320,
                           prepTime: '15 mins',
@@ -1952,19 +1922,38 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                           </div>
                         </div>
 
-                        {/* Direct Image Link input with test open button */}
+                        {/* Direct Image Link input with test open button & Device File Upload */}
                         <div>
-                          <label className="block text-gray-400 mb-1">Dish Image URL (Direct Web Link)</label>
+                          <div className="flex justify-between items-center mb-1">
+                            <label className="text-gray-400">Dish Image (URL or Device Upload)</label>
+                            <label className="text-primary hover:underline cursor-pointer flex items-center gap-1 font-bold text-[11px]">
+                              <Upload size={12} />
+                              <span>Upload Photo</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={async (e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    const compressed = await compressImageFile(file, 600, 0.85);
+                                    if (compressed) {
+                                      setMenuFormState(prev => ({ ...prev, image: compressed }));
+                                    }
+                                  }
+                                }}
+                              />
+                            </label>
+                          </div>
                           <div className="flex gap-2">
                             <input
-                              type="url"
+                              type="text"
                               value={menuFormState.image}
                               onChange={(e) => setMenuFormState({...menuFormState, image: e.target.value})}
-                              placeholder="https://images.unsplash.com/..."
-                              required
+                              placeholder="Paste image URL or click Upload Photo above..."
                               className="w-full p-2.5 border rounded-xl bg-transparent text-xs"
                             />
-                            {menuFormState.image && (
+                            {menuFormState.image && !menuFormState.image.startsWith('data:') && (
                               <a
                                 href={menuFormState.image}
                                 target="_blank"
@@ -1984,19 +1973,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                                 alt="Preview" 
                                 className="w-16 h-12 object-cover rounded-lg border bg-gray-200"
                                 onError={(e) => {
-                                  (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500';
+                                  (e.target as HTMLImageElement).src = COMING_SOON_IMAGE;
                                 }}
                               />
-                              <div className="text-[11px] overflow-hidden">
-                                <p className="font-bold text-gray-600 ">Live Preview Thumbnail</p>
-                                <a 
-                                  href={menuFormState.image} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  className="text-primary hover:underline truncate block max-w-xs"
-                                >
-                                  {menuFormState.image}
-                                </a>
+                              <div className="text-[11px] overflow-hidden flex-1">
+                                <p className="font-bold text-gray-600">Live Preview Thumbnail</p>
+                                {menuFormState.image.startsWith('data:') ? (
+                                  <span className="text-emerald-600 font-bold text-[10px]">Photo Uploaded & Compressed</span>
+                                ) : (
+                                  <a 
+                                    href={menuFormState.image} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="text-primary hover:underline truncate block max-w-xs"
+                                  >
+                                    {menuFormState.image}
+                                  </a>
+                                )}
                               </div>
                             </div>
                           )}
@@ -2109,40 +2102,66 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                       >
                         <div>
                           {/* Image Container with Direct Link Overlay and Badge */}
-                          <div className="relative group overflow-hidden rounded-2xl mb-3 bg-gray-100  h-36">
+                          <div className="relative group overflow-hidden rounded-2xl mb-3 bg-gray-100 h-36">
                             <img 
-                              src={item.image} 
+                              src={item.image || COMING_SOON_IMAGE} 
                               alt={item.name} 
                               className="w-full h-full object-cover rounded-2xl transition-transform duration-300 group-hover:scale-105"
                               onError={(e) => {
-                                (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500';
+                                (e.target as HTMLImageElement).src = COMING_SOON_IMAGE;
                               }} 
                             />
 
-                            {/* Direct Link Hover Overlay - Clicking opens image link directly */}
-                            <a
-                              href={item.image}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col items-center justify-center gap-1 text-white font-bold text-xs backdrop-blur-[2px]"
-                              title="Click to open image directly in new tab"
-                            >
-                              <ExternalLink size={20} className="drop-shadow" />
-                              <span className="drop-shadow text-[11px]">Open Full Image</span>
-                            </a>
+                            {/* Direct Link Hover Overlay - Clicking opens image link directly or prompts photo upload */}
+                            {item.image && !item.image.startsWith('data:') ? (
+                              <>
+                                <a
+                                  href={item.image}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col items-center justify-center gap-1 text-white font-bold text-xs backdrop-blur-[2px]"
+                                  title="Click to open image directly in new tab"
+                                >
+                                  <ExternalLink size={20} className="drop-shadow" />
+                                  <span className="drop-shadow text-[11px]">Open Full Image</span>
+                                </a>
 
-                            {/* Corner Direct-Open Link Badge */}
-                            <a
-                              href={item.image}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="absolute top-2 right-2 bg-black/60 hover:bg-primary text-white px-2 py-1 rounded-lg backdrop-blur-md transition-colors shadow-sm flex items-center gap-1 text-[10px] font-bold"
-                              title="Open image directly in new tab"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <ExternalLink size={11} />
-                              <span>Open</span>
-                            </a>
+                                <a
+                                  href={item.image}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="absolute top-2 right-2 bg-black/60 hover:bg-primary text-white px-2 py-1 rounded-lg backdrop-blur-md transition-colors shadow-sm flex items-center gap-1 text-[10px] font-bold"
+                                  title="Open image directly in new tab"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <ExternalLink size={11} />
+                                  <span>Open</span>
+                                </a>
+                              </>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingMenuItem(item);
+                                  setMenuFormState({
+                                    name: item.name,
+                                    price: item.price,
+                                    category: item.category,
+                                    image: item.image || '',
+                                    description: item.description,
+                                    calories: item.calories,
+                                    prepTime: item.prepTime,
+                                    isVeg: item.isVeg,
+                                    isSpecial: !!item.isSpecial
+                                  });
+                                  setNewMenuItemForm(true);
+                                }}
+                                className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col items-center justify-center gap-1 text-white font-bold text-xs backdrop-blur-[2px] cursor-pointer"
+                              >
+                                <Upload size={18} />
+                                <span>Upload Dish Photo</span>
+                              </button>
+                            )}
 
                             {/* Veg / Non-Veg Tag */}
                             <span className={`absolute top-2 left-2 px-2 py-0.5 rounded-md text-[9px] font-extrabold uppercase shadow-sm ${
@@ -2161,12 +2180,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
 
                           {/* Item Details */}
                           <div className="flex justify-between items-start mb-1">
-                            <h4 className="font-extrabold text-xs text-gray-900  line-clamp-1">{item.name}</h4>
+                            <h4 className="font-extrabold text-xs text-gray-900 line-clamp-1">{item.name}</h4>
                             <span className="font-extrabold text-primary text-xs whitespace-nowrap ml-2">{formatPrice(item.price)}</span>
                           </div>
 
                           <div className="flex items-center gap-2 mb-2 text-[10px] text-gray-400 font-semibold">
-                            <span className="bg-gray-100  px-2 py-0.5 rounded-md">{item.category}</span>
+                            <span className="bg-gray-100 px-2 py-0.5 rounded-md">{item.category}</span>
                             {item.prepTime && <span>⏳ {item.prepTime}</span>}
                             {item.calories && <span>🔥 {item.calories} kcal</span>}
                           </div>
@@ -2180,17 +2199,42 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
 
                         {/* Card Footer with Direct Open Link and Edit/Delete */}
                         <div className="border-t pt-3 mt-1 flex justify-between items-center text-[10px] font-bold">
-                          {/* Direct clickable URL link */}
-                          <a
-                            href={item.image}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-primary hover:underline flex items-center gap-1 truncate max-w-[130px] font-semibold"
-                            title={`Open ${item.image}`}
-                          >
-                            <ExternalLink size={10} className="shrink-0" />
-                            <span className="truncate">Open Image</span>
-                          </a>
+                          {/* Direct clickable URL link or Photo Upload button */}
+                          {item.image && !item.image.startsWith('data:') ? (
+                            <a
+                              href={item.image}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-primary hover:underline flex items-center gap-1 truncate max-w-[130px] font-semibold"
+                              title={`Open ${item.image}`}
+                            >
+                              <ExternalLink size={10} className="shrink-0" />
+                              <span className="truncate">Open Image</span>
+                            </a>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingMenuItem(item);
+                                setMenuFormState({
+                                  name: item.name,
+                                  price: item.price,
+                                  category: item.category,
+                                  image: item.image || '',
+                                  description: item.description,
+                                  calories: item.calories,
+                                  prepTime: item.prepTime,
+                                  isVeg: item.isVeg,
+                                  isSpecial: !!item.isSpecial
+                                });
+                                setNewMenuItemForm(true);
+                              }}
+                              className="text-primary hover:underline flex items-center gap-1 font-semibold cursor-pointer"
+                            >
+                              <Upload size={10} />
+                              <span>Set Photo</span>
+                            </button>
+                          )}
 
                           <div className="flex gap-1.5">
                             <button
