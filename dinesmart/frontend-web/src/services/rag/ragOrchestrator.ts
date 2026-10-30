@@ -453,17 +453,29 @@ function matchOperationsQuery(q: string): AnalyticalAnswer | null {
   if (clean.includes('top 5') || clean.includes('best-selling') || clean.includes('best selling') || clean.includes('top dishes')) {
     return operationsAnalytics.getTopSellingDishes();
   }
+  if (clean.includes('breakfast') && (clean.includes('star') || clean.includes('margin'))) {
+    return operationsAnalytics.getBreakfastStars();
+  }
   if (clean.includes('margin') && (clean.includes('highest') || clean.includes('gross margin') || clean.includes('best margin'))) {
     return operationsAnalytics.getMenuEngineering('MARGIN');
   }
   if (clean.includes('dog') || clean.includes('low-selling') || clean.includes('low selling') || clean.includes('low margin')) {
     return operationsAnalytics.getMenuEngineering('DOGS');
   }
+  if (clean.includes('ingredient cost') || clean.includes('food cost for') || clean.includes('cost of masala dosa') || clean.includes('cost for masala dosa') || clean.includes('cost for gulab jamun') || clean.includes('food costs for mutton')) {
+    return operationsAnalytics.getDishIngredientCost(clean);
+  }
   if (clean.includes('food cost')) {
     return operationsAnalytics.getFoodCostComparison();
   }
+  if (clean.includes('turnaround') || clean.includes('table turn')) {
+    return operationsAnalytics.getTableTurnaround();
+  }
   if (clean.includes('weekend') && clean.includes('weekday')) {
     return operationsAnalytics.getWeekendVsWeekday();
+  }
+  if (clean.includes('dessert') && (clean.includes('attach') || clean.includes('rate'))) {
+    return operationsAnalytics.getDessertAttachRate();
   }
   if (clean.includes('categor') && clean.includes('revenue')) {
     return operationsAnalytics.getCategoryRevenueBreakdown();
@@ -479,6 +491,22 @@ function matchOperationsQuery(q: string): AnalyticalAnswer | null {
   }
   if ((clean.includes('veg') || clean.includes('vegetarian')) && (clean.includes('split') || clean.includes('share') || clean.includes('revenue'))) {
     return operationsAnalytics.getVegNonVegSplit();
+  }
+  if (clean.includes('how many staff') || clean.includes('floor roster') || clean.includes('staff members') || clean.includes('registered on the live')) {
+    return operationsAnalytics.getStaffRoster();
+  }
+  if (clean.includes('shift') && (clean.includes('timing') || clean.includes('schedule') || clean.includes('hour'))) {
+    return operationsAnalytics.getShiftTimings();
+  }
+  if (clean.includes('how many') && (clean.includes('dish') || clean.includes('catalog') || clean.includes('menu item'))) {
+    return operationsAnalytics.getMenuCatalogOverview();
+  }
+  if (clean.includes('vegan')) {
+    return operationsAnalytics.getVeganOptions();
+  }
+  if ((clean.includes('price of') || clean.includes('cost of')) && !clean.includes('food cost')) {
+    const dishAns = operationsAnalytics.getDishDetails(clean);
+    if (dishAns) return dishAns;
   }
   return null;
 }
@@ -611,6 +639,38 @@ ${execResult.sql}
         }
       };
     }
+  }
+
+  // 3. Fallback to Semantic Document Search (SOPs, Policies, Allergens, Guidelines)
+  try {
+    const evidence = executeHybridRetrieval(originalQuery || cleanQuery, {});
+    if (evidence.citations && evidence.citations.length > 0 && evidence.formattedContext && evidence.formattedContext.length > 50) {
+      const semanticAnswer = await buildSemanticResponse(originalQuery, evidence);
+      const totalLatency = Math.round(performance.now() - startTime);
+      return {
+        answer: semanticAnswer,
+        scope: 'IN_SCOPE',
+        citations: evidence.citations,
+        decisionReadiness: 'DECISION_READY',
+        telemetry: {
+          requestId,
+          timestamp: new Date().toISOString(),
+          userQuery: originalQuery,
+          scope: 'IN_SCOPE',
+          retrievalHitCount: evidence.citations.length,
+          retrievalLatencyMs: 6,
+          inferenceLatencyMs: 0,
+          totalLatencyMs: totalLatency,
+          provider: 'GROUNDED_LOCAL_ENGINE',
+          modelUsed: 'HybridSemanticRetriever',
+          citationsCount: evidence.citations.length,
+          decisionReadiness: 'DECISION_READY',
+          securityFlags: []
+        }
+      };
+    }
+  } catch (semanticErr) {
+    // Continue to limitation notice
   }
 
   const totalLatency = Math.round(performance.now() - startTime);

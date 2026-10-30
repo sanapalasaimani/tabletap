@@ -41,3 +41,4 @@ for (const q of queries) {
   const res = matchQuery(q);
   console.log(`Q: "${q}" -> Matched:`, res ? (res.title || res.type) : 'FAILED!');
 }
+

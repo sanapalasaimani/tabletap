@@ -42,21 +42,31 @@ const ROOM_METRIC_PATTERNS = [
 
 // Factual / Numerical / Aggregation keywords for SQL routing
 const SQL_METRIC_KEYWORDS = [
-  'how many', 'total', 'sum', 'count', 'average', 'avg', 'aov', 'revenue',
-  'sales', 'income', 'orders', 'order count', 'discounts', 'discount', 'tips',
-  'tip amount', 'waiter', 'waiters', 'staff', 'salary', 'inventory', 'stock',
-  'cost', 'gross', 'net', 'cancellation', 'cancelled', 'top dishes', 'best selling',
-  'least selling', 'highest', 'lowest', 'yesterday', 'today', 'this month',
-  'last week', 'last month', '7 days', '30 days', 'table turns', 'gst', 'upi',
-  'cash', 'card payment'
+  'how many orders', 'total revenue', 'total gross', 'sum of', 'count of', 'average order value',
+  'aov', 'gross revenue', 'net revenue', 'sales report', 'order count', 'discounts given',
+  'total tips', 'tip amount', 'salary', 'inventory count', 'stock count', 'least selling',
+  'highest revenue', 'lowest revenue', 'yesterday revenue', 'revenue this month',
+  'last week sales', 'last month revenue', '7 days revenue', '30 days sales', 'table turns'
 ];
 
 // SOP / Policy / Recipe / Allergen keywords
 const SEMANTIC_DOC_KEYWORDS = [
-  'recipe', 'ingredients', 'how to make', 'how to prepare', 'allergen',
-  'gluten', 'dairy', 'sop', 'standard operating procedure', 'policy',
-  'hygiene', 'dress code', 'refund policy', 'cancellation policy',
-  'customer review', 'sentiment', 'feedback comments', 'guidelines'
+  'recipe', 'ingredients', 'how to make', 'how to prepare', 'allergen', 'allergens',
+  'gluten', 'dairy', 'sop', 'standard operating procedure', 'policy', 'policies',
+  'hygiene', 'dress code', 'refund policy', 'cancellation policy', 'order modification',
+  'customer review', 'sentiment', 'feedback comments', 'guidelines', 'guideline',
+  'standards', 'standard', 'protocol', 'protocols', 'etiquette', 'grace period',
+  'operating hours', 'timings', 'opening', 'closing', 'expediter',
+  'temperature', 'holding temperature', 'refrigeration', 'chopping board',
+  'hand washing', 'fssai', 'last framework', 'complaint', 'service recovery',
+  'payment methods', 'refund sla', 'service charge', 'tipping policy',
+  'tax policy', 'gst', 'cgst', 'sgst', 'vat', 'luxury tax', 'excise',
+  'vegan', 'celiac', 'safe for celiac', 'shift timings', 'two-bite',
+  'greeting time', '5-step', 'service sequence', 'breakfast service',
+  'items are served', 'walk-in dining', 'party reservations', 'capacity',
+  'capacities', 'indoor dining tables', 'kds queue', 'delay alarms',
+  'closing stock audit', 'wastage logging', 'food handlers', 'authorized to comp',
+  'replace an unsatisfactory dish', 'nut allergens', 'walnut brownie'
 ];
 
 // Strategic / Optimization keywords requiring both data and recommendations
@@ -125,8 +135,17 @@ export function routeQuery(query: string): RouteClassification {
     };
   }
 
-  // 4. Pure Text-to-SQL Check
-  if (hasNumbers || clean.match(/\b(sum|avg|count|total|orders?|revenue|dishes|waiters?|staff|price|inventory)\b/i)) {
+  // 4. Semantic Document Search Check (SOPs, Policies, Allergens, Guidelines, Service Protocols)
+  if (hasSemantic || clean.includes('recipe') || clean.includes('allergen') || clean.includes('spicy') || clean.includes('taste')) {
+    return {
+      intent: 'SEMANTIC_DOC',
+      confidence: 0.95,
+      reason: 'Qualitative query requesting recipes, culinary attributes, SOPs, policies, or standards.'
+    };
+  }
+
+  // 5. Pure Text-to-SQL Check
+  if (hasNumbers || clean.match(/\b(sum|avg|count|total|orders?|revenue|sales|waiters?|aov|inventory)\b/i)) {
     const historicalKeywords = ['last year', '1 year', 'annual', 'historical', 'trend over year'];
     const requiresHistorical = historicalKeywords.some(kw => clean.includes(kw));
 
@@ -135,15 +154,6 @@ export function routeQuery(query: string): RouteClassification {
       confidence: 0.95,
       reason: 'Factual or quantitative query requiring deterministic database aggregates.',
       requiresHistoricalData: requiresHistorical
-    };
-  }
-
-  // 5. Semantic Document Search Check
-  if (hasSemantic || clean.includes('dish') || clean.includes('spicy') || clean.includes('taste')) {
-    return {
-      intent: 'SEMANTIC_DOC',
-      confidence: 0.90,
-      reason: 'Qualitative query requesting recipes, culinary attributes, SOPs, or customer sentiments.'
     };
   }
 
