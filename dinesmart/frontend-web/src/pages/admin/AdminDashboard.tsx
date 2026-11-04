@@ -3,23 +3,23 @@ import { createPortal } from 'react-dom';
 import { db } from '../../supabase';
 import { MenuItem, Order, UserProfile, WaiterRequest } from '../../types';
 import { MENU_ITEMS, COMING_SOON_IMAGE } from '../../data/menu';
-import { 
-  LayoutDashboard, ShoppingBag, ChefHat, Utensils, Layers, Users, 
-  Map, CreditCard, Award, Megaphone, UserCheck, BarChart3, 
-  Settings, Shield, QrCode, Image, MessageSquare, Search, Trash2, 
-  Edit3, Plus, X, ChevronRight, Download, Sparkles, Filter, Check, 
-  AlertTriangle, Moon, Sun, RefreshCw, FileText, Mail, MessageCircle, 
+import {
+  LayoutDashboard, ShoppingBag, ChefHat, Utensils, Layers, Users,
+  Map, CreditCard, Award, Megaphone, UserCheck, BarChart3,
+  Settings, Shield, QrCode, Image, MessageSquare, Search, Trash2,
+  Edit3, Plus, X, ChevronRight, Download, Sparkles, Filter, Check,
+  AlertTriangle, Moon, Sun, RefreshCw, FileText, Mail, MessageCircle,
   CornerDownRight, UserPlus, Heart, TrendingUp, DollarSign, Calendar,
   TrendingDown, ArrowUpRight, ArrowDownRight, Clock, Star, Eye, EyeOff, Phone, Copy, FileSpreadsheet, ChevronDown, ExternalLink,
   Upload, Smartphone, Share2, CheckCircle2,
-  Bell, LogOut, Activity, BookOpen
+  Bell, LogOut, Activity, BookOpen, Smile, Meh, Frown
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, CartesianGrid, AreaChart, Area } from 'recharts';
-import { 
-  predictSales, getCustomerAIInsights, 
+import {
+  predictSales, getCustomerAIInsights,
   getAIBusinessSuggestions, getPeakTimePredictions, analyzeReviewSentiment,
-  SalesPrediction, CustomerInsights, BusinessSuggestion, 
-  PeakTimePrediction, SentimentResult 
+  SalesPrediction, CustomerInsights, BusinessSuggestion,
+  PeakTimePrediction, SentimentResult
 } from './groq';
 import BhakasuraChatBot from './BhakasuraChatBot';
 import { generateComprehensivePDF, generateComprehensiveExcel } from '../../utils/reportGenerator';
@@ -31,7 +31,7 @@ interface AdminDashboardProps {
   onLogout: () => void;
 }
 
-type TabType = 
+type TabType =
   | 'overview' | 'orders' | 'menu' | 'staff'
   | 'loyalty' | 'promotions' | 'customers' | 'ai_analytics'
   | 'reports' | 'settings' | 'security' | 'qrcodes' | 'gallery' | 'reviews';
@@ -127,7 +127,7 @@ interface ActivityLog {
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }) => {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
-  
+
   // Real-time Database States
   const [orders, setOrders] = useState<Order[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>(MENU_ITEMS);
@@ -140,7 +140,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
   const [reviews, setReviews] = useState<any[]>([]);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
-  
+
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -150,13 +150,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
     localStorage.removeItem('theme');
   }, []);
   const [syncTime, setSyncTime] = useState('');
-  const [alertSettings, setAlertSettings] = useState<any>({ tax: 5, currency: '₹', gstNo: '27AAAAA1111A1Z1', mapsLocation: '' });
+  const [alertSettings, setAlertSettings] = useState<any>({ restaurantName: 'Babai Hotel', tax: 5, currency: '₹', gstNo: '27AAAAA1111A1Z1', mapsLocation: '' });
 
   // Redesign States: Role-Based Metric Perspective, Chart Toggles & Clock
   const [dashboardViewMode, setDashboardViewMode] = useState<'manager' | 'chef'>('manager');
   const [chartTimeframe, setChartTimeframe] = useState<'hourly' | 'daily'>('hourly');
   const [revenueTimeframe, setRevenueTimeframe] = useState<'today' | 'week' | 'month'>('today');
   const [searchGlobalQuery, setSearchGlobalQuery] = useState('');
+  const [reviewFilter, setReviewFilter] = useState<'all' | 'positive' | 'neutral' | 'critical' | 'unreplied'>('all');
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
 
   useEffect(() => {
@@ -272,7 +273,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
   const [newPromotionModal, setNewPromotionModal] = useState(false);
   const [replyReviewId, setReplyReviewId] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
-  
+
   const [otpModal, setOtpModal] = useState(false);
   const [otpInput, setOtpInput] = useState('');
   const [pendingEditStaff, setPendingEditStaff] = useState<Employee | null>(null);
@@ -478,7 +479,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
   // ----------------------------------------------------
   // OPERATIONS ACTIONS WITH DELETION WARNINGS
   // ----------------------------------------------------
-  
+
   const handleUpdateOrderStatus = async (orderId: string, status: Order['status']) => {
     await db.updateOrderStatus(orderId, status);
     fetchData();
@@ -489,7 +490,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
     await db.payOrder(orderId, method);
     fetchData();
     logActivity(`Processed payment for Order #${orderId} via ${method}`);
-    
+
     const orderObj = orders.find(o => o.id === orderId);
     if (orderObj) {
       const tableObj = tables.find(t => t.id === parseInt(orderObj.tableId));
@@ -541,7 +542,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
   const handleSaveMenuItem = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    
+
     try {
       const newItem: MenuItem = {
         id: editingMenuItem ? editingMenuItem.id : `m_${Date.now()}`,
@@ -557,7 +558,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
         prepTime: menuFormState.prepTime,
         description: menuFormState.description
       };
-      
+
       await db.saveMenuItem(newItem);
       await fetchData();
       logActivity(editingMenuItem ? `Modified menu dish: ${newItem.name}` : `Added new menu dish: ${newItem.name}`);
@@ -739,17 +740,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
       const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
       const qrDataUrl = `${baseUrl}/table/${tableId}?token=${qrToken}`;
       const apiEndpoint = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrDataUrl)}`;
-      
+
       const response = await fetch(apiEndpoint);
       const blob = await response.blob();
       const blobUrl = window.URL.createObjectURL(blob);
-      
+
       const link = document.createElement('a');
       link.href = blobUrl;
       link.download = `table_${tableId}_qr.png`;
       document.body.appendChild(link);
       link.click();
-      
+
       document.body.removeChild(link);
       window.URL.revokeObjectURL(blobUrl);
       logActivity(`Downloaded QR Sticker for Table #${tableId}`);
@@ -935,7 +936,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
       if (dayName && dayRevenues[dayName] !== undefined) {
         dayRevenues[dayName] += (o.total || 0);
       }
-    } catch (e) {}
+    } catch (e) { }
   });
 
   const weeklyData = [
@@ -968,16 +969,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
   const hasRealCatData = Object.keys(categoryTotals).length > 0;
   const categoryData = hasRealCatData
     ? Object.entries(categoryTotals).map(([name, value]) => ({
-        name,
-        value,
-        color: categoryColors[name] || '#4F46E5'
-      }))
+      name,
+      value,
+      color: categoryColors[name] || '#4F46E5'
+    }))
     : [
-        { name: 'Starters', value: 3115, color: '#4F46E5' },
-        { name: 'Main Course', value: 2032, color: '#10B981' },
-        { name: 'Beverages', value: 1084, color: '#06B6D4' },
-        { name: 'Desserts', value: 542, color: '#8B5CF6' }
-      ];
+      { name: 'Starters', value: 3115, color: '#4F46E5' },
+      { name: 'Main Course', value: 2032, color: '#10B981' },
+      { name: 'Beverages', value: 1084, color: '#06B6D4' },
+      { name: 'Desserts', value: 542, color: '#8B5CF6' }
+    ];
 
   const catTotalSum = categoryData.reduce((acc, c) => acc + c.value, 0);
 
@@ -1014,7 +1015,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
         hoursMap[slot].orders++;
         hoursMap[slot].revenue += (o.total || 0);
       }
-    } catch (e) {}
+    } catch (e) { }
   });
 
   const hasRealHourly = orders.length > 0;
@@ -1037,10 +1038,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
     (o.items || []).forEach(it => {
       if (!itemSalesMap[it.name]) {
         const dish = menuItems.find(m => m.name === it.name || m.id === it.menuItemId);
-        itemSalesMap[it.name] = { 
-          name: it.name, 
+        itemSalesMap[it.name] = {
+          name: it.name,
           category: dish?.category || 'Main Course',
-          sold: 0, 
+          sold: 0,
           rev: 0,
           margin: 70
         };
@@ -1073,7 +1074,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
 
   return (
     <div className="flex h-screen overflow-hidden font-sans bg-slate-50 text-brand-text">
-      
+
       {/* 1. SIDEBAR NAVIGATION */}
       <aside className="w-64 flex flex-col justify-between flex-shrink-0 z-20 border-r bg-[#11141D] text-white border-slate-800">
         <div>
@@ -1099,11 +1100,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
               <nav className="space-y-1">
                 <button
                   onClick={() => setActiveTab('overview')}
-                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${
-                    activeTab === 'overview'
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'overview'
                       ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
                       : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
-                  }`}
+                    }`}
                 >
                   <LayoutDashboard size={15} className={activeTab === 'overview' ? 'text-[#FF6B00]' : 'text-slate-400'} />
                   <span>Overview & Home</span>
@@ -1117,11 +1117,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
               <nav className="space-y-1">
                 <button
                   onClick={() => setActiveTab('menu')}
-                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${
-                    activeTab === 'menu'
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'menu'
                       ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
                       : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
-                  }`}
+                    }`}
                 >
                   <BookOpen size={15} className={activeTab === 'menu' ? 'text-[#FF6B00]' : 'text-slate-400'} />
                   <span>Menu Management</span>
@@ -1129,11 +1128,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                 </button>
                 <button
                   onClick={() => setActiveTab('qrcodes')}
-                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${
-                    activeTab === 'qrcodes'
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'qrcodes'
                       ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
                       : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
-                  }`}
+                    }`}
                 >
                   <QrCode size={15} className={activeTab === 'qrcodes' ? 'text-[#FF6B00]' : 'text-slate-400'} />
                   <span>QR Code Manager</span>
@@ -1147,11 +1145,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
               <nav className="space-y-1">
                 <button
                   onClick={() => setActiveTab('staff')}
-                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${
-                    activeTab === 'staff'
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'staff'
                       ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
                       : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
-                  }`}
+                    }`}
                 >
                   <UserCheck size={15} className={activeTab === 'staff' ? 'text-[#FF6B00]' : 'text-slate-400'} />
                   <span>Waiter Management</span>
@@ -1165,11 +1162,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
               <nav className="space-y-1">
                 <button
                   onClick={() => setActiveTab('loyalty')}
-                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${
-                    activeTab === 'loyalty'
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'loyalty'
                       ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
                       : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
-                  }`}
+                    }`}
                 >
                   <Award size={15} className={activeTab === 'loyalty' ? 'text-[#FF6B00]' : 'text-slate-400'} />
                   <span>Loyalty Programs</span>
@@ -1177,11 +1173,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                 </button>
                 <button
                   onClick={() => setActiveTab('promotions')}
-                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${
-                    activeTab === 'promotions'
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'promotions'
                       ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
                       : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
-                  }`}
+                    }`}
                 >
                   <Megaphone size={15} className={activeTab === 'promotions' ? 'text-[#FF6B00]' : 'text-slate-400'} />
                   <span>Promotions Builder</span>
@@ -1195,11 +1190,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
               <nav className="space-y-1">
                 <button
                   onClick={() => setActiveTab('reports')}
-                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${
-                    activeTab === 'reports'
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'reports'
                       ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
                       : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
-                  }`}
+                    }`}
                 >
                   <BarChart3 size={15} className={activeTab === 'reports' ? 'text-[#FF6B00]' : 'text-slate-400'} />
                   <span>Reports & Export</span>
@@ -1207,11 +1201,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                 </button>
                 <button
                   onClick={() => setActiveTab('reviews')}
-                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${
-                    activeTab === 'reviews'
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'reviews'
                       ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
                       : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
-                  }`}
+                    }`}
                 >
                   <MessageSquare size={15} className={activeTab === 'reviews' ? 'text-[#FF6B00]' : 'text-slate-400'} />
                   <span>Reviews Sentiment</span>
@@ -1219,17 +1212,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                 </button>
               </nav>
             </div>
-            
+
             <div>
               <p className="text-[9px] text-slate-500 font-extrabold uppercase tracking-widest mb-2 px-3">Control & Security</p>
               <nav className="space-y-1">
                 <button
                   onClick={() => setActiveTab('settings')}
-                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${
-                    activeTab === 'settings'
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'settings'
                       ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
                       : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
-                  }`}
+                    }`}
                 >
                   <Settings size={15} className={activeTab === 'settings' ? 'text-[#FF6B00]' : 'text-slate-400'} />
                   <span>Restaurant Settings</span>
@@ -1237,11 +1229,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                 </button>
                 <button
                   onClick={() => setActiveTab('security')}
-                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${
-                    activeTab === 'security'
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'security'
                       ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
                       : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
-                  }`}
+                    }`}
                 >
                   <Shield size={15} className={activeTab === 'security' ? 'text-[#FF6B00]' : 'text-slate-400'} />
                   <span>Security Audit Log</span>
@@ -1257,11 +1248,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
           <div className="p-3 rounded-2xl bg-[#161922] border border-slate-800/80 flex items-center justify-between">
             <div className="flex items-center gap-2.5 overflow-hidden">
               <div className="w-9 h-9 rounded-full bg-amber-100 text-amber-900 font-extrabold text-xs flex items-center justify-center shadow-xs flex-shrink-0">
-                {role === 'Admin' ? 'AM' : role.slice(0, 2).toUpperCase()}
+                AD
               </div>
               <div className="overflow-hidden">
-                <p className="text-xs font-bold text-white leading-tight truncate">{role === 'Admin' ? 'Alex Morgan' : role}</p>
-                <span className="text-[10px] text-slate-400 font-medium block">Role: {role}</span>
+                <p className="text-xs font-bold text-white leading-tight truncate">Admin</p>
+                <span className="text-[10px] text-slate-400 font-medium block">Role: Admin</span>
               </div>
             </div>
             <button
@@ -1277,80 +1268,30 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
 
       {/* 2. MAIN WORKSPACE */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        
-        {/* Top Header from Figma Design */}
-        <header className="border-b px-6 py-3.5 flex flex-wrap justify-between items-center gap-4 z-10 flex-shrink-0 bg-white border-slate-200/80 shadow-2xs">
-          <div className="flex items-center gap-3 flex-1 max-w-xl">
-            {/* Global Search Bar from Figma */}
-            <div className="relative flex items-center w-full max-w-md">
-              <Search size={15} className="absolute left-3.5 text-slate-400" />
-              <input
-                type="text"
-                value={searchGlobalQuery}
-                onChange={(e) => setSearchGlobalQuery(e.target.value)}
-                placeholder="Search orders, tables, guests..."
-                className="w-full pl-10 pr-12 py-2 text-xs font-medium bg-slate-50/80 hover:bg-slate-100/60 focus:bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 text-slate-800 placeholder-slate-400 transition-all"
-              />
-              <span className="absolute right-3 px-1.5 py-0.5 text-[10px] font-bold text-slate-400 bg-white border border-slate-200 rounded-md shadow-2xs">
-                ⌘ K
-              </span>
-            </div>
 
-            {/* Live Synced • WebSocket Active pill */}
-            <div className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80 flex-shrink-0">
+        {/* Top Header */}
+        <header className="border-b px-6 py-3.5 flex justify-between items-center gap-4 z-10 flex-shrink-0 bg-white border-slate-200/80 shadow-2xs">
+          <div className="flex items-center gap-3">
+            {/* Last sync pill */}
+            <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200/80 flex-shrink-0">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
               </span>
-              <span>Live Synced</span>
+              <span>Last sync: {syncTime || 'Just now'}</span>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Perspective Switcher */}
-            <div className="hidden sm:flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
-              <button
-                onClick={() => setDashboardViewMode('manager')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                  dashboardViewMode === 'manager'
-                    ? 'bg-white text-slate-900 shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                <LayoutDashboard size={13} />
-                <span>Manager</span>
-              </button>
-              <button
-                onClick={() => setDashboardViewMode('chef')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                  dashboardViewMode === 'chef'
-                    ? 'bg-white text-[#FF6B00] shadow-2xs font-black'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                <ChefHat size={13} />
-                <span>Chef</span>
-              </button>
-            </div>
-
             {/* Date Pill from Figma */}
             <div className="flex items-center gap-2 px-3.5 py-1.5 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl shadow-2xs">
               <Calendar size={13} className="text-slate-400" />
               <span>{currentTime.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
             </div>
 
-            {/* Notification Bell Button from Figma */}
-            <button 
-              className="relative w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:text-slate-900 shadow-2xs transition-colors cursor-pointer"
-              title="Notifications"
-            >
-              <Bell size={15} />
-              <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-[#FF6B00] ring-2 ring-white"></span>
-            </button>
-
-            {/* User Avatar Circle from Figma */}
-            <div className="w-9 h-9 rounded-full bg-amber-100 text-amber-900 font-extrabold text-xs flex items-center justify-center shadow-xs border border-amber-200">
-              {role === 'Admin' ? 'AM' : role.slice(0, 2).toUpperCase()}
+            {/* User Avatar Circle */}
+            <div className="w-9 h-9 rounded-full bg-amber-100 text-amber-900 font-extrabold text-xs flex items-center justify-center shadow-xs border border-amber-200" title="Admin">
+              AD
             </div>
           </div>
         </header>
@@ -1366,11 +1307,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
           {activeTab === 'overview' && (() => {
             const occupiedTablesCount = tables.filter(t => t.status !== 'Available' && t.status !== 'Cleaning').length;
             const totalTablesCount = tables.length > 0 ? tables.length : 36;
-            const floorDisplay = tables.length > 0 && occupiedTablesCount > 0 
-              ? `${occupiedTablesCount}/${totalTablesCount}` 
+            const floorDisplay = tables.length > 0 && occupiedTablesCount > 0
+              ? `${occupiedTablesCount}/${totalTablesCount}`
               : '28/36';
-            const occupancyPct = tables.length > 0 && occupiedTablesCount > 0 
-              ? Math.round((occupiedTablesCount / totalTablesCount) * 100) 
+            const occupancyPct = tables.length > 0 && occupiedTablesCount > 0
+              ? Math.round((occupiedTablesCount / totalTablesCount) * 100)
               : 78;
 
             const liveOrdersCount = orders.length > 0 ? orders.length : 46;
@@ -1401,9 +1342,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
               { time: 'Week 4', revenue: 84000 }
             ];
 
-            const currentRevenueArea = 
+            const currentRevenueArea =
               revenueTimeframe === 'today' ? revenueAreaToday :
-              revenueTimeframe === 'week' ? revenueAreaWeek : revenueAreaMonth;
+                revenueTimeframe === 'week' ? revenueAreaWeek : revenueAreaMonth;
 
             // Table status donut chart
             const tableStatusData = [
@@ -1423,130 +1364,37 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
 
             const displayRecentOrders = orders.length > 0
               ? orders.slice(0, 5).map((o, idx) => ({
-                  id: `#DS-${o.id ? o.id.slice(-4).toUpperCase() : 4829 - idx}`,
-                  location: o.tableId ? `Table ${o.tableId}` : (idx % 2 === 0 ? `Table 12` : `Room 304`),
-                  waiter: idx % 3 === 0 ? 'Olivia M.' : idx % 3 === 1 ? 'Lucas R.' : 'Emma W.',
-                  amount: o.total || (idx === 0 ? 128.40 : idx === 1 ? 84.20 : 210.00),
-                  status: (o.status as string) === 'Ready to Serve' ? 'Ready' : o.status === 'Delivered' ? 'Completed' : 'Preparing',
-                  time: `${(idx + 1) * 4} min ago`
-                }))
+                id: `#DS-${o.id ? o.id.slice(-4).toUpperCase() : 4829 - idx}`,
+                location: o.tableId ? `Table ${o.tableId}` : (idx % 2 === 0 ? `Table 12` : `Room 304`),
+                waiter: idx % 3 === 0 ? 'Olivia M.' : idx % 3 === 1 ? 'Lucas R.' : 'Emma W.',
+                amount: o.total || (idx === 0 ? 128.40 : idx === 1 ? 84.20 : 210.00),
+                status: (o.status as string) === 'Ready to Serve' ? 'Ready' : o.status === 'Delivered' ? 'Completed' : 'Preparing',
+                time: `${(idx + 1) * 4} min ago`
+              }))
               : defaultRecentOrders;
 
             const greetingWord = currentTime.getHours() < 12 ? 'Good morning' : currentTime.getHours() < 17 ? 'Good afternoon' : 'Good evening';
-            const managerName = role === 'Admin' ? 'Alex' : role;
+            const restaurantDisplayName = alertSettings?.restaurantName || 'Babai Hotel';
 
             return (
               <div className="space-y-6 animate-fade-in max-w-7xl mx-auto">
-                
-                {/* 1. HERO GREETING & ACTION BUTTONS (FIGMA DESIGN) */}
+
+                {/* 1. HERO GREETING */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
                     <span className="text-[11px] font-black uppercase tracking-widest text-[#FF6B00]">
                       OVERVIEW
                     </span>
                     <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 mt-0.5">
-                      {greetingWord}, {managerName}
+                      {greetingWord}, Admin
                     </h1>
                     <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
-                      Here's what's happening at DineSmart Grand today.
+                      Here's what's happening at {restaurantDisplayName} today.
                     </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => generateComprehensivePDF(orders, menuItems)}
-                      className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 shadow-2xs flex items-center gap-2 transition-all cursor-pointer"
-                    >
-                      <Download size={14} className="text-slate-500" />
-                      <span>Export report</span>
-                    </button>
-                    <button
-                      onClick={() => setActiveTab('menu')}
-                      className="px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-[#FF6B00] hover:bg-[#e05e00] shadow-md shadow-orange-500/20 flex items-center gap-2 transition-all cursor-pointer"
-                    >
-                      <Plus size={15} />
-                      <span>+ Create order</span>
-                    </button>
                   </div>
                 </div>
 
-                {/* 2. CHEF PERSPECTIVE WORKSPACE (WHEN CHEF VIEW IS ACTIVE) */}
-                {dashboardViewMode === 'chef' && (
-                  <div className="p-5 rounded-2xl border bg-slate-900 text-white border-slate-800 shadow-md space-y-4">
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-3 border-b border-slate-800">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-orange-500/20 text-orange-400 rounded-xl flex items-center justify-center font-black">
-                          <ChefHat size={20} />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-extrabold text-white text-base">Chef Operational Console</h3>
-                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-orange-500/20 text-orange-400 border border-orange-500/30">
-                              Kitchen Focus Mode
-                            </span>
-                          </div>
-                          <p className="text-xs text-slate-400 mt-0.5">Real-time station capacity workloads, ticket SLAs & expediter distribution</p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={runAIKitchenAdvisor}
-                        className="bg-[#FF6B00] hover:bg-orange-600 text-white font-bold py-2 px-3.5 rounded-xl text-xs flex items-center gap-2 shadow-sm transition-all cursor-pointer"
-                      >
-                        <Sparkles size={14} className="text-amber-300 animate-pulse" />
-                        <span>Run AI Workload Advisor</span>
-                      </button>
-                    </div>
-
-                    {/* Kitchen Stations Workload Progress */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      <div className="p-4 rounded-xl bg-slate-800/80 border border-slate-700/80">
-                        <div className="flex justify-between items-center mb-1.5">
-                          <span className="text-xs font-bold text-white">Station 1: Curry & Gravies</span>
-                          <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/40">85% Load</span>
-                        </div>
-                        <p className="text-[10px] text-slate-400 mb-2.5">Biryani, Butter Chicken, Gravy Pots • Morning Shift</p>
-                        <div className="w-full bg-slate-700 h-2 rounded-full overflow-hidden">
-                          <div className="bg-[#FF6B00] h-full rounded-full" style={{ width: '85%' }}></div>
-                        </div>
-                        <div className="flex justify-between items-center mt-2 text-[10px] text-slate-400 font-medium">
-                          <span>42 tickets dispatched</span>
-                          <span className="text-orange-400 font-bold">Near Peak</span>
-                        </div>
-                      </div>
-
-                      <div className="p-4 rounded-xl bg-slate-800/80 border border-slate-700/80">
-                        <div className="flex justify-between items-center mb-1.5">
-                          <span className="text-xs font-bold text-white">Station 2: Starters & Tandoor</span>
-                          <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/40">62% Load</span>
-                        </div>
-                        <p className="text-[10px] text-slate-400 mb-2.5">Kebabs, Tikka, Grills & Fries • Morning Shift</p>
-                        <div className="w-full bg-slate-700 h-2 rounded-full overflow-hidden">
-                          <div className="bg-blue-500 h-full rounded-full" style={{ width: '62%' }}></div>
-                        </div>
-                        <div className="flex justify-between items-center mt-2 text-[10px] text-slate-400 font-medium">
-                          <span>38 tickets dispatched</span>
-                          <span className="text-blue-400 font-bold">Balanced</span>
-                        </div>
-                      </div>
-
-                      <div className="p-4 rounded-xl bg-slate-800/80 border border-slate-700/80">
-                        <div className="flex justify-between items-center mb-1.5">
-                          <span className="text-xs font-bold text-white">Station 3: Breads & Beverages</span>
-                          <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">45% Load</span>
-                        </div>
-                        <p className="text-[10px] text-slate-400 mb-2.5">Naan, Roti, Desserts, Mocktails • Evening Shift</p>
-                        <div className="w-full bg-slate-700 h-2 rounded-full overflow-hidden">
-                          <div className="bg-emerald-500 h-full rounded-full" style={{ width: '45%' }}></div>
-                        </div>
-                        <div className="flex justify-between items-center mt-2 text-[10px] text-slate-400 font-medium">
-                          <span>29 tickets dispatched</span>
-                          <span className="text-emerald-400 font-bold">Smooth Capacity</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* 3. TOP KPI CARDS (4 CARDS FROM FIGMA DESIGN) */}
+                {/* 2. TOP KPI CARDS (4 CARDS FROM FIGMA DESIGN) */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   {/* Card 1: Today's Revenue */}
                   <div className="p-5 rounded-2xl border bg-white border-slate-200/90 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between">
@@ -1644,11 +1492,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                             <button
                               key={tf}
                               onClick={() => setRevenueTimeframe(tf)}
-                              className={`px-3 py-1 rounded-lg text-xs font-bold capitalize transition-all cursor-pointer ${
-                                revenueTimeframe === tf
+                              className={`px-3 py-1 rounded-lg text-xs font-bold capitalize transition-all cursor-pointer ${revenueTimeframe === tf
                                   ? 'bg-white text-slate-900 shadow-2xs'
                                   : 'text-slate-500 hover:text-slate-800'
-                              }`}
+                                }`}
                             >
                               {tf}
                             </button>
@@ -1681,18 +1528,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
                             <XAxis dataKey="time" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94A3B8' }} dy={10} />
-                            <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94A3B8' }} tickFormatter={(val) => `₹${val >= 1000 ? `${(val/1000).toFixed(0)}k` : val}`} />
-                            <Tooltip 
-                              contentStyle={{ borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }} 
+                            <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94A3B8' }} tickFormatter={(val) => `₹${val >= 1000 ? `${(val / 1000).toFixed(0)}k` : val}`} />
+                            <Tooltip
+                              contentStyle={{ borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}
                               formatter={(val: any) => [`₹${Number(val).toLocaleString()}`, 'Revenue']}
                             />
-                            <Area 
-                              type="monotone" 
-                              dataKey="revenue" 
-                              stroke="#FF6B00" 
-                              strokeWidth={3} 
-                              fillOpacity={1} 
-                              fill="url(#figmaRevenueGrad)" 
+                            <Area
+                              type="monotone"
+                              dataKey="revenue"
+                              stroke="#FF6B00"
+                              strokeWidth={3}
+                              fillOpacity={1}
+                              fill="url(#figmaRevenueGrad)"
                               dot={false}
                               activeDot={{ r: 6, fill: '#FF6B00', stroke: '#fff', strokeWidth: 2 }}
                             />
@@ -1710,8 +1557,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                           <h3 className="font-extrabold text-base text-slate-900">Table status</h3>
                           <p className="text-xs text-slate-400 mt-0.5">Live dining floor overview</p>
                         </div>
-                        <button 
-                          onClick={() => setDashboardViewMode(dashboardViewMode === 'chef' ? 'manager' : 'chef')}
+                        <button
+                          onClick={() => setActiveTab('qrcodes')}
                           className="text-xs font-bold text-[#FF6B00] hover:text-orange-600 flex items-center gap-0.5 cursor-pointer"
                         >
                           <span>View floor</span>
@@ -1780,7 +1627,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                         <h3 className="font-extrabold text-base text-slate-900">Recent orders</h3>
                         <p className="text-xs text-slate-400 mt-0.5">Latest orders across all service areas</p>
                       </div>
-                      <button 
+                      <button
                         onClick={() => setActiveTab('orders')}
                         className="text-xs font-bold text-[#FF6B00] hover:text-orange-600 flex items-center gap-0.5 cursor-pointer"
                       >
@@ -1812,13 +1659,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                                 ₹{typeof order.amount === 'number' ? order.amount.toFixed(2) : order.amount}
                               </td>
                               <td className="py-3 px-3 text-center">
-                                <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold inline-block ${
-                                  order.status === 'Preparing'
+                                <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold inline-block ${order.status === 'Preparing'
                                     ? 'bg-orange-50 text-orange-600 border border-orange-200/50'
                                     : order.status === 'Ready'
-                                    ? 'bg-sky-50 text-sky-600 border border-sky-200/50'
-                                    : 'bg-emerald-50 text-emerald-600 border border-emerald-200/50'
-                                }`}>
+                                      ? 'bg-sky-50 text-sky-600 border border-sky-200/50'
+                                      : 'bg-emerald-50 text-emerald-600 border border-emerald-200/50'
+                                  }`}>
                                   {order.status}
                                 </span>
                               </td>
@@ -1910,8 +1756,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
 
                     <div className="space-y-2.5">
                       {topSellingDishes.map(item => (
-                        <div 
-                          key={item.rank} 
+                        <div
+                          key={item.rank}
                           className="flex items-center justify-between p-3 rounded-xl bg-slate-50/80 border border-slate-100 hover:bg-slate-50 transition-colors"
                         >
                           <div className="flex items-center gap-3">
@@ -2039,11 +1885,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                       <button
                         key={cat}
                         onClick={() => setMenuFilterCategory(cat)}
-                        className={`text-xs px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
-                          menuFilterCategory === cat 
-                            ? 'bg-primary text-white shadow-sm' 
+                        className={`text-xs px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${menuFilterCategory === cat
+                            ? 'bg-primary text-white shadow-sm'
                             : 'bg-gray-100  text-gray-500 hover:text-black dark:hover:text-white'
-                        }`}
+                          }`}
                       >
                         {cat}
                       </button>
@@ -2087,7 +1932,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                             <input
                               type="text"
                               value={menuFormState.name}
-                              onChange={(e) => setMenuFormState({...menuFormState, name: e.target.value})}
+                              onChange={(e) => setMenuFormState({ ...menuFormState, name: e.target.value })}
                               required
                               placeholder="e.g. Chicken Biryani"
                               className="w-full p-2.5 border rounded-xl bg-transparent"
@@ -2098,7 +1943,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                             <input
                               type="number"
                               value={menuFormState.price}
-                              onChange={(e) => setMenuFormState({...menuFormState, price: parseInt(e.target.value) || 0})}
+                              onChange={(e) => setMenuFormState({ ...menuFormState, price: parseInt(e.target.value) || 0 })}
                               required
                               className="w-full p-2.5 border rounded-xl bg-transparent"
                             />
@@ -2132,7 +1977,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                             <input
                               type="text"
                               value={menuFormState.image}
-                              onChange={(e) => setMenuFormState({...menuFormState, image: e.target.value})}
+                              onChange={(e) => setMenuFormState({ ...menuFormState, image: e.target.value })}
                               placeholder="Paste image URL or click Upload Photo above..."
                               className="w-full p-2.5 border rounded-xl bg-transparent text-xs"
                             />
@@ -2151,9 +1996,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                           </div>
                           {menuFormState.image && (
                             <div className="mt-2.5 flex items-center gap-3 p-2 border rounded-xl bg-gray-50 /50">
-                              <img 
-                                src={menuFormState.image} 
-                                alt="Preview" 
+                              <img
+                                src={menuFormState.image}
+                                alt="Preview"
                                 className="w-16 h-12 object-cover rounded-lg border bg-gray-200"
                                 onError={(e) => {
                                   (e.target as HTMLImageElement).src = COMING_SOON_IMAGE;
@@ -2164,9 +2009,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                                 {menuFormState.image.startsWith('data:') ? (
                                   <span className="text-emerald-600 font-bold text-[10px]">Photo Uploaded & Compressed</span>
                                 ) : (
-                                  <a 
-                                    href={menuFormState.image} 
-                                    target="_blank" 
+                                  <a
+                                    href={menuFormState.image}
+                                    target="_blank"
                                     rel="noopener noreferrer"
                                     className="text-primary hover:underline truncate block max-w-xs"
                                   >
@@ -2183,7 +2028,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                             <label className="block text-gray-400 mb-1">Category</label>
                             <select
                               value={menuFormState.category}
-                              onChange={(e) => setMenuFormState({...menuFormState, category: e.target.value as MenuItem['category']})}
+                              onChange={(e) => setMenuFormState({ ...menuFormState, category: e.target.value as MenuItem['category'] })}
                               className="w-full p-2.5 border rounded-xl bg-transparent"
                             >
                               <option value="Breakfast">Breakfast</option>
@@ -2201,7 +2046,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                             <input
                               type="text"
                               value={menuFormState.prepTime}
-                              onChange={(e) => setMenuFormState({...menuFormState, prepTime: e.target.value})}
+                              onChange={(e) => setMenuFormState({ ...menuFormState, prepTime: e.target.value })}
                               placeholder="e.g. 15-20 mins"
                               className="w-full p-2.5 border rounded-xl bg-transparent"
                             />
@@ -2214,7 +2059,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                             <input
                               type="number"
                               value={menuFormState.calories}
-                              onChange={(e) => setMenuFormState({...menuFormState, calories: parseInt(e.target.value) || 0})}
+                              onChange={(e) => setMenuFormState({ ...menuFormState, calories: parseInt(e.target.value) || 0 })}
                               className="w-full p-2.5 border rounded-xl bg-transparent"
                             />
                           </div>
@@ -2222,7 +2067,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                             <label className="block text-gray-400 mb-1">Description</label>
                             <textarea
                               value={menuFormState.description}
-                              onChange={(e) => setMenuFormState({...menuFormState, description: e.target.value})}
+                              onChange={(e) => setMenuFormState({ ...menuFormState, description: e.target.value })}
                               rows={2}
                               placeholder="Ingredients and taste description..."
                               className="w-full p-2.5 border rounded-xl bg-transparent"
@@ -2232,27 +2077,27 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
 
                         <div className="flex gap-5 pt-1">
                           <label className="flex items-center gap-2 cursor-pointer">
-                            <input 
-                              type="checkbox" 
-                              checked={menuFormState.isVeg} 
-                              onChange={(e) => setMenuFormState({...menuFormState, isVeg: e.target.checked})}
-                              className="w-4 h-4 accent-green-600 rounded" 
+                            <input
+                              type="checkbox"
+                              checked={menuFormState.isVeg}
+                              onChange={(e) => setMenuFormState({ ...menuFormState, isVeg: e.target.checked })}
+                              className="w-4 h-4 accent-green-600 rounded"
                             />
                             <span>Vegetarian Dish</span>
                           </label>
                           <label className="flex items-center gap-2 cursor-pointer">
-                            <input 
-                              type="checkbox" 
-                              checked={menuFormState.isSpecial} 
-                              onChange={(e) => setMenuFormState({...menuFormState, isSpecial: e.target.checked})}
-                              className="w-4 h-4 accent-primary rounded" 
+                            <input
+                              type="checkbox"
+                              checked={menuFormState.isSpecial}
+                              onChange={(e) => setMenuFormState({ ...menuFormState, isSpecial: e.target.checked })}
+                              className="w-4 h-4 accent-primary rounded"
                             />
                             <span>Chef's Special</span>
                           </label>
                         </div>
 
-                        <button 
-                          type="submit" 
+                        <button
+                          type="submit"
                           className="w-full bg-primary text-white font-bold py-3 rounded-xl cursor-pointer hover:bg-primary/95 transition-colors shadow-sm"
                         >
                           Update Dish Details &amp; Photo
@@ -2267,7 +2112,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                 {filteredDishes.length === 0 ? (
                   <div className="text-center py-16 border rounded-3xl bg-gray-50/50 /30">
                     <p className="text-sm font-bold text-gray-400">No dishes found matching your search filter.</p>
-                    <button 
+                    <button
                       onClick={() => { setMenuFilterCategory('All'); setMenuSearchQuery(''); }}
                       className="mt-2 text-xs font-bold text-primary underline cursor-pointer"
                     >
@@ -2277,22 +2122,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
                     {filteredDishes.map(item => (
-                      <div 
+                      <div
                         key={item.id}
-                        className={`p-4 rounded-3xl border shadow-sm flex flex-col justify-between transition-all hover:shadow-md ${
-                          'bg-white border-gray-100'
-                        }`}
+                        className={`p-4 rounded-3xl border shadow-sm flex flex-col justify-between transition-all hover:shadow-md ${'bg-white border-gray-100'
+                          }`}
                       >
                         <div>
                           {/* Image Container with Direct Link Overlay and Badge */}
                           <div className="relative group overflow-hidden rounded-2xl mb-3 bg-gray-100 h-36">
-                            <img 
-                              src={item.image || COMING_SOON_IMAGE} 
-                              alt={item.name} 
+                            <img
+                              src={item.image || COMING_SOON_IMAGE}
+                              alt={item.name}
                               className="w-full h-full object-cover rounded-2xl transition-transform duration-300 group-hover:scale-105"
                               onError={(e) => {
                                 (e.target as HTMLImageElement).src = COMING_SOON_IMAGE;
-                              }} 
+                              }}
                             />
 
                             {/* Direct Link Hover Overlay - Clicking opens image link directly or prompts photo upload */}
@@ -2347,9 +2191,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                             )}
 
                             {/* Veg / Non-Veg Tag */}
-                            <span className={`absolute top-2 left-2 px-2 py-0.5 rounded-md text-[9px] font-extrabold uppercase shadow-sm ${
-                              item.isVeg ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
-                            }`}>
+                            <span className={`absolute top-2 left-2 px-2 py-0.5 rounded-md text-[9px] font-extrabold uppercase shadow-sm ${item.isVeg ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+                              }`}>
                               {item.isVeg ? 'Veg' : 'Non-Veg'}
                             </span>
 
@@ -2502,7 +2345,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                   >
                     <RefreshCw size={15} />
                   </button>
-                  
+
                   <button
                     onClick={handleOpenAddStaff}
                     className="bg-primary hover:bg-orange-600 text-white text-xs font-black px-5 py-2.5 rounded-2xl transition-all flex items-center gap-2 cursor-pointer shadow-sm hover:shadow-md shrink-0"
@@ -2579,11 +2422,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                       <button
                         type="button"
                         onClick={() => setShowApkQr(!showApkQr)}
-                        className={`text-xs font-bold px-3.5 py-3 rounded-2xl transition-all flex items-center gap-2 cursor-pointer border ${
-                          showApkQr 
-                            ? 'bg-orange-500/20 text-orange-300 border-orange-500/40' 
+                        className={`text-xs font-bold px-3.5 py-3 rounded-2xl transition-all flex items-center gap-2 cursor-pointer border ${showApkQr
+                            ? 'bg-orange-500/20 text-orange-300 border-orange-500/40'
                             : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
-                        }`}
+                          }`}
                         title="Show scannable QR code for waiter's phone"
                       >
                         <QrCode size={16} />
@@ -2601,7 +2443,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                       </button>
 
                       {/* Upload / Replace APK Button */}
-                      <label 
+                      <label
                         className="p-3 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 rounded-2xl cursor-pointer transition-all flex items-center justify-center"
                         title="Upload/Select newer APK file"
                       >
@@ -2757,8 +2599,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                   {staff.map(emp => {
                     const showPw = revealedPasswords[emp.id];
                     return (
-                      <div 
-                        key={emp.id} 
+                      <div
+                        key={emp.id}
                         className="p-5 rounded-3xl border border-slate-200/80 bg-white shadow-xs hover:shadow-md transition-all flex flex-col justify-between"
                       >
                         <div>
@@ -2843,7 +2685,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                                   href={`tel:${emp.mobile}`}
                                   className="font-bold text-primary hover:underline flex items-center gap-1 mt-0.5 truncate"
                                 >
-                                  <Phone size={11} className="shrink-0" /> 
+                                  <Phone size={11} className="shrink-0" />
                                   <span>{emp.mobile}</span>
                                 </a>
                               ) : (
@@ -2998,7 +2840,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                         <input
                           type="text"
                           value={couponFormState.code}
-                          onChange={(e) => setCouponFormState({...couponFormState, code: e.target.value})}
+                          onChange={(e) => setCouponFormState({ ...couponFormState, code: e.target.value })}
                           required
                           className="w-full p-2.5 border rounded-xl"
                         />
@@ -3008,7 +2850,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                         <input
                           type="number"
                           value={couponFormState.discount}
-                          onChange={(e) => setCouponFormState({...couponFormState, discount: parseInt(e.target.value)})}
+                          onChange={(e) => setCouponFormState({ ...couponFormState, discount: parseInt(e.target.value) })}
                           required
                           className="w-full p-2.5 border rounded-xl"
                         />
@@ -3018,7 +2860,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                         <input
                           type="number"
                           value={couponFormState.minBill}
-                          onChange={(e) => setCouponFormState({...couponFormState, minBill: parseInt(e.target.value)})}
+                          onChange={(e) => setCouponFormState({ ...couponFormState, minBill: parseInt(e.target.value) })}
                           required
                           className="w-full p-2.5 border rounded-xl"
                         />
@@ -3032,7 +2874,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
               {/* Coupon list */}
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
                 {coupons.map(cp => (
-                  <div 
+                  <div
                     key={cp.id}
                     className={`p-4 rounded-3xl border shadow-sm flex flex-col justify-between bg-white border-gray-50`}
                   >
@@ -3076,7 +2918,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                
+
                 {/* 1. SALES INSIGHTS */}
                 <div className={`p-5 rounded-3xl border shadow-sm relative overflow-hidden bg-white border-gray-50`}>
                   <h4 className="font-extrabold text-xs text-primary uppercase tracking-wider flex items-center gap-1.5 mb-3.5">
@@ -3154,7 +2996,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                   <div className="flex flex-col gap-1.5">
                     <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Date Range Filter</label>
                     <div className="relative">
-                      <select 
+                      <select
                         value={reportDateFilter}
                         onChange={(e) => setReportDateFilter(e.target.value as any)}
                         className={`appearance-none border text-xs py-2 pl-3.5 pr-9 rounded-xl font-bold outline-none cursor-pointer transition-colors bg-white border-gray-300 text-gray-700 hover:border-gray-400`}
@@ -3171,7 +3013,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                   <div className="flex flex-col gap-1.5">
                     <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Category Scope</label>
                     <div className="relative">
-                      <select 
+                      <select
                         value={reportCategoryFilter}
                         onChange={(e) => setReportCategoryFilter(e.target.value)}
                         className={`appearance-none border text-xs py-2 pl-3.5 pr-9 rounded-xl font-bold outline-none cursor-pointer transition-colors bg-white border-gray-300 text-gray-700 hover:border-gray-400`}
@@ -3197,38 +3039,38 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
               {/* Custom SVG Sales Chart */}
               <div className={`p-6 rounded-2xl border shadow-sm bg-white border-gray-200 relative z-10 mt-2`}>
                 <h4 className="font-extrabold text-sm mb-6 text-gray-800">Weekly Sales Volume Chart</h4>
-                
+
                 <div className="w-full h-[280px] relative">
-                   {/* Y-Axis Grid Lines & Labels */}
-                   <div className="absolute inset-0 flex flex-col justify-between text-[11px] font-bold text-gray-400">
-                      <div className="flex items-center gap-3"><span className="w-8 text-right">₹22K</span><div className="flex-1 border-t border-dashed border-gray-200"></div></div>
-                      <div className="flex items-center gap-3"><span className="w-8 text-right">₹17K</span><div className="flex-1 border-t border-dashed border-gray-200"></div></div>
-                      <div className="flex items-center gap-3"><span className="w-8 text-right">₹11K</span><div className="flex-1 border-t border-dashed border-gray-200"></div></div>
-                      <div className="flex items-center gap-3"><span className="w-8 text-right">₹6K</span><div className="flex-1 border-t border-dashed border-gray-200"></div></div>
-                      <div className="flex items-center gap-3"><span className="w-8 text-right">₹0K</span><div className="flex-1 border-t border-gray-300"></div></div>
-                   </div>
+                  {/* Y-Axis Grid Lines & Labels */}
+                  <div className="absolute inset-0 flex flex-col justify-between text-[11px] font-bold text-gray-400">
+                    <div className="flex items-center gap-3"><span className="w-8 text-right">₹22K</span><div className="flex-1 border-t border-dashed border-gray-200"></div></div>
+                    <div className="flex items-center gap-3"><span className="w-8 text-right">₹17K</span><div className="flex-1 border-t border-dashed border-gray-200"></div></div>
+                    <div className="flex items-center gap-3"><span className="w-8 text-right">₹11K</span><div className="flex-1 border-t border-dashed border-gray-200"></div></div>
+                    <div className="flex items-center gap-3"><span className="w-8 text-right">₹6K</span><div className="flex-1 border-t border-dashed border-gray-200"></div></div>
+                    <div className="flex items-center gap-3"><span className="w-8 text-right">₹0K</span><div className="flex-1 border-t border-gray-300"></div></div>
+                  </div>
 
-                   {/* Bars */}
-                   <div className="absolute inset-0 ml-12 mb-4 flex items-end justify-around px-2 pt-6 pb-[2px]">
-                      <div className="w-[12%] bg-[#ff7f24] rounded-t-sm h-[30%] hover:brightness-110 transition-all cursor-pointer"></div>
-                      <div className="w-[12%] bg-[#ff7f24] rounded-t-sm h-[48%] hover:brightness-110 transition-all cursor-pointer"></div>
-                      <div className="w-[12%] bg-[#ff7f24] rounded-t-sm h-[42%] hover:brightness-110 transition-all cursor-pointer"></div>
-                      <div className="w-[12%] bg-[#ff7f24] rounded-t-sm h-[60%] hover:brightness-110 transition-all cursor-pointer"></div>
-                      <div className="w-[12%] bg-[#ff7f24] rounded-t-sm h-[75%] hover:brightness-110 transition-all cursor-pointer"></div>
-                      <div className="w-[12%] bg-[#ff7f24] rounded-t-sm h-[95%] hover:brightness-110 transition-all cursor-pointer"></div>
-                      <div className="w-[12%] bg-[#ff7f24] rounded-t-sm h-[85%] hover:brightness-110 transition-all cursor-pointer"></div>
-                   </div>
+                  {/* Bars */}
+                  <div className="absolute inset-0 ml-12 mb-4 flex items-end justify-around px-2 pt-6 pb-[2px]">
+                    <div className="w-[12%] bg-[#ff7f24] rounded-t-sm h-[30%] hover:brightness-110 transition-all cursor-pointer"></div>
+                    <div className="w-[12%] bg-[#ff7f24] rounded-t-sm h-[48%] hover:brightness-110 transition-all cursor-pointer"></div>
+                    <div className="w-[12%] bg-[#ff7f24] rounded-t-sm h-[42%] hover:brightness-110 transition-all cursor-pointer"></div>
+                    <div className="w-[12%] bg-[#ff7f24] rounded-t-sm h-[60%] hover:brightness-110 transition-all cursor-pointer"></div>
+                    <div className="w-[12%] bg-[#ff7f24] rounded-t-sm h-[75%] hover:brightness-110 transition-all cursor-pointer"></div>
+                    <div className="w-[12%] bg-[#ff7f24] rounded-t-sm h-[95%] hover:brightness-110 transition-all cursor-pointer"></div>
+                    <div className="w-[12%] bg-[#ff7f24] rounded-t-sm h-[85%] hover:brightness-110 transition-all cursor-pointer"></div>
+                  </div>
 
-                   {/* X-Axis Labels */}
-                   <div className="absolute bottom-0 left-12 right-0 flex justify-around px-2 -mb-6 text-[11px] font-bold text-gray-500">
-                      <span className="w-[12%] text-center">Mon</span>
-                      <span className="w-[12%] text-center">Tue</span>
-                      <span className="w-[12%] text-center">Wed</span>
-                      <span className="w-[12%] text-center">Thu</span>
-                      <span className="w-[12%] text-center">Fri</span>
-                      <span className="w-[12%] text-center">Sat</span>
-                      <span className="w-[12%] text-center">Sun</span>
-                   </div>
+                  {/* X-Axis Labels */}
+                  <div className="absolute bottom-0 left-12 right-0 flex justify-around px-2 -mb-6 text-[11px] font-bold text-gray-500">
+                    <span className="w-[12%] text-center">Mon</span>
+                    <span className="w-[12%] text-center">Tue</span>
+                    <span className="w-[12%] text-center">Wed</span>
+                    <span className="w-[12%] text-center">Thu</span>
+                    <span className="w-[12%] text-center">Fri</span>
+                    <span className="w-[12%] text-center">Sat</span>
+                    <span className="w-[12%] text-center">Sun</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -3251,33 +3093,33 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-gray-400 mb-1">Restaurant Name</label>
-                      <input type="text" required className="w-full p-2.5 border rounded-xl bg-transparent" value={alertSettings.restaurantName || ''} onChange={(e) => setAlertSettings({...alertSettings, restaurantName: e.target.value})} />
+                      <input type="text" required className="w-full p-2.5 border rounded-xl bg-transparent" value={alertSettings.restaurantName || ''} onChange={(e) => setAlertSettings({ ...alertSettings, restaurantName: e.target.value })} />
                     </div>
                     <div>
                       <label className="block text-gray-400 mb-1">Owner Name</label>
-                      <input type="text" placeholder="Enter Owner Name" required className="w-full p-2.5 border rounded-xl bg-transparent" value={alertSettings.ownerName || ''} onChange={(e) => setAlertSettings({...alertSettings, ownerName: e.target.value})} />
+                      <input type="text" placeholder="Enter Owner Name" required className="w-full p-2.5 border rounded-xl bg-transparent" value={alertSettings.ownerName || ''} onChange={(e) => setAlertSettings({ ...alertSettings, ownerName: e.target.value })} />
                     </div>
                   </div>
-                  
+
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-gray-400 mb-1">Branch Name</label>
-                      <input type="text" placeholder="Enter Branch Name" required className="w-full p-2.5 border rounded-xl bg-transparent" value={alertSettings.branchName || ''} onChange={(e) => setAlertSettings({...alertSettings, branchName: e.target.value})} />
+                      <input type="text" placeholder="Enter Branch Name" required className="w-full p-2.5 border rounded-xl bg-transparent" value={alertSettings.branchName || ''} onChange={(e) => setAlertSettings({ ...alertSettings, branchName: e.target.value })} />
                     </div>
                     <div>
                       <label className="block text-gray-400 mb-1">Email Address</label>
-                      <input type="email" placeholder="Enter Email" required pattern="[a-zA-Z0-9._%+\-]+@gmail\.com$" title="Must be a valid @gmail.com address" className="w-full p-2.5 border rounded-xl bg-transparent" value={alertSettings.email || ''} onChange={(e) => setAlertSettings({...alertSettings, email: e.target.value})} />
+                      <input type="email" placeholder="Enter Email" required pattern="[a-zA-Z0-9._%+\-]+@gmail\.com$" title="Must be a valid @gmail.com address" className="w-full p-2.5 border rounded-xl bg-transparent" value={alertSettings.email || ''} onChange={(e) => setAlertSettings({ ...alertSettings, email: e.target.value })} />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-gray-400 mb-1">Mobile Number</label>
-                      <input type="tel" placeholder="Primary Contact" required pattern="^[6-9]\d{9}$" title="Must be a valid 10-digit Indian mobile number" className="w-full p-2.5 border rounded-xl bg-transparent" value={alertSettings.mobile || ''} onChange={(e) => setAlertSettings({...alertSettings, mobile: e.target.value})} />
+                      <input type="tel" placeholder="Primary Contact" required pattern="^[6-9]\d{9}$" title="Must be a valid 10-digit Indian mobile number" className="w-full p-2.5 border rounded-xl bg-transparent" value={alertSettings.mobile || ''} onChange={(e) => setAlertSettings({ ...alertSettings, mobile: e.target.value })} />
                     </div>
                     <div>
                       <label className="block text-gray-400 mb-1">Alternate Contact Number</label>
-                      <input type="tel" placeholder="Alternate Contact" required pattern="^[6-9]\d{9}$" title="Must be a valid 10-digit Indian mobile number" className="w-full p-2.5 border rounded-xl bg-transparent" value={alertSettings.alternateMobile || ''} onChange={(e) => setAlertSettings({...alertSettings, alternateMobile: e.target.value})} />
+                      <input type="tel" placeholder="Alternate Contact" required pattern="^[6-9]\d{9}$" title="Must be a valid 10-digit Indian mobile number" className="w-full p-2.5 border rounded-xl bg-transparent" value={alertSettings.alternateMobile || ''} onChange={(e) => setAlertSettings({ ...alertSettings, alternateMobile: e.target.value })} />
                     </div>
                   </div>
 
@@ -3292,13 +3134,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                           pattern="^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$"
                           title="Must be a valid 15-character GSTIN format"
                           value={alertSettings.gstNo || ''}
-                          onChange={(e) => setAlertSettings({...alertSettings, gstNo: e.target.value})}
+                          onChange={(e) => setAlertSettings({ ...alertSettings, gstNo: e.target.value })}
                           className="w-full p-2.5 border rounded-xl bg-transparent"
                         />
                       </div>
                       <div>
                         <label className="block text-gray-400 mb-1">FSSAI License Number (India)</label>
-                        <input type="text" placeholder="FSSAI Number" required pattern="^[1-2]\d{13}$" title="Must be a valid 14-digit FSSAI license number" className="w-full p-2.5 border rounded-xl bg-transparent" value={alertSettings.fssai || ''} onChange={(e) => setAlertSettings({...alertSettings, fssai: e.target.value})} />
+                        <input type="text" placeholder="FSSAI Number" required pattern="^[1-2]\d{13}$" title="Must be a valid 14-digit FSSAI license number" className="w-full p-2.5 border rounded-xl bg-transparent" value={alertSettings.fssai || ''} onChange={(e) => setAlertSettings({ ...alertSettings, fssai: e.target.value })} />
                       </div>
                       <div>
                         <label className="block text-gray-400 mb-1">Tax Percentage (%)</label>
@@ -3308,7 +3150,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                           min="0"
                           max="100"
                           value={alertSettings.tax || 0}
-                          onChange={(e) => setAlertSettings({...alertSettings, tax: parseInt(e.target.value) || 0})}
+                          onChange={(e) => setAlertSettings({ ...alertSettings, tax: parseInt(e.target.value) || 0 })}
                           className="w-full p-2.5 border rounded-xl bg-transparent"
                         />
                       </div>
@@ -3320,44 +3162,44 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                     <div className="space-y-3">
                       <div>
                         <label className="block text-gray-400 mb-1">Address</label>
-                        <textarea placeholder="Street Address" required className="w-full p-2.5 border rounded-xl bg-transparent" rows={2} value={alertSettings.address || ''} onChange={(e) => setAlertSettings({...alertSettings, address: e.target.value})}></textarea>
+                        <textarea placeholder="Street Address" required className="w-full p-2.5 border rounded-xl bg-transparent" rows={2} value={alertSettings.address || ''} onChange={(e) => setAlertSettings({ ...alertSettings, address: e.target.value })}></textarea>
                       </div>
                       <div className="grid grid-cols-3 gap-3">
                         <div>
                           <label className="block text-gray-400 mb-1">City</label>
-                          <input type="text" placeholder="City" required className="w-full p-2.5 border rounded-xl bg-transparent" value={alertSettings.city || ''} onChange={(e) => setAlertSettings({...alertSettings, city: e.target.value})} />
+                          <input type="text" placeholder="City" required className="w-full p-2.5 border rounded-xl bg-transparent" value={alertSettings.city || ''} onChange={(e) => setAlertSettings({ ...alertSettings, city: e.target.value })} />
                         </div>
                         <div>
                           <label className="block text-gray-400 mb-1">State</label>
-                          <input type="text" placeholder="State" required className="w-full p-2.5 border rounded-xl bg-transparent" value={alertSettings.state || ''} onChange={(e) => setAlertSettings({...alertSettings, state: e.target.value})} />
+                          <input type="text" placeholder="State" required className="w-full p-2.5 border rounded-xl bg-transparent" value={alertSettings.state || ''} onChange={(e) => setAlertSettings({ ...alertSettings, state: e.target.value })} />
                         </div>
                         <div>
                           <label className="block text-gray-400 mb-1">Country</label>
-                          <input type="text" placeholder="Country" required className="w-full p-2.5 border rounded-xl bg-transparent" value={alertSettings.country || ''} onChange={(e) => setAlertSettings({...alertSettings, country: e.target.value})} />
+                          <input type="text" placeholder="Country" required className="w-full p-2.5 border rounded-xl bg-transparent" value={alertSettings.country || ''} onChange={(e) => setAlertSettings({ ...alertSettings, country: e.target.value })} />
                         </div>
                       </div>
                       <div className="grid grid-cols-3 gap-3">
                         <div>
                           <label className="block text-gray-400 mb-1">PIN Code</label>
-                          <input type="text" placeholder="PIN Code" required pattern="^[1-9][0-9]{5}$" title="Must be a valid 6-digit Indian PIN code" className="w-full p-2.5 border rounded-xl bg-transparent" value={alertSettings.pinCode || ''} onChange={(e) => setAlertSettings({...alertSettings, pinCode: e.target.value})} />
+                          <input type="text" placeholder="PIN Code" required pattern="^[1-9][0-9]{5}$" title="Must be a valid 6-digit Indian PIN code" className="w-full p-2.5 border rounded-xl bg-transparent" value={alertSettings.pinCode || ''} onChange={(e) => setAlertSettings({ ...alertSettings, pinCode: e.target.value })} />
                         </div>
                         <div>
                           <label className="block text-gray-400 mb-1">Landmark</label>
-                          <input type="text" placeholder="Nearby Landmark" required className="w-full p-2.5 border rounded-xl bg-transparent" value={alertSettings.landmark || ''} onChange={(e) => setAlertSettings({...alertSettings, landmark: e.target.value})} />
+                          <input type="text" placeholder="Nearby Landmark" required className="w-full p-2.5 border rounded-xl bg-transparent" value={alertSettings.landmark || ''} onChange={(e) => setAlertSettings({ ...alertSettings, landmark: e.target.value })} />
                         </div>
                         <div>
                           <label className="block text-gray-400 mb-1">Google Maps Location</label>
                           <div className="flex gap-2">
-                            <input 
-                              type="url" 
-                              placeholder="Maps URL" 
+                            <input
+                              type="url"
+                              placeholder="Maps URL"
                               required
                               value={alertSettings.mapsLocation || ''}
-                              onChange={(e) => setAlertSettings({...alertSettings, mapsLocation: e.target.value})}
-                              className="w-full p-2.5 border rounded-xl bg-transparent flex-1" 
+                              onChange={(e) => setAlertSettings({ ...alertSettings, mapsLocation: e.target.value })}
+                              className="w-full p-2.5 border rounded-xl bg-transparent flex-1"
                             />
-                            <button 
-                              type="button" 
+                            <button
+                              type="button"
                               onClick={handleGetLocation}
                               className="bg-gray-100 hover:bg-gray-200 text-gray-700  dark:hover:bg-gray-700  p-2.5 rounded-xl border border-transparent  flex items-center justify-center cursor-pointer transition-colors"
                               title="Detect Current Location"
@@ -3418,7 +3260,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                 </div>
                 <div className="flex gap-2">
                   {tables.length === 0 && (
-                    <button 
+                    <button
                       onClick={handleInitializeTables}
                       disabled={loading}
                       className="bg-primary text-white font-bold py-2 px-3.5 rounded-xl cursor-pointer text-xs"
@@ -3426,7 +3268,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                       Initialize Tables 1-12
                     </button>
                   )}
-                  <button 
+                  <button
                     onClick={handleAddTable}
                     disabled={loading}
                     className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2 px-3.5 rounded-xl cursor-pointer text-xs flex items-center gap-1.5"
@@ -3439,17 +3281,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 text-xs font-semibold">
                 {tables.map(num => {
                   const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-                  const secureUrl = num.qr_token 
-                    ? `${baseUrl}/table/${num.id}?token=${num.qr_token}` 
+                  const secureUrl = num.qr_token
+                    ? `${baseUrl}/table/${num.id}?token=${num.qr_token}`
                     : `No Token Session Configured`;
                   return (
                     <div key={num.id} className={`p-4 rounded-3xl border text-center shadow-sm bg-white border-gray-50`}>
                       <h4 className="font-extrabold">Table #{num.id} QR</h4>
                       <div className="w-24 h-24 bg-gray-50 rounded-2xl mx-auto my-3 flex items-center justify-center border">
                         {num.qr_token ? (
-                          <img 
-                            src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(secureUrl)}`} 
-                            alt="Table QR" 
+                          <img
+                            src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(secureUrl)}`}
+                            alt="Table QR"
                             className="w-20 h-20"
                           />
                         ) : (
@@ -3486,110 +3328,435 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
           )}
 
           {/* ----------------------------------------------------
-              VIEW 19: REVIEWS & SENTIMENT ANALYSIS
+              VIEW 19: REVIEWS & SENTIMENT ANALYSIS (ADMIN VIEW)
               ---------------------------------------------------- */}
-          {activeTab === 'reviews' && (
-            <div className="space-y-6 animate-fade-in">
-              <div className="border-b pb-3">
-                <h3 className="font-extrabold text-sm">Customer Sentiment Reviews</h3>
-                <p className="text-[10px] text-gray-400">Review feedback submissions graded by Groq LLM (😄/😐/😞).</p>
-              </div>
+          {activeTab === 'reviews' && (() => {
+            const allCustomerRevs = reviews || [];
+            const allRatings = allCustomerRevs
+              .map(r => Number(r.rating || r.food_rating || 5))
+              .filter(val => !isNaN(val) && val > 0);
+            const overallRating = allRatings.length > 0
+              ? (allRatings.reduce((sum, r) => sum + r, 0) / allRatings.length).toFixed(1)
+              : '5.0';
 
-              <div className="space-y-4">
-                {reviews.map(item => {
-                  const sentiment = aiReviewSentiment[item.id];
-                  return (
-                    <div 
-                      key={item.id}
-                      className={`p-4 rounded-3xl border shadow-sm bg-white border-gray-50`}
-                    >
-                      <div className="flex justify-between items-start mb-2 text-xs">
-                        <div>
-                          <h4 className="font-extrabold">{item.customer_name}</h4>
-                          <span className="text-[9px] text-gray-400">Order: #{item.order_id} • {item.date}</span>
+            const starCounts: Record<number, number> = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+            allRatings.forEach(r => {
+              const rounded = Math.min(5, Math.max(1, Math.round(r)));
+              starCounts[rounded] = (starCounts[rounded] || 0) + 1;
+            });
+
+            // Sub-ratings from original feedback data
+            const foodRatings = allCustomerRevs.map(r => Number(r.food_rating || r.rating || 0)).filter(v => v > 0);
+            const serviceRatings = allCustomerRevs.map(r => Number(r.service_rating || 0)).filter(v => v > 0);
+            const ambienceRatings = allCustomerRevs.map(r => Number(r.ambience_rating || 0)).filter(v => v > 0);
+
+            const avgFood = foodRatings.length > 0 ? (foodRatings.reduce((s, v) => s + v, 0) / foodRatings.length).toFixed(1) : overallRating;
+            const avgService = serviceRatings.length > 0 ? (serviceRatings.reduce((s, v) => s + v, 0) / serviceRatings.length).toFixed(1) : overallRating;
+            const avgAmbience = ambienceRatings.length > 0 ? (ambienceRatings.reduce((s, v) => s + v, 0) / ambienceRatings.length).toFixed(1) : overallRating;
+
+            // Only text reviews are considered for the detailed feed
+            const textReviews = allCustomerRevs.filter(r => typeof r.comment === 'string' && r.comment.trim().length > 0);
+            const starOnlyCount = allCustomerRevs.length - textReviews.length;
+
+            // Executive sentiment categorizer based on original data
+            const getSentiment = (r: any): { sentiment: 'Positive' | 'Neutral' | 'Critical'; label: string; bg: string; text: string; border: string } => {
+              const ai = aiReviewSentiment[r.id];
+              const rawSentiment = String(ai?.sentiment || r.sentiment || '').toLowerCase();
+              if (rawSentiment === 'positive') {
+                return { sentiment: 'Positive', label: 'Positive Experience', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' };
+              }
+              if (rawSentiment === 'negative' || rawSentiment === 'critical') {
+                return { sentiment: 'Critical', label: 'Needs Attention', bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200' };
+              }
+              if (rawSentiment === 'neutral') {
+                return { sentiment: 'Neutral', label: 'Neutral Feedback', bg: 'bg-slate-100', text: 'text-slate-700', border: 'border-slate-200' };
+              }
+              const score = Number(r.rating || 5);
+              if (score >= 4) return { sentiment: 'Positive', label: 'Positive Experience', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' };
+              if (score === 3) return { sentiment: 'Neutral', label: 'Neutral Feedback', bg: 'bg-slate-100', text: 'text-slate-700', border: 'border-slate-200' };
+              return { sentiment: 'Critical', label: 'Needs Attention', bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200' };
+            };
+
+            const posCount = textReviews.filter(r => getSentiment(r).sentiment === 'Positive').length;
+            const neutCount = textReviews.filter(r => getSentiment(r).sentiment === 'Neutral').length;
+            const critCount = textReviews.filter(r => getSentiment(r).sentiment === 'Critical').length;
+            const unrepliedCount = textReviews.filter(r => !r.reply || !r.reply.trim()).length;
+            const repliedCount = textReviews.length - unrepliedCount;
+
+            const posPct = textReviews.length > 0 ? Math.round((posCount / textReviews.length) * 100) : (allCustomerRevs.length > 0 ? 100 : 0);
+            const neutPct = textReviews.length > 0 ? Math.round((neutCount / textReviews.length) * 100) : 0;
+            const critPct = textReviews.length > 0 ? Math.round((critCount / textReviews.length) * 100) : 0;
+
+            const filteredReviews = textReviews.filter(r => {
+              if (reviewFilter === 'positive') return getSentiment(r).sentiment === 'Positive';
+              if (reviewFilter === 'neutral') return getSentiment(r).sentiment === 'Neutral';
+              if (reviewFilter === 'critical') return getSentiment(r).sentiment === 'Critical';
+              if (reviewFilter === 'unreplied') return !r.reply || !r.reply.trim();
+              return true;
+            });
+
+            return (
+              <div className="space-y-6 animate-fade-in max-w-7xl mx-auto">
+                {/* Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <span className="text-[11px] font-black uppercase tracking-widest text-[#FF6B00]">
+                      CUSTOMER FEEDBACK INTELLIGENCE
+                    </span>
+                    <h2 className="text-2xl font-black tracking-tight text-slate-900 mt-0.5">
+                      Customer Reviews & Sentiment
+                    </h2>
+                    <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
+                      Clear-cut administrative sentiment analytics, satisfaction metrics, and management response console.
+                    </p>
+                  </div>
+                </div>
+
+                {/* 1. TOP METRIC CARDS */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Card 1: Overall Average Rating */}
+                  <div className="p-5 rounded-2xl border bg-white border-slate-200 shadow-2xs flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Overall Rating</span>
+                        <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-500 flex items-center justify-center">
+                          <Star size={16} fill="currentColor" />
                         </div>
-                        <button
-                          onClick={() => analyzeSentimentForReview(item.id, item.comment)}
-                          className="bg-primary/10 text-primary font-bold py-1 px-2.5 rounded-xl text-[9px] flex items-center gap-1 cursor-pointer"
-                        >
-                          <Sparkles size={10} fill="currentColor" />
-                          <span>Analyze Sentiment</span>
-                        </button>
                       </div>
+                      <div className="flex items-baseline gap-2 mt-2">
+                        <strong className="text-3xl font-black text-slate-900">★ {overallRating}</strong>
+                        <span className="text-sm font-bold text-slate-400">/ 5.0</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 font-medium mt-1">
+                        Calculated by all {allCustomerRevs.length} customer ratings
+                      </p>
+                    </div>
 
-                      <p className="text-xs italic text-gray-500 font-semibold mb-3">"{item.comment}"</p>
-
-                      {/* Realtime NLP or Groq Sentiment */}
-                      {(() => {
-                        const effectiveSentiment = sentiment || (item.sentiment ? {
-                          sentiment: item.sentiment,
-                          emoji: item.emoji || (item.sentiment === 'Positive' ? '😊' : item.sentiment === 'Negative' ? '😞' : '😐'),
-                          aiSummary: item.kitchen_alert ? `⚠️ KITCHEN ALERT: ${item.kitchen_alert_reason}` : (item.key_phrases?.join(', ') || 'Runtime NLP analysis')
-                        } : null);
-
-                        if (!effectiveSentiment) return null;
-
+                    {/* Star Breakdown Bars */}
+                    <div className="mt-4 pt-3 border-t border-slate-100 space-y-1.5">
+                      {[5, 4, 3, 2, 1].map(stars => {
+                        const count = starCounts[stars] || 0;
+                        const pct = allRatings.length > 0 ? Math.round((count / allRatings.length) * 100) : (stars === 5 ? 100 : 0);
                         return (
-                          <div className={`p-3 rounded-2xl border text-[11px] font-semibold mb-3 flex gap-2 ${
-                            item.kitchen_alert 
-                              ? 'bg-red-50 text-red-800 border-red-200' 
-                              : effectiveSentiment.sentiment === 'Positive'
-                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                                : 'bg-gray-50 text-gray-700 border-gray-100'
-                          }`}>
-                            <span className="text-base">{effectiveSentiment.emoji}</span>
-                            <div>
-                              <p className="flex items-center gap-1.5">
-                                <span>NLP Sentiment:</span>
-                                <strong className="font-black">{effectiveSentiment.sentiment}</strong>
-                                {item.sentiment_score && (
-                                  <span className="text-[9px] font-bold opacity-75">({Math.round(item.sentiment_score)}% score)</span>
-                                )}
-                              </p>
-                              <p className="mt-0.5 text-[10px] opacity-90">{effectiveSentiment.aiSummary}</p>
+                          <div key={stars} className="flex items-center gap-2 text-[10px]">
+                            <span className="w-5 text-slate-500 font-bold">{stars}★</span>
+                            <div className="flex-1 bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full ${stars >= 4 ? 'bg-amber-400' : stars === 3 ? 'bg-slate-400' : 'bg-rose-400'}`}
+                                style={{ width: `${pct}%` }}
+                              />
                             </div>
+                            <span className="w-6 text-right text-slate-400 font-medium">{count}</span>
                           </div>
                         );
-                      })()}
-
-                      {/* Reply drawer */}
-                      {item.reply ? (
-                        <div className="bg-orange-50/20 p-2.5 rounded-2xl border border-orange-100 text-[10px] font-semibold flex gap-2">
-                          <CornerDownRight size={14} className="text-primary flex-shrink-0 mt-0.5" />
-                          <div>
-                            <span className="text-primary font-black uppercase text-[9px]">Reply:</span>
-                            <p className="mt-0.5 italic">"{item.reply}"</p>
-                          </div>
-                        </div>
-                      ) : (
-                        replyReviewId === item.id ? (
-                          <div className="mt-2.5 flex gap-2">
-                            <input
-                              type="text"
-                              value={replyText}
-                              onChange={(e) => setReplyText(e.target.value)}
-                              className="flex-grow text-xs border rounded-xl py-2 px-3 focus:outline-none focus:ring-1 focus:ring-primary bg-white text-black"
-                              placeholder="Write reply comment..."
-                            />
-                            <button onClick={() => handleReplyReviewSubmit(item.id)} className="bg-primary text-white text-xs font-bold px-4 rounded-xl cursor-pointer">Send</button>
-                            <button onClick={() => setReplyReviewId(null)} className="border text-gray-500 text-xs px-3 rounded-xl bg-white cursor-pointer">Cancel</button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => setReplyReviewId(item.id)}
-                            className="text-[9px] text-primary font-black uppercase tracking-wider flex items-center gap-1.5"
-                          >
-                            <CornerDownRight size={11} />
-                            <span>Reply to review</span>
-                          </button>
-                        )
-                      )}
+                      })}
                     </div>
-                  );
-                })}
+                  </div>
+
+                  {/* Card 2: Sentiment Polarity (Original Data) */}
+                  <div className="p-5 rounded-2xl border bg-white border-slate-200 shadow-2xs flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Sentiment Polarity</span>
+                        <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                          <Smile size={16} />
+                        </div>
+                      </div>
+                      <div className="flex items-baseline gap-2 mt-2">
+                        <strong className="text-3xl font-black text-emerald-600">{posPct}%</strong>
+                        <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                          Positive
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 font-medium mt-1">
+                        Based on original customer feedback dataset
+                      </p>
+                    </div>
+
+                    <div className="mt-4 pt-3 border-t border-slate-100 space-y-2">
+                      <div className="w-full h-2 rounded-full bg-slate-100 flex overflow-hidden">
+                        <div className="bg-emerald-500 h-full" style={{ width: `${posPct}%` }} title={`Positive: ${posPct}%`} />
+                        <div className="bg-slate-400 h-full" style={{ width: `${neutPct}%` }} title={`Neutral: ${neutPct}%`} />
+                        <div className="bg-rose-500 h-full" style={{ width: `${critPct}%` }} title={`Critical: ${critPct}%`} />
+                      </div>
+                      <div className="flex justify-between text-[10px] text-slate-500 font-semibold">
+                        <span className="text-emerald-700">{posCount} Positive</span>
+                        <span className="text-slate-600">{neutCount} Neutral</span>
+                        <span className="text-rose-600">{critCount} Critical</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 3: Feedback Coverage */}
+                  <div className="p-5 rounded-2xl border bg-white border-slate-200 shadow-2xs flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Written Reviews</span>
+                        <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                          <MessageSquare size={16} />
+                        </div>
+                      </div>
+                      <div className="flex items-baseline gap-2 mt-2">
+                        <strong className="text-3xl font-black text-slate-900">{textReviews.length}</strong>
+                        <span className="text-xs font-bold text-slate-400">Reviews</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 font-medium mt-1">
+                        Only reviews with written feedback displayed below
+                      </p>
+                    </div>
+
+                    <div className="mt-4 pt-3 border-t border-slate-100">
+                      <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-[11px] text-slate-600 font-medium">
+                        <span className="font-bold text-slate-800">{starOnlyCount}</span> star-only ratings contribute directly to Overall Rating without text clutter.
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 4: Response Rate */}
+                  <div className="p-5 rounded-2xl border bg-white border-slate-200 shadow-2xs flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Management Response</span>
+                        <div className="w-8 h-8 rounded-lg bg-orange-50 text-[#FF6B00] flex items-center justify-center">
+                          <CornerDownRight size={16} />
+                        </div>
+                      </div>
+                      <div className="flex items-baseline gap-2 mt-2">
+                        <strong className="text-3xl font-black text-slate-900">
+                          {textReviews.length > 0 ? Math.round((repliedCount / textReviews.length) * 100) : 100}%
+                        </strong>
+                        <span className="text-xs font-bold text-slate-400">Replied</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 font-medium mt-1">
+                        {unrepliedCount === 0 ? 'All customer reviews answered' : `${unrepliedCount} awaiting manager response`}
+                      </p>
+                    </div>
+
+                    <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                      <span className="text-slate-500 font-medium">{repliedCount} Replied</span>
+                      <span className={`font-bold px-2 py-0.5 rounded-full text-[10px] ${unrepliedCount > 0 ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                        {unrepliedCount} Pending
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Sub-aspect Satisfaction Breakdown */}
+                {foodRatings.length > 0 && (serviceRatings.length > 0 || ambienceRatings.length > 0) && (
+                  <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-2xs flex flex-wrap items-center justify-between gap-4">
+                    <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      Aspect Satisfaction Breakdown
+                    </span>
+                    <div className="flex items-center gap-6">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-slate-500 font-medium">Food Quality:</span>
+                        <strong className="text-xs font-black text-amber-600">★ {avgFood} / 5.0</strong>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-slate-500 font-medium">Service Speed:</span>
+                        <strong className="text-xs font-black text-amber-600">★ {avgService} / 5.0</strong>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-slate-500 font-medium">Ambience:</span>
+                        <strong className="text-xs font-black text-amber-600">★ {avgAmbience} / 5.0</strong>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Filter Tabs */}
+                <div className="flex flex-wrap items-center gap-2 pt-2 border-b border-slate-200 pb-3">
+                  <button
+                    onClick={() => setReviewFilter('all')}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      reviewFilter === 'all'
+                        ? 'bg-slate-900 text-white shadow-xs'
+                        : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    All Comments ({textReviews.length})
+                  </button>
+                  <button
+                    onClick={() => setReviewFilter('positive')}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      reviewFilter === 'positive'
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'bg-white text-emerald-700 border border-emerald-200 hover:bg-emerald-50'
+                    }`}
+                  >
+                    Positive ({posCount})
+                  </button>
+                  <button
+                    onClick={() => setReviewFilter('neutral')}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      reviewFilter === 'neutral'
+                        ? 'bg-slate-600 text-white shadow-xs'
+                        : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    Neutral ({neutCount})
+                  </button>
+                  <button
+                    onClick={() => setReviewFilter('critical')}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      reviewFilter === 'critical'
+                        ? 'bg-rose-600 text-white shadow-xs'
+                        : 'bg-white text-rose-700 border border-rose-200 hover:bg-rose-50'
+                    }`}
+                  >
+                    Action Needed ({critCount})
+                  </button>
+                  <button
+                    onClick={() => setReviewFilter('unreplied')}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      reviewFilter === 'unreplied'
+                        ? 'bg-[#FF6B00] text-white shadow-xs'
+                        : 'bg-white text-[#FF6B00] border border-orange-200 hover:bg-orange-50'
+                    }`}
+                  >
+                    Needs Reply ({unrepliedCount})
+                  </button>
+                </div>
+
+                {/* 2. CUSTOMER REVIEWS LIST (TEXT REVIEWS ONLY) */}
+                <div className="space-y-3.5">
+                  {filteredReviews.length === 0 ? (
+                    <div className="text-center py-16 bg-white rounded-2xl border border-slate-200 text-slate-400">
+                      <MessageSquare size={40} className="mx-auto mb-3 opacity-40" />
+                      <p className="text-sm font-bold text-slate-700">No written reviews match this filter</p>
+                      <p className="text-xs text-slate-400 mt-1">
+                        {textReviews.length === 0
+                          ? `All ${allCustomerRevs.length} customer feedbacks are star-only ratings, which are actively tracked in the Overall Rating.`
+                          : 'Try switching to another filter tab above.'}
+                      </p>
+                    </div>
+                  ) : (
+                    filteredReviews.map(item => {
+                      const sentimentInfo = getSentiment(item);
+                      const ratingVal = Number(item.rating || 5);
+
+                      return (
+                        <div
+                          key={item.id}
+                          className="p-5 rounded-2xl border bg-white border-slate-200/90 shadow-2xs hover:shadow-xs transition-all space-y-3"
+                        >
+                          {/* Review Header */}
+                          <div className="flex flex-wrap justify-between items-start gap-2">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-extrabold text-sm text-slate-900">{item.customer_name || 'Guest Customer'}</h4>
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200">
+                                  #{item.order_id || 'Table Service'}
+                                </span>
+                              </div>
+                              <span className="text-[11px] text-slate-400 font-medium block mt-0.5">
+                                {item.date || 'Recent Visit'}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                              {/* Star Rating display */}
+                              <div className="flex items-center gap-0.5">
+                                {[1, 2, 3, 4, 5].map(s => (
+                                  <Star
+                                    key={s}
+                                    size={14}
+                                    fill={s <= ratingVal ? '#F59E0B' : 'none'}
+                                    stroke={s <= ratingVal ? '#F59E0B' : '#CBD5E1'}
+                                  />
+                                ))}
+                                <span className="text-xs font-black text-slate-700 ml-1.5">{ratingVal}.0</span>
+                              </div>
+
+                              {/* Executive Sentiment Badge */}
+                              <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold border flex items-center gap-1.5 ${sentimentInfo.bg} ${sentimentInfo.text} ${sentimentInfo.border}`}>
+                                {sentimentInfo.sentiment === 'Positive' ? (
+                                  <Smile size={13} />
+                                ) : sentimentInfo.sentiment === 'Critical' ? (
+                                  <Frown size={13} />
+                                ) : (
+                                  <Meh size={13} />
+                                )}
+                                <span>{sentimentInfo.label}</span>
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Customer Comment */}
+                          <p className="text-xs sm:text-sm text-slate-700 font-medium leading-relaxed bg-slate-50/70 p-3.5 rounded-xl border border-slate-100 italic">
+                            "{item.comment}"
+                          </p>
+
+                          {/* Aspect breakdown if present */}
+                          {(item.food_rating || item.service_rating || item.ambience_rating) && (
+                            <div className="flex items-center gap-4 text-[10px] text-slate-500 font-semibold">
+                              {item.food_rating && <span>Food: {item.food_rating}★</span>}
+                              {item.service_rating && <span>Service: {item.service_rating}★</span>}
+                              {item.ambience_rating && <span>Ambience: {item.ambience_rating}★</span>}
+                            </div>
+                          )}
+
+                          {/* Management Reply Section */}
+                          {item.reply ? (
+                            <div className="p-3 rounded-xl bg-orange-50/40 border border-orange-100 flex items-start gap-2.5 text-xs">
+                              <CornerDownRight size={14} className="text-[#FF6B00] flex-shrink-0 mt-0.5" />
+                              <div className="flex-1">
+                                <div className="flex items-center justify-between">
+                                  <span className="font-extrabold text-[#FF6B00] uppercase text-[10px]">Management Response</span>
+                                  <span className="text-[10px] text-slate-400 font-medium">Saved</span>
+                                </div>
+                                <p className="text-slate-700 font-medium mt-0.5 italic">"{item.reply}"</p>
+                              </div>
+                            </div>
+                          ) : (
+                            replyReviewId === item.id ? (
+                              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                                  Respond as Management
+                                </span>
+                                <textarea
+                                  value={replyText}
+                                  onChange={(e) => setReplyText(e.target.value)}
+                                  placeholder="Type an executive response to this customer..."
+                                  rows={2}
+                                  className="w-full text-xs p-2.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 text-slate-800"
+                                />
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => handleReplyReviewSubmit(item.id)}
+                                    className="px-3.5 py-1.5 rounded-lg text-xs font-bold text-white bg-[#FF6B00] hover:bg-orange-600 cursor-pointer shadow-xs"
+                                  >
+                                    Send Response
+                                  </button>
+                                  <button
+                                    onClick={() => { setReplyReviewId(null); setReplyText(''); }}
+                                    className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-100 cursor-pointer"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-between pt-1">
+                                <span className="text-[11px] font-medium text-slate-400">No response sent</span>
+                                <button
+                                  onClick={() => { setReplyReviewId(item.id); setReplyText(''); }}
+                                  className="text-xs font-bold text-[#FF6B00] hover:text-orange-600 flex items-center gap-1.5 cursor-pointer"
+                                >
+                                  <CornerDownRight size={13} />
+                                  <span>Reply to Customer</span>
+                                </button>
+                              </div>
+                            )
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
         </main>
       </div>
@@ -3628,45 +3795,45 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
           <div className={`w-full max-w-sm rounded-3xl p-6 bg-white`}>
             <div className="flex justify-between items-center mb-5">
               <h3 className="font-extrabold">Edit Loyalty Rules</h3>
-              <button onClick={() => setEditLoyaltyModal(false)} className="text-gray-400 hover:text-red-500 cursor-pointer"><X size={20}/></button>
+              <button onClick={() => setEditLoyaltyModal(false)} className="text-gray-400 hover:text-red-500 cursor-pointer"><X size={20} /></button>
             </div>
             <form onSubmit={handleSaveLoyaltyRules} className="space-y-4 text-xs font-semibold">
               <div>
                 <label className="block text-gray-500 mb-1">Points per ₹100 spent</label>
-                <input 
-                  type="number" 
-                  value={loyaltyRules.pointsPerHundred} 
-                  onChange={e => setLoyaltyRules({...loyaltyRules, pointsPerHundred: Number(e.target.value)})}
+                <input
+                  type="number"
+                  value={loyaltyRules.pointsPerHundred}
+                  onChange={e => setLoyaltyRules({ ...loyaltyRules, pointsPerHundred: Number(e.target.value) })}
                   className={`w-full p-3 rounded-xl border bg-gray-50 border-gray-200`}
                   required
                 />
               </div>
               <div>
                 <label className="block text-gray-500 mb-1">Silver Tier Threshold (Points)</label>
-                <input 
-                  type="number" 
-                  value={loyaltyRules.silverTierPoints} 
-                  onChange={e => setLoyaltyRules({...loyaltyRules, silverTierPoints: Number(e.target.value)})}
+                <input
+                  type="number"
+                  value={loyaltyRules.silverTierPoints}
+                  onChange={e => setLoyaltyRules({ ...loyaltyRules, silverTierPoints: Number(e.target.value) })}
                   className={`w-full p-3 rounded-xl border bg-gray-50 border-gray-200`}
                   required
                 />
               </div>
               <div>
                 <label className="block text-gray-500 mb-1">Gold Tier Threshold (Points)</label>
-                <input 
-                  type="number" 
-                  value={loyaltyRules.goldTierPoints} 
-                  onChange={e => setLoyaltyRules({...loyaltyRules, goldTierPoints: Number(e.target.value)})}
+                <input
+                  type="number"
+                  value={loyaltyRules.goldTierPoints}
+                  onChange={e => setLoyaltyRules({ ...loyaltyRules, goldTierPoints: Number(e.target.value) })}
                   className={`w-full p-3 rounded-xl border bg-gray-50 border-gray-200`}
                   required
                 />
               </div>
               <div>
                 <label className="block text-gray-500 mb-1">Gold Tier Discount (%)</label>
-                <input 
-                  type="number" 
-                  value={loyaltyRules.goldDiscountPercent} 
-                  onChange={e => setLoyaltyRules({...loyaltyRules, goldDiscountPercent: Number(e.target.value)})}
+                <input
+                  type="number"
+                  value={loyaltyRules.goldDiscountPercent}
+                  onChange={e => setLoyaltyRules({ ...loyaltyRules, goldDiscountPercent: Number(e.target.value) })}
                   className={`w-full p-3 rounded-xl border bg-gray-50 border-gray-200`}
                   required
                 />
@@ -3677,7 +3844,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
         </div>
       )}
 
-      
+
       {/* =========================================================================
           PORTALIZED FULL-SCREEN MODALS (Directly rendered on document.body)
           Guarantees perfect viewport centering, backdrop coverage, and pinned headers
@@ -3686,8 +3853,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
       {/* 1. EDIT / ADD WAITER MODAL */}
       {newStaffForm && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm overflow-y-auto animate-fade-in font-sans">
-          <div 
-            onClick={(e) => e.stopPropagation()} 
+          <div
+            onClick={(e) => e.stopPropagation()}
             className="relative my-auto w-full max-w-lg max-h-[88vh] flex flex-col rounded-3xl shadow-2xl border bg-white border-slate-100 text-slate-900 overflow-hidden"
           >
             {/* Pinned Header */}
@@ -3700,9 +3867,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                   {editingStaff ? `Updating details for ${editingStaff.name} (${editingStaff.empid})` : 'Register waiter account with terminal login credentials'}
                 </p>
               </div>
-              <button 
+              <button
                 type="button"
-                className="cursor-pointer text-slate-400 hover:text-slate-700 p-1.5 rounded-full hover:bg-slate-100 transition-all" 
+                className="cursor-pointer text-slate-400 hover:text-slate-700 p-1.5 rounded-full hover:bg-slate-100 transition-all"
                 onClick={() => setNewStaffForm(false)}
               >
                 <X size={18} />
@@ -3722,7 +3889,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                     <input
                       type="text"
                       value={staffFormState.photo}
-                      onChange={(e) => setStaffFormState({...staffFormState, photo: e.target.value})}
+                      onChange={(e) => setStaffFormState({ ...staffFormState, photo: e.target.value })}
                       placeholder="Paste Photo URL or Google Drive link"
                       className="w-full p-2 border border-orange-200 rounded-xl text-xs bg-white focus:outline-none focus:ring-2 focus:ring-orange-500"
                     />
@@ -3747,7 +3914,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                       {staffFormState.photo && (
                         <button
                           type="button"
-                          onClick={() => setStaffFormState({...staffFormState, photo: ''})}
+                          onClick={() => setStaffFormState({ ...staffFormState, photo: '' })}
                           className="text-[10px] text-red-500 font-bold hover:underline cursor-pointer"
                         >
                           Remove Photo
@@ -3764,7 +3931,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                 <input
                   type="text"
                   value={staffFormState.name}
-                  onChange={(e) => setStaffFormState({...staffFormState, name: e.target.value})}
+                  onChange={(e) => setStaffFormState({ ...staffFormState, name: e.target.value })}
                   placeholder="e.g. Anand Sharma"
                   required
                   className="w-full p-2.5 border rounded-xl bg-white border-slate-200 text-slate-900"
@@ -3778,7 +3945,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                   <input
                     type="text"
                     value={staffFormState.mobile}
-                    onChange={(e) => setStaffFormState({...staffFormState, mobile: e.target.value})}
+                    onChange={(e) => setStaffFormState({ ...staffFormState, mobile: e.target.value })}
                     placeholder="+91 98765 43210"
                     required
                     className="w-full p-2.5 border rounded-xl bg-white border-slate-200 text-slate-900"
@@ -3789,7 +3956,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                   <input
                     type="email"
                     value={staffFormState.email}
-                    onChange={(e) => setStaffFormState({...staffFormState, email: e.target.value})}
+                    onChange={(e) => setStaffFormState({ ...staffFormState, email: e.target.value })}
                     placeholder="waiter@restaurant.com"
                     className="w-full p-2.5 border rounded-xl bg-white border-slate-200 text-slate-900"
                   />
@@ -3803,7 +3970,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                   <input
                     type="text"
                     value={staffFormState.empid}
-                    onChange={(e) => setStaffFormState({...staffFormState, empid: e.target.value})}
+                    onChange={(e) => setStaffFormState({ ...staffFormState, empid: e.target.value })}
                     placeholder="e.g. EMP-1024"
                     required
                     className="w-full p-2.5 border rounded-xl font-mono uppercase bg-white border-slate-200 text-slate-900 font-bold"
@@ -3826,7 +3993,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                   <input
                     type="text"
                     value={staffFormState.password}
-                    onChange={(e) => setStaffFormState({...staffFormState, password: e.target.value})}
+                    onChange={(e) => setStaffFormState({ ...staffFormState, password: e.target.value })}
                     placeholder="Terminal password"
                     required
                     className="w-full p-2.5 border rounded-xl font-mono bg-white border-slate-200 text-slate-900 font-bold"
@@ -3846,7 +4013,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                   <label className="block text-slate-600 mb-1 text-[10px] uppercase font-bold">Shift *</label>
                   <select
                     value={staffFormState.shift}
-                    onChange={(e) => setStaffFormState({...staffFormState, shift: e.target.value as any})}
+                    onChange={(e) => setStaffFormState({ ...staffFormState, shift: e.target.value as any })}
                     className="w-full p-2.5 border rounded-xl bg-white border-slate-200 text-slate-900 font-bold"
                   >
                     <option value="Morning">Morning Shift</option>
@@ -3859,7 +4026,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                   <input
                     type="number"
                     value={staffFormState.salary}
-                    onChange={(e) => setStaffFormState({...staffFormState, salary: parseInt(e.target.value) || 0})}
+                    onChange={(e) => setStaffFormState({ ...staffFormState, salary: parseInt(e.target.value) || 0 })}
                     required
                     className="w-full p-2.5 border rounded-xl bg-white border-slate-200 text-slate-900 font-bold"
                   />
@@ -3893,16 +4060,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                         onClick={() => {
                           setStaffFormState(prev => ({
                             ...prev,
-                            assignedTables: isSelected 
+                            assignedTables: isSelected
                               ? prev.assignedTables.filter(t => t !== table.id)
                               : [...prev.assignedTables, table.id]
                           }));
                         }}
-                        className={`p-2 rounded-xl text-[10px] font-bold border transition-all cursor-pointer ${
-                          isSelected
+                        className={`p-2 rounded-xl text-[10px] font-bold border transition-all cursor-pointer ${isSelected
                             ? 'bg-orange-500 text-white border-orange-500 shadow-xs'
                             : 'bg-white text-slate-600 border-slate-200 hover:border-orange-500'
-                        }`}
+                          }`}
                       >
                         Table #{table.id}
                       </button>
@@ -3942,11 +4108,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
       {/* 5. OTP SECURITY VERIFICATION MODAL (PORTALIZED) */}
       {otpModal && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm overflow-y-auto animate-fade-in font-sans">
-          <div 
-            onClick={(e) => e.stopPropagation()} 
-            className={`relative my-auto w-full max-w-sm rounded-3xl p-6 shadow-2xl border ${
-              'bg-white border-gray-100 text-slate-900'
-            }`}
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className={`relative my-auto w-full max-w-sm rounded-3xl p-6 shadow-2xl border ${'bg-white border-gray-100 text-slate-900'
+              }`}
           >
             <div className="flex justify-between items-center mb-4 pb-2 border-b border-gray-100 ">
               <h4 className="font-extrabold text-sm">Security Verification</h4>
