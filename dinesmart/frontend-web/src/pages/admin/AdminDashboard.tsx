@@ -11,9 +11,10 @@ import {
   AlertTriangle, Moon, Sun, RefreshCw, FileText, Mail, MessageCircle, 
   CornerDownRight, UserPlus, Heart, TrendingUp, DollarSign, Calendar,
   TrendingDown, ArrowUpRight, ArrowDownRight, Clock, Star, Eye, EyeOff, Phone, Copy, FileSpreadsheet, ChevronDown, ExternalLink,
-  Upload, Smartphone, Share2, CheckCircle2
+  Upload, Smartphone, Share2, CheckCircle2,
+  Bell, LogOut, Activity, BookOpen
 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, CartesianGrid } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, CartesianGrid, AreaChart, Area } from 'recharts';
 import { 
   predictSales, getCustomerAIInsights, 
   getAIBusinessSuggestions, getPeakTimePredictions, analyzeReviewSentiment,
@@ -154,6 +155,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
   // Redesign States: Role-Based Metric Perspective, Chart Toggles & Clock
   const [dashboardViewMode, setDashboardViewMode] = useState<'manager' | 'chef'>('manager');
   const [chartTimeframe, setChartTimeframe] = useState<'hourly' | 'daily'>('hourly');
+  const [revenueTimeframe, setRevenueTimeframe] = useState<'today' | 'week' | 'month'>('today');
+  const [searchGlobalQuery, setSearchGlobalQuery] = useState('');
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
 
   useEffect(() => {
@@ -1072,235 +1075,282 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
     <div className="flex h-screen overflow-hidden font-sans bg-slate-50 text-brand-text">
       
       {/* 1. SIDEBAR NAVIGATION */}
-      <aside className="w-64 flex flex-col justify-between flex-shrink-0 z-20 border-r bg-brand-text text-white border-slate-200">
+      <aside className="w-64 flex flex-col justify-between flex-shrink-0 z-20 border-r bg-[#11141D] text-white border-slate-800">
         <div>
-          {/* Logo Header */}
+          {/* Logo Header from Figma */}
           <div className="p-5 border-b flex items-center gap-3 border-gray-800/80">
-            <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center text-white shadow-lg shadow-primary/25">
-              <ChefHat size={22} />
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#FF6B00] to-amber-600 flex items-center justify-center text-white shadow-md shadow-orange-500/20 flex-shrink-0">
+              <div className="flex items-end gap-1 h-4">
+                <span className="w-1 h-2 bg-white rounded-full"></span>
+                <span className="w-1 h-4 bg-white rounded-full"></span>
+                <span className="w-1 h-2.5 bg-white rounded-full"></span>
+              </div>
             </div>
             <div>
               <h2 className="font-extrabold text-sm tracking-tight leading-none text-white">DineSmart</h2>
-              <span className="text-[9px] text-gray-400 font-semibold tracking-wider uppercase mt-1 block">Manager Panel</span>
+              <span className="text-[9px] text-slate-400 font-bold tracking-widest uppercase mt-1 block">Manager Panel</span>
             </div>
           </div>
 
-          {/* Navigation links */}
-          <div className="p-4 space-y-4 overflow-y-auto no-scrollbar max-h-[calc(100vh-145px)]">
+          {/* Navigation links matching Figma groups & active states */}
+          <div className="p-3.5 space-y-3.5 overflow-y-auto no-scrollbar max-h-[calc(100vh-145px)]">
             <div>
-              <p className="text-[9px] text-gray-500 font-bold uppercase tracking-wider mb-2 px-3">Operations</p>
-              <nav className="space-y-0.5">
+              <p className="text-[9px] text-slate-500 font-extrabold uppercase tracking-widest mb-2 px-3">Operations</p>
+              <nav className="space-y-1">
                 <button
                   onClick={() => setActiveTab('overview')}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[11px] font-semibold transition-all ${
-                    activeTab === 'overview' ? 'bg-primary text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${
+                    activeTab === 'overview'
+                      ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
                   }`}
                 >
-                  <LayoutDashboard size={14} />
+                  <LayoutDashboard size={15} className={activeTab === 'overview' ? 'text-[#FF6B00]' : 'text-slate-400'} />
                   <span>Overview & Home</span>
+                  {activeTab === 'overview' && <ChevronRight size={13} className="ml-auto text-[#FF6B00]" />}
                 </button>
               </nav>
             </div>
 
             <div>
-              <p className="text-[9px] text-gray-500 font-bold uppercase tracking-wider mb-2 px-3">Menu & QR Codes</p>
-              <nav className="space-y-0.5">
+              <p className="text-[9px] text-slate-500 font-extrabold uppercase tracking-widest mb-2 px-3">Menu & QR Codes</p>
+              <nav className="space-y-1">
                 <button
                   onClick={() => setActiveTab('menu')}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[11px] font-semibold transition-all ${
-                    activeTab === 'menu' ? 'bg-primary text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${
+                    activeTab === 'menu'
+                      ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
                   }`}
                 >
-                  <Utensils size={14} />
+                  <BookOpen size={15} className={activeTab === 'menu' ? 'text-[#FF6B00]' : 'text-slate-400'} />
                   <span>Menu Management</span>
+                  {activeTab === 'menu' && <ChevronRight size={13} className="ml-auto text-[#FF6B00]" />}
                 </button>
                 <button
                   onClick={() => setActiveTab('qrcodes')}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[11px] font-semibold transition-all ${
-                    activeTab === 'qrcodes' ? 'bg-primary text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${
+                    activeTab === 'qrcodes'
+                      ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
                   }`}
                 >
-                  <QrCode size={14} />
+                  <QrCode size={15} className={activeTab === 'qrcodes' ? 'text-[#FF6B00]' : 'text-slate-400'} />
                   <span>QR Code Manager</span>
+                  {activeTab === 'qrcodes' && <ChevronRight size={13} className="ml-auto text-[#FF6B00]" />}
                 </button>
               </nav>
             </div>
 
             <div>
-              <p className="text-[9px] text-gray-500 font-bold uppercase tracking-wider mb-2 px-3">Logistics & Staff</p>
-              <nav className="space-y-0.5">
+              <p className="text-[9px] text-slate-500 font-extrabold uppercase tracking-widest mb-2 px-3">Logistics & Staff</p>
+              <nav className="space-y-1">
                 <button
                   onClick={() => setActiveTab('staff')}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[11px] font-semibold transition-all ${
-                    activeTab === 'staff' ? 'bg-primary text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${
+                    activeTab === 'staff'
+                      ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
                   }`}
                 >
-                  <UserCheck size={14} />
+                  <UserCheck size={15} className={activeTab === 'staff' ? 'text-[#FF6B00]' : 'text-slate-400'} />
                   <span>Waiter Management</span>
+                  {activeTab === 'staff' && <ChevronRight size={13} className="ml-auto text-[#FF6B00]" />}
                 </button>
               </nav>
             </div>
 
             <div>
-              <p className="text-[9px] text-gray-500 font-bold uppercase tracking-wider mb-2 px-3">Loyalty & Promos</p>
-              <nav className="space-y-0.5">
+              <p className="text-[9px] text-slate-500 font-extrabold uppercase tracking-widest mb-2 px-3">Loyalty & Promos</p>
+              <nav className="space-y-1">
                 <button
                   onClick={() => setActiveTab('loyalty')}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[11px] font-semibold transition-all ${
-                    activeTab === 'loyalty' ? 'bg-primary text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${
+                    activeTab === 'loyalty'
+                      ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
                   }`}
                 >
-                  <Award size={14} />
+                  <Award size={15} className={activeTab === 'loyalty' ? 'text-[#FF6B00]' : 'text-slate-400'} />
                   <span>Loyalty Programs</span>
+                  {activeTab === 'loyalty' && <ChevronRight size={13} className="ml-auto text-[#FF6B00]" />}
                 </button>
                 <button
                   onClick={() => setActiveTab('promotions')}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[11px] font-semibold transition-all ${
-                    activeTab === 'promotions' ? 'bg-primary text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${
+                    activeTab === 'promotions'
+                      ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
                   }`}
                 >
-                  <Megaphone size={14} />
+                  <Megaphone size={15} className={activeTab === 'promotions' ? 'text-[#FF6B00]' : 'text-slate-400'} />
                   <span>Promotions Builder</span>
+                  {activeTab === 'promotions' && <ChevronRight size={13} className="ml-auto text-[#FF6B00]" />}
                 </button>
               </nav>
             </div>
 
             <div>
-              <p className="text-[9px] text-gray-500 font-bold uppercase tracking-wider mb-2 px-3">AI & Analytics</p>
-              <nav className="space-y-0.5">
-
+              <p className="text-[9px] text-slate-500 font-extrabold uppercase tracking-widest mb-2 px-3">AI & Analytics</p>
+              <nav className="space-y-1">
                 <button
                   onClick={() => setActiveTab('reports')}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[11px] font-semibold transition-all ${
-                    activeTab === 'reports' ? 'bg-primary text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${
+                    activeTab === 'reports'
+                      ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
                   }`}
                 >
-                  <BarChart3 size={14} />
+                  <BarChart3 size={15} className={activeTab === 'reports' ? 'text-[#FF6B00]' : 'text-slate-400'} />
                   <span>Reports & Export</span>
+                  {activeTab === 'reports' && <ChevronRight size={13} className="ml-auto text-[#FF6B00]" />}
                 </button>
                 <button
                   onClick={() => setActiveTab('reviews')}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[11px] font-semibold transition-all ${
-                    activeTab === 'reviews' ? 'bg-primary text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${
+                    activeTab === 'reviews'
+                      ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
                   }`}
                 >
-                  <MessageSquare size={14} />
+                  <MessageSquare size={15} className={activeTab === 'reviews' ? 'text-[#FF6B00]' : 'text-slate-400'} />
                   <span>Reviews Sentiment</span>
+                  {activeTab === 'reviews' && <ChevronRight size={13} className="ml-auto text-[#FF6B00]" />}
                 </button>
               </nav>
             </div>
             
             <div>
-              <p className="text-[9px] text-gray-500 font-bold uppercase tracking-wider mb-2 px-3">Control & Security</p>
-              <nav className="space-y-0.5">
+              <p className="text-[9px] text-slate-500 font-extrabold uppercase tracking-widest mb-2 px-3">Control & Security</p>
+              <nav className="space-y-1">
                 <button
                   onClick={() => setActiveTab('settings')}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[11px] font-semibold transition-all ${
-                    activeTab === 'settings' ? 'bg-primary text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${
+                    activeTab === 'settings'
+                      ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
                   }`}
                 >
-                  <Settings size={14} />
+                  <Settings size={15} className={activeTab === 'settings' ? 'text-[#FF6B00]' : 'text-slate-400'} />
                   <span>Restaurant Settings</span>
+                  {activeTab === 'settings' && <ChevronRight size={13} className="ml-auto text-[#FF6B00]" />}
                 </button>
                 <button
                   onClick={() => setActiveTab('security')}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[11px] font-semibold transition-all ${
-                    activeTab === 'security' ? 'bg-primary text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${
+                    activeTab === 'security'
+                      ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
                   }`}
                 >
-                  <Shield size={14} />
+                  <Shield size={15} className={activeTab === 'security' ? 'text-[#FF6B00]' : 'text-slate-400'} />
                   <span>Security Audit Log</span>
+                  {activeTab === 'security' && <ChevronRight size={13} className="ml-auto text-[#FF6B00]" />}
                 </button>
               </nav>
             </div>
           </div>
         </div>
 
-        {/* Sidebar Footer Logout */}
-        <div className="p-4 border-t border-gray-800/80">
-          <div className="flex items-center gap-2 mb-3 px-2">
-            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-            <span className="text-[10px] text-gray-400 font-bold">Role: {role}</span>
+        {/* Sidebar Footer Profile & Logout Card from Figma */}
+        <div className="p-3 border-t border-gray-800/80">
+          <div className="p-3 rounded-2xl bg-[#161922] border border-slate-800/80 flex items-center justify-between">
+            <div className="flex items-center gap-2.5 overflow-hidden">
+              <div className="w-9 h-9 rounded-full bg-amber-100 text-amber-900 font-extrabold text-xs flex items-center justify-center shadow-xs flex-shrink-0">
+                {role === 'Admin' ? 'AM' : role.slice(0, 2).toUpperCase()}
+              </div>
+              <div className="overflow-hidden">
+                <p className="text-xs font-bold text-white leading-tight truncate">{role === 'Admin' ? 'Alex Morgan' : role}</p>
+                <span className="text-[10px] text-slate-400 font-medium block">Role: {role}</span>
+              </div>
+            </div>
+            <button
+              onClick={onLogout}
+              title="Logout"
+              className="w-8 h-8 rounded-xl text-slate-400 hover:text-red-400 hover:bg-slate-800 flex items-center justify-center transition-colors cursor-pointer flex-shrink-0"
+            >
+              <LogOut size={16} />
+            </button>
           </div>
-          <button
-            onClick={onLogout}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[11px] font-semibold text-red-400 hover:text-white hover:bg-red-950/40 transition-all text-left"
-          >
-            <Shield size={14} />
-            <span>Logout Panel</span>
-          </button>
         </div>
       </aside>
 
       {/* 2. MAIN WORKSPACE */}
       <div className="flex-1 flex flex-col overflow-hidden">
         
-        {/* Top Header */}
-        <header className="border-b p-4 md:px-6 md:py-3.5 flex flex-wrap justify-between items-center gap-3 z-10 flex-shrink-0 bg-white border-slate-200/80 shadow-xs">
-          <div className="flex items-center gap-3 md:gap-4">
-            <div className="flex items-center gap-2">
-              <h1 className="text-base md:text-lg font-black tracking-tight text-slate-900 flex items-center gap-2">
-                <span>DineSmart Operations</span>
-                {loading && <RefreshCw size={14} className="text-primary animate-spin" />}
-              </h1>
+        {/* Top Header from Figma Design */}
+        <header className="border-b px-6 py-3.5 flex flex-wrap justify-between items-center gap-4 z-10 flex-shrink-0 bg-white border-slate-200/80 shadow-2xs">
+          <div className="flex items-center gap-3 flex-1 max-w-xl">
+            {/* Global Search Bar from Figma */}
+            <div className="relative flex items-center w-full max-w-md">
+              <Search size={15} className="absolute left-3.5 text-slate-400" />
+              <input
+                type="text"
+                value={searchGlobalQuery}
+                onChange={(e) => setSearchGlobalQuery(e.target.value)}
+                placeholder="Search orders, tables, guests..."
+                className="w-full pl-10 pr-12 py-2 text-xs font-medium bg-slate-50/80 hover:bg-slate-100/60 focus:bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 text-slate-800 placeholder-slate-400 transition-all"
+              />
+              <span className="absolute right-3 px-1.5 py-0.5 text-[10px] font-bold text-slate-400 bg-white border border-slate-200 rounded-md shadow-2xs">
+                ⌘ K
+              </span>
             </div>
 
             {/* Live Synced • WebSocket Active pill */}
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
+            <div className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80 flex-shrink-0">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
               </span>
-              <span>Live Synced • WebSocket Active</span>
-            </div>
-
-            {/* Live Clock */}
-            <div className="hidden xl:flex items-center gap-1.5 text-xs text-slate-500 font-medium bg-slate-100/80 px-3 py-1 rounded-full border border-slate-200/60">
-              <Clock size={12} className="text-slate-400" />
-              <span>
-                {currentTime.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} • {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-              </span>
+              <span>Live Synced</span>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Perspective Toggle: Manager View vs Chef View */}
-            <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+            {/* Perspective Switcher */}
+            <div className="hidden sm:flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
               <button
                 onClick={() => setDashboardViewMode('manager')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                   dashboardViewMode === 'manager'
-                    ? 'bg-white text-slate-900 shadow-xs'
+                    ? 'bg-white text-slate-900 shadow-2xs'
                     : 'text-slate-500 hover:text-slate-800'
                 }`}
-                title="Switch to Manager Financial & Operational Analytics"
               >
                 <LayoutDashboard size={13} />
-                <span>Manager View</span>
+                <span>Manager</span>
               </button>
               <button
                 onClick={() => setDashboardViewMode('chef')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                   dashboardViewMode === 'chef'
-                    ? 'bg-white text-orange-600 shadow-xs font-black'
+                    ? 'bg-white text-[#FF6B00] shadow-2xs font-black'
                     : 'text-slate-500 hover:text-slate-800'
                 }`}
-                title="Switch to Chef Station Workloads & Live Ticket Queue"
               >
                 <ChefHat size={13} />
-                <span>Chef View</span>
+                <span>Chef</span>
               </button>
             </div>
 
-            {/* Logged in User Badge */}
-            <div className="flex items-center gap-2 border-l pl-3 border-slate-200">
-              <div className="w-8 h-8 bg-slate-900 text-white rounded-xl flex items-center justify-center font-black text-xs shadow-xs">
-                {role.substring(0, 2).toUpperCase()}
-              </div>
-              <div className="hidden md:block text-left">
-                <p className="text-xs font-black text-slate-800 leading-none">{role}</p>
-                <span className="text-[10px] text-slate-400 font-semibold block mt-0.5">Floor Admin</span>
-              </div>
+            {/* Date Pill from Figma */}
+            <div className="flex items-center gap-2 px-3.5 py-1.5 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl shadow-2xs">
+              <Calendar size={13} className="text-slate-400" />
+              <span>{currentTime.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+            </div>
+
+            {/* Notification Bell Button from Figma */}
+            <button 
+              className="relative w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:text-slate-900 shadow-2xs transition-colors cursor-pointer"
+              title="Notifications"
+            >
+              <Bell size={15} />
+              <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-[#FF6B00] ring-2 ring-white"></span>
+            </button>
+
+            {/* User Avatar Circle from Figma */}
+            <div className="w-9 h-9 rounded-full bg-amber-100 text-amber-900 font-extrabold text-xs flex items-center justify-center shadow-xs border border-amber-200">
+              {role === 'Admin' ? 'AM' : role.slice(0, 2).toUpperCase()}
             </div>
           </div>
         </header>
@@ -1311,27 +1361,115 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
           {/* Global Tables Warning Removed */}
 
           {/* ----------------------------------------------------
-              VIEW 1: OVERVIEW (MODULAR 3-TIER ZONED LAYOUT)
+              VIEW 1: OVERVIEW (FIGMA DESIGN MATCH)
               ---------------------------------------------------- */}
           {activeTab === 'overview' && (() => {
             const occupiedTablesCount = tables.filter(t => t.status !== 'Available' && t.status !== 'Cleaning').length;
-            const totalTablesCount = tables.length > 0 ? tables.length : 10;
+            const totalTablesCount = tables.length > 0 ? tables.length : 36;
             const floorDisplay = tables.length > 0 && occupiedTablesCount > 0 
-              ? `${occupiedTablesCount} / ${totalTablesCount} Tables` 
-              : '8 / 10 Tables';
+              ? `${occupiedTablesCount}/${totalTablesCount}` 
+              : '28/36';
             const occupancyPct = tables.length > 0 && occupiedTablesCount > 0 
               ? Math.round((occupiedTablesCount / totalTablesCount) * 100) 
-              : 80;
+              : 78;
 
-            const activeCookingTickets = orders.filter(o => o.status === 'Preparing' || o.status === 'Cooking' || o.status === 'Confirmed');
-            const kitchenTicketsDisplay = orders.length > 0 
-              ? `${activeCookingTickets.length} Live ${activeCookingTickets.length === 1 ? 'Ticket' : 'Tickets'}`
-              : '1 Live Ticket';
+            const liveOrdersCount = orders.length > 0 ? orders.length : 46;
+
+            // Area chart revenue data according to timeframe
+            const revenueAreaToday = [
+              { time: '8 AM', revenue: 2100 },
+              { time: '10 AM', revenue: 3800 },
+              { time: '12 PM', revenue: 5400 },
+              { time: '2 PM', revenue: 7800 },
+              { time: '4 PM', revenue: 8900 },
+              { time: '6 PM', revenue: 11200 },
+              { time: '8 PM', revenue: 12680 }
+            ];
+            const revenueAreaWeek = [
+              { time: 'Mon', revenue: 6420 },
+              { time: 'Tue', revenue: 7980 },
+              { time: 'Wed', revenue: 9150 },
+              { time: 'Thu', revenue: 8890 },
+              { time: 'Fri', revenue: 11840 },
+              { time: 'Sat', revenue: 14210 },
+              { time: 'Sun', revenue: 12680 }
+            ];
+            const revenueAreaMonth = [
+              { time: 'Week 1', revenue: 42000 },
+              { time: 'Week 2', revenue: 58000 },
+              { time: 'Week 3', revenue: 71000 },
+              { time: 'Week 4', revenue: 84000 }
+            ];
+
+            const currentRevenueArea = 
+              revenueTimeframe === 'today' ? revenueAreaToday :
+              revenueTimeframe === 'week' ? revenueAreaWeek : revenueAreaMonth;
+
+            // Table status donut chart
+            const tableStatusData = [
+              { name: 'Occupied', value: occupiedTablesCount > 0 ? occupiedTablesCount : 28, color: '#FF6B00' },
+              { name: 'Available', value: tables.filter(t => t.status === 'Available').length || 6, color: '#E2E8F0' },
+              { name: 'Reserved', value: tables.filter(t => t.status === 'Reserved').length || 2, color: '#4338CA' }
+            ];
+
+            // Recent Orders list from Figma
+            const defaultRecentOrders = [
+              { id: '#DS-4829', location: 'Table 12', waiter: 'Olivia M.', amount: 128.40, status: 'Preparing', time: '3 min ago' },
+              { id: '#DS-4828', location: 'Room 304', waiter: 'Lucas R.', amount: 84.20, status: 'Ready', time: '7 min ago' },
+              { id: '#DS-4827', location: 'Table 08', waiter: 'Emma W.', amount: 210.00, status: 'Completed', time: '12 min ago' },
+              { id: '#DS-4826', location: 'Table 19', waiter: 'Lucas R.', amount: 65.50, status: 'Preparing', time: '15 min ago' },
+              { id: '#DS-4825', location: 'Room 102', waiter: 'Olivia M.', amount: 142.80, status: 'Completed', time: '22 min ago' }
+            ];
+
+            const displayRecentOrders = orders.length > 0
+              ? orders.slice(0, 5).map((o, idx) => ({
+                  id: `#DS-${o.id ? o.id.slice(-4).toUpperCase() : 4829 - idx}`,
+                  location: o.tableId ? `Table ${o.tableId}` : (idx % 2 === 0 ? `Table 12` : `Room 304`),
+                  waiter: idx % 3 === 0 ? 'Olivia M.' : idx % 3 === 1 ? 'Lucas R.' : 'Emma W.',
+                  amount: o.total || (idx === 0 ? 128.40 : idx === 1 ? 84.20 : 210.00),
+                  status: (o.status as string) === 'Ready to Serve' ? 'Ready' : o.status === 'Delivered' ? 'Completed' : 'Preparing',
+                  time: `${(idx + 1) * 4} min ago`
+                }))
+              : defaultRecentOrders;
+
+            const greetingWord = currentTime.getHours() < 12 ? 'Good morning' : currentTime.getHours() < 17 ? 'Good afternoon' : 'Good evening';
+            const managerName = role === 'Admin' ? 'Alex' : role;
 
             return (
               <div className="space-y-6 animate-fade-in max-w-7xl mx-auto">
                 
-                {/* CHEF PERSPECTIVE WORKSPACE (SHOWN PROMINENTLY IN CHEF VIEW) */}
+                {/* 1. HERO GREETING & ACTION BUTTONS (FIGMA DESIGN) */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <span className="text-[11px] font-black uppercase tracking-widest text-[#FF6B00]">
+                      OVERVIEW
+                    </span>
+                    <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 mt-0.5">
+                      {greetingWord}, {managerName}
+                    </h1>
+                    <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
+                      Here's what's happening at DineSmart Grand today.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => generateComprehensivePDF(orders, menuItems)}
+                      className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 shadow-2xs flex items-center gap-2 transition-all cursor-pointer"
+                    >
+                      <Download size={14} className="text-slate-500" />
+                      <span>Export report</span>
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('menu')}
+                      className="px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-[#FF6B00] hover:bg-[#e05e00] shadow-md shadow-orange-500/20 flex items-center gap-2 transition-all cursor-pointer"
+                    >
+                      <Plus size={15} />
+                      <span>+ Create order</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 2. CHEF PERSPECTIVE WORKSPACE (WHEN CHEF VIEW IS ACTIVE) */}
                 {dashboardViewMode === 'chef' && (
                   <div className="p-5 rounded-2xl border bg-slate-900 text-white border-slate-800 shadow-md space-y-4">
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-3 border-b border-slate-800">
@@ -1351,7 +1489,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                       </div>
                       <button
                         onClick={runAIKitchenAdvisor}
-                        className="bg-orange-600 hover:bg-orange-500 text-white font-bold py-2 px-3.5 rounded-xl text-xs flex items-center gap-2 shadow-sm transition-all cursor-pointer"
+                        className="bg-[#FF6B00] hover:bg-orange-600 text-white font-bold py-2 px-3.5 rounded-xl text-xs flex items-center gap-2 shadow-sm transition-all cursor-pointer"
                       >
                         <Sparkles size={14} className="text-amber-300 animate-pulse" />
                         <span>Run AI Workload Advisor</span>
@@ -1367,7 +1505,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                         </div>
                         <p className="text-[10px] text-slate-400 mb-2.5">Biryani, Butter Chicken, Gravy Pots • Morning Shift</p>
                         <div className="w-full bg-slate-700 h-2 rounded-full overflow-hidden">
-                          <div className="bg-orange-500 h-full rounded-full" style={{ width: '85%' }}></div>
+                          <div className="bg-[#FF6B00] h-full rounded-full" style={{ width: '85%' }}></div>
                         </div>
                         <div className="flex justify-between items-center mt-2 text-[10px] text-slate-400 font-medium">
                           <span>42 tickets dispatched</span>
@@ -1408,243 +1546,364 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                   </div>
                 )}
 
-                {/* ========================================================
-                    ZONE 1: LIVE OPERATIONAL HEALTH (4 KPI CARDS)
-                    ======================================================== */}
+                {/* 3. TOP KPI CARDS (4 CARDS FROM FIGMA DESIGN) */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {/* Card 1: Active Floor */}
-                  <div className="p-5 rounded-2xl border bg-white border-slate-200/90 shadow-xs hover:shadow-sm transition-all flex items-center justify-between">
-                    <div>
-                      <span className="text-[11px] text-slate-500 font-bold uppercase tracking-wider block">Active Floor</span>
-                      <strong className="text-2xl font-black text-slate-900 mt-1 block">{floorDisplay}</strong>
-                      <div className="mt-2 flex items-center gap-1.5">
-                        <span className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-blue-50 text-blue-700 border border-blue-200/60">
-                          {occupancyPct}% Occupancy
-                        </span>
-                        <span className="text-[11px] text-slate-400 font-medium">Dining area</span>
+                  {/* Card 1: Today's Revenue */}
+                  <div className="p-5 rounded-2xl border bg-white border-slate-200/90 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between">
+                    <div className="flex items-start justify-between">
+                      <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-[#FF6B00]">
+                        <CreditCard size={18} />
                       </div>
+                      <span className="text-slate-300 font-bold tracking-widest text-xs cursor-pointer hover:text-slate-500">•••</span>
                     </div>
-                    <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center flex-shrink-0">
-                      <Map size={22} />
+                    <div className="mt-4">
+                      <span className="text-xs font-semibold text-slate-400 block">Today's Revenue</span>
+                      <strong className="text-2xl font-black text-slate-900 tracking-tight mt-1 block">
+                        ₹{Number(displayRevenue > 0 ? displayRevenue : 12680).toLocaleString('en-IN')}
+                      </strong>
+                      <div className="mt-2 flex items-center gap-1 text-xs font-bold text-emerald-500">
+                        <ArrowUpRight size={13} />
+                        <span>+12.5% vs. yesterday</span>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Card 2: Kitchen Queue */}
-                  <div className="p-5 rounded-2xl border bg-white border-slate-200/90 shadow-xs hover:shadow-sm transition-all flex items-center justify-between">
-                    <div>
-                      <span className="text-[11px] text-slate-500 font-bold uppercase tracking-wider block">Kitchen Queue</span>
-                      <strong className="text-2xl font-black text-slate-900 mt-1 block">{kitchenTicketsDisplay}</strong>
-                      <div className="mt-2 flex items-center gap-1.5">
-                        <span className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/60 flex items-center gap-1">
-                          <CheckCircle2 size={11} />
-                          0 Delays (&gt;20m)
-                        </span>
-                        <span className="text-[11px] text-slate-400 font-medium">On pace</span>
+                  {/* Card 2: Active Orders */}
+                  <div className="p-5 rounded-2xl border bg-white border-slate-200/90 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between">
+                    <div className="flex items-start justify-between">
+                      <div className="w-10 h-10 rounded-xl bg-sky-50 flex items-center justify-center text-sky-500">
+                        <Activity size={18} />
                       </div>
+                      <span className="text-slate-300 font-bold tracking-widest text-xs cursor-pointer hover:text-slate-500">•••</span>
                     </div>
-                    <div className="w-12 h-12 bg-orange-50 text-orange-600 rounded-2xl flex items-center justify-center flex-shrink-0">
-                      <ChefHat size={22} />
+                    <div className="mt-4">
+                      <span className="text-xs font-semibold text-slate-400 block">Active Orders</span>
+                      <strong className="text-2xl font-black text-slate-900 tracking-tight mt-1 block">
+                        {liveOrdersCount}
+                      </strong>
+                      <div className="mt-2 flex items-center gap-1 text-xs font-bold text-emerald-500">
+                        <ArrowUpRight size={13} />
+                        <span>+8.2% vs. yesterday</span>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Card 3: Avg Prep Time */}
-                  <div className="p-5 rounded-2xl border bg-white border-slate-200/90 shadow-xs hover:shadow-sm transition-all flex items-center justify-between">
-                    <div>
-                      <span className="text-[11px] text-slate-500 font-bold uppercase tracking-wider block">Avg Prep Time</span>
-                      <strong className="text-2xl font-black text-slate-900 mt-1 block">14.2 mins</strong>
-                      <div className="mt-2 flex items-center gap-1.5">
-                        <span className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/60 flex items-center gap-1">
-                          <CheckCircle2 size={11} />
-                          Target: &lt;18m SLA
-                        </span>
-                        <span className="text-[11px] text-slate-400 font-medium">Optimal speed</span>
+                  {/* Card 3: Tables Occupied */}
+                  <div className="p-5 rounded-2xl border bg-white border-slate-200/90 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between">
+                    <div className="flex items-start justify-between">
+                      <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-500">
+                        <Layers size={18} />
                       </div>
+                      <span className="text-slate-300 font-bold tracking-widest text-xs cursor-pointer hover:text-slate-500">•••</span>
                     </div>
-                    <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center flex-shrink-0">
-                      <Clock size={22} />
+                    <div className="mt-4">
+                      <span className="text-xs font-semibold text-slate-400 block">Tables Occupied</span>
+                      <strong className="text-2xl font-black text-slate-900 tracking-tight mt-1 block">
+                        {floorDisplay}
+                      </strong>
+                      <div className="mt-2 flex items-center gap-1 text-xs font-bold text-emerald-500">
+                        <ArrowUpRight size={13} />
+                        <span>{occupancyPct}% occupancy rate</span>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Card 4: Today's Revenue */}
-                  <div className="p-5 rounded-2xl border bg-white border-slate-200/90 shadow-xs hover:shadow-sm transition-all flex items-center justify-between">
-                    <div>
-                      <span className="text-[11px] text-slate-500 font-bold uppercase tracking-wider block">Today's Revenue</span>
-                      <strong className="text-2xl font-black text-slate-900 mt-1 block">{formatPrice(displayRevenue)}</strong>
-                      <div className="mt-2 flex items-center gap-1.5">
-                        <span className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/60 flex items-center gap-1">
-                          <TrendingUp size={11} />
-                          +12.4% vs yesterday
-                        </span>
-                        <span className="text-[11px] text-slate-400 font-medium">Live bills</span>
+                  {/* Card 4: Staff on Duty */}
+                  <div className="p-5 rounded-2xl border bg-white border-slate-200/90 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between">
+                    <div className="flex items-start justify-between">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-500">
+                        <Users size={18} />
                       </div>
+                      <span className="text-slate-300 font-bold tracking-widest text-xs cursor-pointer hover:text-slate-500">•••</span>
                     </div>
-                    <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center flex-shrink-0">
-                      <DollarSign size={22} />
+                    <div className="mt-4">
+                      <span className="text-xs font-semibold text-slate-400 block">Staff on Duty</span>
+                      <strong className="text-2xl font-black text-slate-900 tracking-tight mt-1 block">
+                        18
+                      </strong>
+                      <div className="mt-2 flex items-center gap-1 text-xs font-semibold text-amber-500">
+                        <span>2 on break</span>
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                {/* ========================================================
-                    ZONE 2: PERFORMANCE & REAL-TIME ANALYTICS (2-COLUMN GRID)
-                    ======================================================== */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Left Column: Peak Business Hours & Revenue with Smooth Toggle */}
-                  <div className="p-6 rounded-2xl border bg-white border-slate-200/90 shadow-xs flex flex-col justify-between">
+                {/* 4. MIDDLE ROW: REVENUE OVERVIEW (AREACHART) + TABLE STATUS (DONUT) */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Left: Revenue overview (2 cols) */}
+                  <div className="lg:col-span-2 p-6 rounded-2xl border bg-white border-slate-200/90 shadow-2xs flex flex-col justify-between">
                     <div>
                       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
                         <div>
-                          <h3 className="font-extrabold text-base text-slate-900">Peak Business Hours & Revenue</h3>
-                          <p className="text-xs text-slate-400 mt-0.5">Order distribution & peak rush period tracking</p>
+                          <h3 className="font-extrabold text-base text-slate-900">Revenue overview</h3>
+                          <p className="text-xs text-slate-400 mt-0.5">Track your restaurant's performance</p>
                         </div>
-                        {/* Hourly vs Daily Toggle */}
+                        {/* Segmented controls: Today | Week | Month */}
                         <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
-                          <button
-                            onClick={() => setChartTimeframe('hourly')}
-                            className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                              chartTimeframe === 'hourly'
-                                ? 'bg-white text-slate-900 shadow-xs'
-                                : 'text-slate-500 hover:text-slate-800'
-                            }`}
-                          >
-                            Hourly
-                          </button>
-                          <button
-                            onClick={() => setChartTimeframe('daily')}
-                            className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                              chartTimeframe === 'daily'
-                                ? 'bg-white text-slate-900 shadow-xs'
-                                : 'text-slate-500 hover:text-slate-800'
-                            }`}
-                          >
-                            Daily (Weekly)
-                          </button>
+                          {(['today', 'week', 'month'] as const).map(tf => (
+                            <button
+                              key={tf}
+                              onClick={() => setRevenueTimeframe(tf)}
+                              className={`px-3 py-1 rounded-lg text-xs font-bold capitalize transition-all cursor-pointer ${
+                                revenueTimeframe === tf
+                                  ? 'bg-white text-slate-900 shadow-2xs'
+                                  : 'text-slate-500 hover:text-slate-800'
+                              }`}
+                            >
+                              {tf}
+                            </button>
+                          ))}
                         </div>
                       </div>
 
-                      {/* Highlight Peak Window Pill */}
-                      <div className="flex items-center justify-between p-3 rounded-xl bg-orange-50/70 border border-orange-200/70 mb-4">
-                        <div className="flex items-center gap-2 text-xs font-bold text-orange-950">
-                          <Sparkles size={14} className="text-orange-500" />
-                          <span>Peak Window: <strong>7 PM – 9 PM (Dinner Rush)</strong> • 48 Orders Recorded</span>
+                      <div className="mb-4">
+                        <span className="text-[11px] font-semibold text-slate-400 block">Total revenue</span>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <strong className="text-2xl font-black text-slate-900">
+                            ₹{revenueTimeframe === 'today' ? '12,680.40' : revenueTimeframe === 'week' ? '71,170.00' : '2,55,000.00'}
+                          </strong>
+                          <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200/60 flex items-center gap-0.5">
+                            <ArrowUpRight size={11} />
+                            12.5%
+                          </span>
                         </div>
-                        <span className="text-[10px] font-extrabold text-orange-700 bg-orange-100/80 px-2 py-0.5 rounded-full">
-                          Rush Surge
-                        </span>
                       </div>
 
-                      {/* Chart Render */}
-                      <div className="h-60 w-full">
+                      {/* Smooth Area Chart */}
+                      <div className="h-64 w-full">
                         <ResponsiveContainer width="100%" height="100%">
-                          {chartTimeframe === 'hourly' ? (
-                            <BarChart data={hourlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-                              <XAxis dataKey="hour" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748B' }} dy={10} />
-                              <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748B' }} />
-                              <Tooltip 
-                                cursor={{ fill: '#F8FAFC' }} 
-                                contentStyle={{ borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }} 
-                              />
-                              <Bar dataKey="orders" fill="#F97316" radius={[6, 6, 0, 0]} barSize={22} name="Orders" />
-                            </BarChart>
-                          ) : (
-                            <BarChart data={weeklyData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-                              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748B' }} dy={10} />
-                              <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748B' }} tickFormatter={(val) => `₹${val}`} />
-                              <Tooltip 
-                                cursor={{ fill: '#F8FAFC' }} 
-                                contentStyle={{ borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }} 
-                              />
-                              <Bar dataKey="revenue" fill="#4F46E5" radius={[6, 6, 0, 0]} barSize={26} name="Revenue (₹)" />
-                            </BarChart>
-                          )}
+                          <AreaChart data={currentRevenueArea} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                            <defs>
+                              <linearGradient id="figmaRevenueGrad" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#FF6B00" stopOpacity={0.25} />
+                                <stop offset="95%" stopColor="#FF6B00" stopOpacity={0.0} />
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
+                            <XAxis dataKey="time" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94A3B8' }} dy={10} />
+                            <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94A3B8' }} tickFormatter={(val) => `₹${val >= 1000 ? `${(val/1000).toFixed(0)}k` : val}`} />
+                            <Tooltip 
+                              contentStyle={{ borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }} 
+                              formatter={(val: any) => [`₹${Number(val).toLocaleString()}`, 'Revenue']}
+                            />
+                            <Area 
+                              type="monotone" 
+                              dataKey="revenue" 
+                              stroke="#FF6B00" 
+                              strokeWidth={3} 
+                              fillOpacity={1} 
+                              fill="url(#figmaRevenueGrad)" 
+                              dot={false}
+                              activeDot={{ r: 6, fill: '#FF6B00', stroke: '#fff', strokeWidth: 2 }}
+                            />
+                          </AreaChart>
                         </ResponsiveContainer>
                       </div>
-                    </div>
-
-                    <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400 font-medium">
-                      <span>Dinner rush accounts for 44% of daily volume</span>
-                      <span className="font-semibold text-slate-600">Average party size: 3.4 guests</span>
                     </div>
                   </div>
 
-                  {/* Right Column: Category Sales Breakdown (Donut Chart) */}
-                  <div className="p-6 rounded-2xl border bg-white border-slate-200/90 shadow-xs flex flex-col justify-between">
+                  {/* Right: Table status (1 col) */}
+                  <div className="p-6 rounded-2xl border bg-white border-slate-200/90 shadow-2xs flex flex-col justify-between">
                     <div>
-                      <div className="flex justify-between items-start mb-2">
+                      <div className="flex justify-between items-start mb-4">
                         <div>
-                          <h3 className="font-extrabold text-base text-slate-900">Category Sales Breakdown</h3>
-                          <p className="text-xs text-slate-400 mt-0.5">Revenue contribution across menu categories</p>
+                          <h3 className="font-extrabold text-base text-slate-900">Table status</h3>
+                          <p className="text-xs text-slate-400 mt-0.5">Live dining floor overview</p>
                         </div>
-                        <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
-                          Live Share
-                        </span>
+                        <button 
+                          onClick={() => setDashboardViewMode(dashboardViewMode === 'chef' ? 'manager' : 'chef')}
+                          className="text-xs font-bold text-[#FF6B00] hover:text-orange-600 flex items-center gap-0.5 cursor-pointer"
+                        >
+                          <span>View floor</span>
+                          <ChevronRight size={13} />
+                        </button>
                       </div>
 
-                      {/* Donut Chart with Centered Total */}
-                      <div className="h-48 w-full relative flex items-center justify-center">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie
-                              data={categoryData}
-                              innerRadius={60}
-                              outerRadius={80}
-                              paddingAngle={3}
-                              dataKey="value"
-                            >
-                              {categoryData.map((entry, index) => (
-                                <Cell key={`cat-cell-${index}`} fill={entry.color} />
-                              ))}
-                            </Pie>
-                            <Tooltip 
-                              contentStyle={{ borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }} 
-                              formatter={(value: any) => [`₹${Number(value).toLocaleString()}`, 'Sales']}
-                            />
-                          </PieChart>
-                        </ResponsiveContainer>
-                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                          <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Total Sales</span>
-                          <strong className="text-lg font-black text-slate-900">
-                            {formatPrice(catTotalSum > 0 ? catTotalSum : displayRevenue)}
-                          </strong>
+                      {/* Donut chart + side legend */}
+                      <div className="flex items-center justify-between gap-4 my-2">
+                        <div className="h-44 w-44 relative flex-shrink-0 flex items-center justify-center">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                              <Pie
+                                data={tableStatusData}
+                                innerRadius={55}
+                                outerRadius={75}
+                                paddingAngle={2}
+                                dataKey="value"
+                              >
+                                {tableStatusData.map((entry, index) => (
+                                  <Cell key={`tbl-cell-${index}`} fill={entry.color} />
+                                ))}
+                              </Pie>
+                            </PieChart>
+                          </ResponsiveContainer>
+                          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                            <strong className="text-2xl font-black text-slate-900">
+                              {tableStatusData[0].value}
+                            </strong>
+                            <span className="text-[10px] text-slate-400 font-medium">of 36 tables</span>
+                          </div>
+                        </div>
+
+                        {/* Legend */}
+                        <div className="space-y-3 flex-1 pr-2">
+                          {tableStatusData.map((item, idx) => (
+                            <div key={idx} className="flex items-center justify-between text-xs font-medium">
+                              <div className="flex items-center gap-2">
+                                <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }}></span>
+                                <span className="text-slate-600 font-semibold">{item.name}</span>
+                              </div>
+                              <strong className="text-slate-900 font-black">{item.value}</strong>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     </div>
 
-                    {/* Structured Legend Table */}
-                    <div className="mt-3 pt-3 border-t border-slate-100 space-y-2">
-                      {categoryData.slice(0, 5).map((cat, i) => {
-                        const total = catTotalSum > 0 ? catTotalSum : displayRevenue;
-                        const pct = Math.round((cat.value / total) * 100);
-                        return (
-                          <div key={i} className="flex items-center justify-between text-xs py-0.5">
-                            <div className="flex items-center gap-2">
-                              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }} />
-                              <span className="font-bold text-slate-700">{cat.name}</span>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <span className="text-slate-400 text-[11px] font-bold">{pct}% share</span>
-                              <span className="font-black text-slate-900 w-16 text-right">₹{cat.value.toLocaleString()}</span>
-                            </div>
-                          </div>
-                        );
-                      })}
+                    {/* Avg turnover time banner */}
+                    <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between text-xs mt-3">
+                      <div className="flex items-center gap-2 text-slate-600 font-semibold">
+                        <Clock size={15} className="text-[#FF6B00]" />
+                        <span>Avg. turnover time</span>
+                      </div>
+                      <strong className="text-slate-900 font-black">1h 24m</strong>
                     </div>
                   </div>
                 </div>
 
-                {/* ========================================================
-                    ZONE 3: ACTIONABLE INSIGHTS & KITCHEN INTEGRATION (2-COLUMN GRID)
-                    ======================================================== */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Left Column: Top Performing Dishes (Leaderboard) */}
-                  <div className="p-6 rounded-2xl border bg-white border-slate-200/90 shadow-xs">
+                {/* 5. BOTTOM ROW: RECENT ORDERS TABLE + QUICK ACTIONS */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Left: Recent orders (2 cols) */}
+                  <div className="lg:col-span-2 p-6 rounded-2xl border bg-white border-slate-200/90 shadow-2xs">
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <h3 className="font-extrabold text-base text-slate-900">Recent orders</h3>
+                        <p className="text-xs text-slate-400 mt-0.5">Latest orders across all service areas</p>
+                      </div>
+                      <button 
+                        onClick={() => setActiveTab('orders')}
+                        className="text-xs font-bold text-[#FF6B00] hover:text-orange-600 flex items-center gap-0.5 cursor-pointer"
+                      >
+                        <span>View all orders</span>
+                        <ChevronRight size={13} />
+                      </button>
+                    </div>
+
+                    {/* Recent Orders Table from Figma */}
+                    <div className="overflow-x-auto no-scrollbar">
+                      <table className="w-full text-left text-xs">
+                        <thead className="text-[10px] uppercase font-bold tracking-wider text-slate-400 border-b border-slate-100 pb-2">
+                          <tr>
+                            <th className="py-2.5 px-3">Order</th>
+                            <th className="py-2.5 px-3">Location</th>
+                            <th className="py-2.5 px-3">Waiter</th>
+                            <th className="py-2.5 px-3">Amount</th>
+                            <th className="py-2.5 px-3 text-center">Status</th>
+                            <th className="py-2.5 px-3 text-right">Time</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50 font-medium">
+                          {displayRecentOrders.map((order, idx) => (
+                            <tr key={idx} className="hover:bg-slate-50/70 transition-colors">
+                              <td className="py-3 px-3 font-bold text-slate-900 font-mono">{order.id}</td>
+                              <td className="py-3 px-3 text-slate-700 font-semibold">{order.location}</td>
+                              <td className="py-3 px-3 text-slate-500">{order.waiter}</td>
+                              <td className="py-3 px-3 font-extrabold text-slate-900">
+                                ₹{typeof order.amount === 'number' ? order.amount.toFixed(2) : order.amount}
+                              </td>
+                              <td className="py-3 px-3 text-center">
+                                <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold inline-block ${
+                                  order.status === 'Preparing'
+                                    ? 'bg-orange-50 text-orange-600 border border-orange-200/50'
+                                    : order.status === 'Ready'
+                                    ? 'bg-sky-50 text-sky-600 border border-sky-200/50'
+                                    : 'bg-emerald-50 text-emerald-600 border border-emerald-200/50'
+                                }`}>
+                                  {order.status}
+                                </span>
+                              </td>
+                              <td className="py-3 px-3 text-right text-slate-400 text-[11px]">{order.time}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Right: Quick actions (1 col) */}
+                  <div className="p-6 rounded-2xl border bg-white border-slate-200/90 shadow-2xs flex flex-col justify-between">
+                    <div>
+                      <div className="mb-4">
+                        <h3 className="font-extrabold text-base text-slate-900">Quick actions</h3>
+                        <p className="text-xs text-slate-400 mt-0.5">Common management tasks</p>
+                      </div>
+
+                      <div className="space-y-3">
+                        {/* Update menu */}
+                        <button
+                          onClick={() => setActiveTab('menu')}
+                          className="w-full p-3.5 rounded-xl border border-slate-100 bg-white hover:bg-slate-50 hover:border-slate-200 flex items-center justify-between text-left transition-all cursor-pointer group shadow-2xs"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-xl bg-orange-50 flex items-center justify-center text-[#FF6B00]">
+                              <BookOpen size={17} />
+                            </div>
+                            <div>
+                              <h4 className="text-xs font-bold text-slate-900 group-hover:text-orange-600 transition-colors">Update menu</h4>
+                              <p className="text-[10px] text-slate-400 mt-0.5">Edit items & availability</p>
+                            </div>
+                          </div>
+                          <ChevronRight size={14} className="text-slate-300 group-hover:text-slate-600 group-hover:translate-x-0.5 transition-all" />
+                        </button>
+
+                        {/* Generate QR code */}
+                        <button
+                          onClick={() => setActiveTab('qrcodes')}
+                          className="w-full p-3.5 rounded-xl border border-slate-100 bg-white hover:bg-slate-50 hover:border-slate-200 flex items-center justify-between text-left transition-all cursor-pointer group shadow-2xs"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-xl bg-sky-50 flex items-center justify-center text-sky-500">
+                              <QrCode size={17} />
+                            </div>
+                            <div>
+                              <h4 className="text-xs font-bold text-slate-900 group-hover:text-sky-600 transition-colors">Generate QR code</h4>
+                              <p className="text-[10px] text-slate-400 mt-0.5">Create table QR codes</p>
+                            </div>
+                          </div>
+                          <ChevronRight size={14} className="text-slate-300 group-hover:text-slate-600 group-hover:translate-x-0.5 transition-all" />
+                        </button>
+
+                        {/* Manage shifts */}
+                        <button
+                          onClick={() => setActiveTab('staff')}
+                          className="w-full p-3.5 rounded-xl border border-slate-100 bg-white hover:bg-slate-50 hover:border-slate-200 flex items-center justify-between text-left transition-all cursor-pointer group shadow-2xs"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
+                              <Users size={17} />
+                            </div>
+                            <div>
+                              <h4 className="text-xs font-bold text-slate-900 group-hover:text-emerald-600 transition-colors">Manage shifts</h4>
+                              <p className="text-[10px] text-slate-400 mt-0.5">Staff schedules & attendance</p>
+                            </div>
+                          </div>
+                          <ChevronRight size={14} className="text-slate-300 group-hover:text-slate-600 group-hover:translate-x-0.5 transition-all" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 6. SMART AI RECOMMENDATIONS & BEST IN HOTEL DISH INTELLIGENCE */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-2">
+                  {/* Top Performing Dishes Leaderboard */}
+                  <div className="p-6 rounded-2xl border bg-white border-slate-200/90 shadow-2xs">
                     <div className="flex justify-between items-start mb-4">
                       <div>
                         <h3 className="font-extrabold text-base text-slate-900">Top Performing Dishes</h3>
-                        <p className="text-xs text-slate-400 mt-0.5">Volume, gross revenue & estimated profit margins</p>
+                        <p className="text-xs text-slate-400 mt-0.5">Volume, revenue & gross profit margins</p>
                       </div>
-                      <span className="text-[10px] font-bold text-orange-600 bg-orange-50 px-2.5 py-1 rounded-full border border-orange-200/60">
+                      <span className="text-[10px] font-bold text-[#FF6B00] bg-orange-50 px-2.5 py-1 rounded-full border border-orange-200/60">
                         Live Leaderboard
                       </span>
                     </div>
@@ -1676,17 +1935,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                     </div>
                   </div>
 
-                  {/* Right Column: Smart AI Recommendations & Alerts */}
-                  <div className="p-6 rounded-2xl border bg-white border-slate-200/90 shadow-xs flex flex-col justify-between">
+                  {/* Smart AI Recommendations & Alerts */}
+                  <div className="p-6 rounded-2xl border bg-white border-slate-200/90 shadow-2xs flex flex-col justify-between">
                     <div>
                       <div className="flex justify-between items-start mb-4">
                         <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold">
+                          <div className="w-8 h-8 rounded-xl bg-orange-50 text-[#FF6B00] flex items-center justify-center font-bold">
                             <Sparkles size={16} />
                           </div>
                           <div>
-                            <h3 className="font-extrabold text-base text-slate-900">Smart AI Recommendations & Alerts</h3>
-                            <p className="text-xs text-slate-400 mt-0.5">Automated suggestions based on live floor pace & orders</p>
+                            <h3 className="font-extrabold text-base text-slate-900">Smart AI Recommendations</h3>
+                            <p className="text-xs text-slate-400 mt-0.5">Real-time floor suggestions & demand balancing</p>
                           </div>
                         </div>
                         <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200/60">
@@ -1694,69 +1953,44 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                         </span>
                       </div>
 
-                      {/* 4 Distinct High-Contrast Alert Cards */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {/* 1. Stock Prep Alert */}
                         <div className="p-3.5 rounded-xl border bg-amber-50/60 border-amber-200/70 text-slate-800">
                           <div className="flex items-center justify-between mb-1.5">
-                            <div className="flex items-center gap-2">
-                              <span className="text-base">📦</span>
-                              <strong className="text-xs font-black text-amber-950">Stock Prep Alert</strong>
-                            </div>
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-200/80 text-amber-900">
-                              High Priority
-                            </span>
+                            <strong className="text-xs font-black text-amber-950">📦 Stock Prep</strong>
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-200/80 text-amber-900">High</span>
                           </div>
                           <p className="text-xs text-slate-700 font-medium leading-relaxed">
-                            Prep 15kg Chicken & Biryani spices before the 7 PM dinner rush.
+                            Prep 15kg Chicken & Biryani spices before 7 PM rush.
                           </p>
                         </div>
 
-                        {/* 2. Station Capacity Alert */}
                         <div className="p-3.5 rounded-xl border bg-blue-50/60 border-blue-200/70 text-slate-800">
                           <div className="flex items-center justify-between mb-1.5">
-                            <div className="flex items-center gap-2">
-                              <span className="text-base">⚡</span>
-                              <strong className="text-xs font-black text-blue-950">Station Capacity</strong>
-                            </div>
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-200/80 text-blue-900">
-                              Rebalance
-                            </span>
+                            <strong className="text-xs font-black text-blue-950">⚡ Station 1 Load</strong>
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-200/80 text-blue-900">85% Cap</span>
                           </div>
                           <p className="text-xs text-slate-700 font-medium leading-relaxed">
                             Station 1 at 85% capacity — auto-rebalance starters to Station 2.
                           </p>
                         </div>
 
-                        {/* 3. Beverage Attach Upselling */}
                         <div className="p-3.5 rounded-xl border bg-purple-50/60 border-purple-200/70 text-slate-800">
                           <div className="flex items-center justify-between mb-1.5">
-                            <div className="flex items-center gap-2">
-                              <span className="text-base">🥤</span>
-                              <strong className="text-xs font-black text-purple-950">Beverage Attach</strong>
-                            </div>
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-200/80 text-purple-900">
-                              AOV +₹65
-                            </span>
+                            <strong className="text-xs font-black text-purple-950">🥤 Beverage Upsell</strong>
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-200/80 text-purple-900">+₹65 AOV</span>
                           </div>
                           <p className="text-xs text-slate-700 font-medium leading-relaxed">
-                            Bundle Mango Lassi / Lemon Iced Tea with Biryani to lift AOV by ₹65.
+                            Bundle Mango Lassi with Spicy Biryani to lift AOV by ₹65.
                           </p>
                         </div>
 
-                        {/* 4. Rush Hour Line Balancing */}
                         <div className="p-3.5 rounded-xl border bg-emerald-50/60 border-emerald-200/70 text-slate-800">
                           <div className="flex items-center justify-between mb-1.5">
-                            <div className="flex items-center gap-2">
-                              <span className="text-base">⏱️</span>
-                              <strong className="text-xs font-black text-emerald-950">Line Balancing</strong>
-                            </div>
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-200/80 text-emerald-900">
-                              SLA Safe
-                            </span>
+                            <strong className="text-xs font-black text-emerald-950">⏱️ SLA Balancing</strong>
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-200/80 text-emerald-900">&lt;18m SLA</span>
                           </div>
                           <p className="text-xs text-slate-700 font-medium leading-relaxed">
-                            Prep time SLA at 14.2m (&lt;18m target). Shift 1 expediter to Station 3.
+                            Prep time SLA at 14.2m. Shift 1 expediter to Station 3.
                           </p>
                         </div>
                       </div>
@@ -1765,221 +1999,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                     <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
                       <span>Predicted Tomorrow Revenue: <strong className="text-slate-800">₹53,600</strong></span>
                       <span className="text-emerald-600 font-bold">94% forecast accuracy</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* ========================================================
-                    DE-JARGONIZED DYNAMIC DISH INTELLIGENCE TABLE
-                    ======================================================== */}
-                <div className="p-6 rounded-2xl border bg-white border-slate-200/90 shadow-xs">
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-4">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="w-6 h-6 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-xs font-black">
-                          AI
-                        </span>
-                        <h4 className="font-extrabold text-sm text-slate-900">
-                          Adaptive Dish Intelligence & Basket Pairings
-                        </h4>
-                      </div>
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        Operational speed benchmarks, AI popularity scoring, and cross-sell attachment pairings
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-2 text-[10px] font-bold">
-                      <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-1 rounded-lg">
-                        Session: {mlService.getBestForCurrentSession().sessionName}
-                      </span>
-                      <span className="bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-1 rounded-lg">
-                        Dynamic Engine Active
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Best in Hotel AI Table */}
-                  <div className="overflow-x-auto no-scrollbar rounded-xl border border-slate-200">
-                    <table className="w-full text-left text-xs">
-                      <thead className="text-[10px] uppercase font-extrabold tracking-wider bg-slate-50 text-slate-500 border-b border-slate-200">
-                        <tr>
-                          <th className="py-2.5 px-3">Rank & Dish</th>
-                          <th className="py-2.5 px-3">Category</th>
-                          <th className="py-2.5 px-3 text-center">Popularity Score (AI)</th>
-                          <th className="py-2.5 px-3 text-center">Kitchen Prep SLA</th>
-                          <th className="py-2.5 px-3 text-center">Order Volume</th>
-                          <th className="py-2.5 px-3">Recommended Cross-Sell Pairing</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 font-medium">
-                        {mlService.getTopBestInHotel(6).map((item, index) => {
-                          const pairings = mlService.getPairingsForDish(item.name);
-                          return (
-                            <tr key={item.name} className="hover:bg-slate-50/60 transition-colors">
-                              <td className="py-2.5 px-3 font-bold text-slate-900 flex items-center gap-2">
-                                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${
-                                  index === 0 ? 'bg-amber-400 text-black' : index === 1 ? 'bg-slate-300 text-black' : index === 2 ? 'bg-amber-700 text-white' : 'bg-slate-100 text-slate-600'
-                                }`}>
-                                  {index + 1}
-                                </span>
-                                <span>{item.name}</span>
-                              </td>
-                              <td className="py-2.5 px-3 text-slate-500 text-[11px]">{item.category}</td>
-                              <td className="py-2.5 px-3 text-center">
-                                <span className="bg-indigo-50 text-indigo-700 font-bold text-[10px] px-2 py-0.5 rounded-full border border-indigo-100">
-                                  {item.compositeScore} / 100
-                                </span>
-                              </td>
-                              <td className="py-2.5 px-3 text-center font-bold text-slate-700">
-                                ⏱️ {item.avgPrepDelayMin} mins
-                              </td>
-                              <td className="py-2.5 px-3 text-center font-bold text-slate-900">
-                                {item.ordersCount.toLocaleString()} orders
-                              </td>
-                              <td className="py-2.5 px-3">
-                                {pairings.length > 0 ? (
-                                  <span className="bg-orange-50 text-orange-700 border border-orange-200 text-[10px] font-bold px-2 py-0.5 rounded-md">
-                                    + {pairings[0].pairedWith} ({Math.round(pairings[0].confidence)}% match)
-                                  </span>
-                                ) : (
-                                  <span className="text-slate-400 text-[10px]">Standard item</span>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                {/* ========================================================
-                    LIVE KITCHEN DISH & EXPEDITER QUEUE STREAM
-                    ======================================================== */}
-                <div className="p-6 rounded-2xl border bg-white border-slate-200/90 shadow-xs space-y-4">
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-3 border-b border-slate-100">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-orange-50 text-orange-600 rounded-xl flex items-center justify-center font-bold">
-                        <ChefHat size={20} />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-extrabold text-base text-slate-900">Live Kitchen Queue & Ticket Stream</h3>
-                          <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-                            Live KDS
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-400 mt-0.5">Real-time tickets currently on prep line & station allocation</p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={runAIKitchenAdvisor}
-                      className="bg-primary hover:bg-primary-hover text-white font-bold py-2 px-3.5 rounded-xl text-xs flex items-center gap-2 shadow-xs transition-all cursor-pointer"
-                    >
-                      <Sparkles size={14} className="text-amber-300 animate-pulse" />
-                      <span>Run AI Workload Advisor</span>
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                    {/* Active Cooking Order Tickets */}
-                    <div className="p-4 rounded-xl border bg-slate-50/70 border-slate-200">
-                      <div className="flex items-center justify-between mb-3">
-                        <h4 className="font-extrabold text-xs text-slate-900 flex items-center gap-2">
-                          <span>🍳 Active Ticket Stream</span>
-                          <span className="bg-orange-500 text-white text-[9px] px-1.5 py-0.5 rounded-full font-black">
-                            {orders.filter(o => o.status === 'Preparing' || o.status === 'Cooking' || o.status === 'Confirmed' || o.status === 'Ready to Serve').length}
-                          </span>
-                        </h4>
-                        <span className="text-[10px] text-slate-400 font-medium">Auto-syncs via WebSocket</span>
-                      </div>
-
-                      <div className="space-y-2.5 max-h-72 overflow-y-auto no-scrollbar pr-1">
-                        {orders.filter(o => o.status === 'Preparing' || o.status === 'Cooking' || o.status === 'Confirmed' || o.status === 'Ready to Serve').length === 0 ? (
-                          <div className="text-center py-8 text-slate-400">
-                            <ChefHat size={32} className="mx-auto mb-2 opacity-40 text-orange-400" />
-                            <p className="text-xs font-bold text-slate-600">Kitchen Queue All Clear!</p>
-                            <p className="text-[10px] mt-0.5 text-slate-400">No pending cooking tickets right now.</p>
-                          </div>
-                        ) : (
-                          orders
-                            .filter(o => o.status === 'Preparing' || o.status === 'Cooking' || o.status === 'Confirmed' || o.status === 'Ready to Serve')
-                            .slice(0, 6)
-                            .map(order => (
-                              <div
-                                key={order.id}
-                                className="p-3 rounded-xl border transition-all bg-white border-slate-200 shadow-xs"
-                              >
-                                <div className="flex items-center justify-between mb-1.5">
-                                  <div className="flex items-center gap-2">
-                                    <span className="px-2 py-0.5 rounded-lg bg-orange-50 text-orange-600 font-extrabold text-[10px] border border-orange-100">
-                                      Table {order.tableId}
-                                    </span>
-                                    <span className="text-[10px] text-slate-400 font-mono">#{order.id.slice(-6)}</span>
-                                  </div>
-                                  <span
-                                    className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                                      order.status === 'Ready to Serve'
-                                        ? 'bg-blue-100 text-blue-700'
-                                        : order.status === 'Cooking'
-                                        ? 'bg-orange-100 text-orange-700 animate-pulse'
-                                        : 'bg-amber-100 text-amber-800'
-                                    }`}
-                                  >
-                                    {order.status}
-                                  </span>
-                                </div>
-                                <div className="text-[11px] font-semibold text-slate-700 space-y-0.5">
-                                  {order.items.map((it, idx) => (
-                                    <div key={idx} className="flex justify-between">
-                                      <span>{it.quantity}x {it.name}</span>
-                                      {it.instructions && it.instructions.length > 0 && (
-                                        <span className="text-[9px] text-orange-500 font-normal italic">
-                                          ({it.instructions.join(', ')})
-                                        </span>
-                                      )}
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            ))
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Active Kitchen Stations */}
-                    <div className="p-4 rounded-xl border bg-slate-50/70 border-slate-200">
-                      <div className="flex items-center justify-between mb-3">
-                        <h4 className="font-extrabold text-xs text-slate-900 flex items-center gap-2">
-                          <span>👨‍🍳 Station Distribution</span>
-                          <span className="bg-blue-600 text-white text-[9px] px-1.5 py-0.5 rounded-full font-black">
-                            3 Stations
-                          </span>
-                        </h4>
-                        <span className="text-[10px] text-slate-400 font-medium">Workload Allocations</span>
-                      </div>
-
-                      <div className="space-y-2.5 max-h-72 overflow-y-auto no-scrollbar pr-1">
-                        {[
-                          { name: 'Station 1: Curry & Gravies', station: 'Main Course & Biryani', shift: 'Morning', orders: 42, load: '85%' },
-                          { name: 'Station 2: Starters & Tandoor', station: 'Kebabs, Grills & Appetizers', shift: 'Morning', orders: 38, load: '62%' },
-                          { name: 'Station 3: Breads & Beverages', station: 'Naan, Rotis, Desserts', shift: 'Evening', orders: 29, load: '45%' },
-                        ].map((mockStation, i) => (
-                          <div key={i} className="p-3 rounded-xl border flex justify-between items-center bg-white border-slate-200 shadow-xs">
-                            <div>
-                              <p className="font-bold text-xs text-slate-900">{mockStation.name}</p>
-                              <p className="text-[10px] text-slate-400 mt-0.5">{mockStation.station} • {mockStation.shift} Shift</p>
-                            </div>
-                            <div className="text-right">
-                              <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-bold text-[10px] border border-blue-100 block">
-                                {mockStation.orders} Orders
-                              </span>
-                              <span className="text-[9px] text-slate-400 font-medium mt-0.5 block">{mockStation.load} Capacity</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
                     </div>
                   </div>
                 </div>
