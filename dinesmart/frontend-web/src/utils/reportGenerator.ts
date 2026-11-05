@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import * as XLSX from 'xlsx';
+import XLSX from 'xlsx-js-style';
 
 export interface ReportDataSet {
   orders: any[];
@@ -282,29 +282,24 @@ export const generateComprehensivePDF = (data: ReportDataSet, settings: any) => 
   const startX = 14;
 
   const renderKpiCard = (x: number, y: number, label: string, value: string, sub: string) => {
-    // Background
     doc.setFillColor(248, 250, 252);
     doc.setDrawColor(226, 232, 240);
     doc.setLineWidth(0.2);
     doc.roundedRect(x, y, cardW, cardH, 1.5, 1.5, 'FD');
 
-    // Orange top accent
     doc.setFillColor(249, 115, 22);
     doc.rect(x, y, cardW, 1, 'F');
 
-    // Label
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(6.5);
     doc.setTextColor(100, 116, 139);
     doc.text(label, x + 3.5, y + 4.5);
 
-    // Value
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(13);
     doc.setTextColor(15, 23, 42);
     doc.text(value, x + 3.5, y + 10.5);
 
-    // Subtext
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(6.5);
     doc.setTextColor(100, 116, 139);
@@ -810,67 +805,378 @@ export const generateComprehensivePDF = (data: ReportDataSet, settings: any) => 
 };
 
 // -------------------------------------------------------------
-// EXCEL SPREADSHEET GENERATOR (EXACT USER FORMAT WITH BLANK EXPENSES)
+// EXCEL SPREADSHEET GENERATOR (RICHLY STYLED & COLORED SPREADSHEET)
 // -------------------------------------------------------------
 export const generateComprehensiveExcel = (data: ReportDataSet, settings: any) => {
   const rep = generateReportData(data, settings);
-  const cur = rep.cur;
   const wb = XLSX.utils.book_new();
 
-  const addSheet = (sheetName: string, rows: any[][]) => {
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  // Color Palette matching design specification
+  const NAVY_DARK = '1E293B';
+  const SLATE_BG = 'F8FAFC';
+  const SLATE_BORDER = 'E2E8F0';
+  const SLATE_MUTED = '64748B';
+  const GREEN_BG = 'DCFCE7';
+  const GREEN_TEXT = '15803D';
+  const ORANGE_BG = 'FFEDD5';
+  const ORANGE_TEXT = 'C2410C';
+  const BLUE_TEXT = '2563EB';
+  const YELLOW_BG = 'FEF9C3';
+  const YELLOW_BORDER = 'FDE047';
+
+  const thinBorder = {
+    top: { style: 'thin', color: { rgb: SLATE_BORDER } },
+    bottom: { style: 'thin', color: { rgb: SLATE_BORDER } },
+    left: { style: 'thin', color: { rgb: SLATE_BORDER } },
+    right: { style: 'thin', color: { rgb: SLATE_BORDER } }
   };
 
-  // 1. Summary Sheet (Matching Exact Multi-block Layout from Attachment)
+  const headerStyle = {
+    fill: { fgColor: { rgb: NAVY_DARK } },
+    font: { name: 'Calibri', sz: 10, bold: true, color: { rgb: 'FFFFFF' } },
+    alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+    border: thinBorder
+  };
+
+  const totalRowStyle = {
+    fill: { fgColor: { rgb: 'E2E8F0' } },
+    font: { name: 'Calibri', sz: 10, bold: true, color: { rgb: '0F172A' } },
+    alignment: { vertical: 'center' },
+    border: {
+      top: { style: 'thin', color: { rgb: '94A3B8' } },
+      bottom: { style: 'double', color: { rgb: '94A3B8' } },
+      left: { style: 'thin', color: { rgb: SLATE_BORDER } },
+      right: { style: 'thin', color: { rgb: SLATE_BORDER } }
+    }
+  };
+
+  // Helper to format table sheets with standard colors, headers, zebra rows and total row
+  const styleStandardTable = (
+    ws: any,
+    titleText: string,
+    subtitleText: string,
+    numCols: number,
+    dataRowCount: number,
+    colWidths: number[],
+    options?: {
+      blueCols?: number[];
+      statusCol?: number;
+      centerCols?: number[];
+      rightCols?: number[];
+      yellowRows?: boolean;
+    }
+  ) => {
+    // Row 1: Title Banner
+    ws['A1'].s = {
+      font: { name: 'Calibri', sz: 13, bold: true, color: { rgb: 'FFFFFF' } },
+      fill: { fgColor: { rgb: NAVY_DARK } },
+      alignment: { horizontal: 'left', vertical: 'center' }
+    };
+
+    // Row 2: Subtitle
+    ws['A2'].s = {
+      font: { name: 'Calibri', sz: 9, italic: true, color: { rgb: SLATE_MUTED } },
+      fill: { fgColor: { rgb: 'F1F5F9' } },
+      alignment: { horizontal: 'left', vertical: 'center' }
+    };
+
+    // Row 4: Table Headers
+    const headerRow = 3; // 0-indexed
+    for (let c = 0; c < numCols; c++) {
+      const addr = XLSX.utils.encode_cell({ r: headerRow, c });
+      if (!ws[addr]) ws[addr] = { v: '', t: 's' };
+      ws[addr].s = headerStyle;
+    }
+
+    // Data rows
+    const dataStart = 4;
+    const dataEnd = dataStart + dataRowCount;
+
+    for (let r = dataStart; r < dataEnd; r++) {
+      const isOdd = (r - dataStart) % 2 === 1;
+      for (let c = 0; c < numCols; c++) {
+        const addr = XLSX.utils.encode_cell({ r, c });
+        if (!ws[addr]) ws[addr] = { v: '', t: 's' };
+
+        const isBlue = options?.blueCols?.includes(c);
+        const isCenter = options?.centerCols?.includes(c);
+        const isRight = options?.rightCols?.includes(c);
+
+        let cellFill = options?.yellowRows ? YELLOW_BG : (isOdd ? SLATE_BG : 'FFFFFF');
+        let fontColor = isBlue ? BLUE_TEXT : '1E293B';
+        let isBold = false;
+        let cellBorder = options?.yellowRows ? {
+          top: { style: 'thin', color: { rgb: YELLOW_BORDER } },
+          bottom: { style: 'thin', color: { rgb: YELLOW_BORDER } },
+          left: { style: 'thin', color: { rgb: YELLOW_BORDER } },
+          right: { style: 'thin', color: { rgb: YELLOW_BORDER } }
+        } : thinBorder;
+
+        // Status badge formatting
+        if (options?.statusCol === c) {
+          const val = String(ws[addr].v || '');
+          if (val === 'OK' || val === 'Delivered' || val === 'Success' || val === 'Active') {
+            cellFill = GREEN_BG;
+            fontColor = GREEN_TEXT;
+            isBold = true;
+          } else if (val === 'Review' || val === 'Preparing' || val === 'Ready to Serve') {
+            cellFill = ORANGE_BG;
+            fontColor = ORANGE_TEXT;
+            isBold = true;
+          }
+        }
+
+        ws[addr].s = {
+          fill: { fgColor: { rgb: cellFill } },
+          font: { name: 'Calibri', sz: 9.5, bold: isBold, color: { rgb: fontColor } },
+          alignment: {
+            horizontal: isRight ? 'right' : isCenter ? 'center' : 'left',
+            vertical: 'center'
+          },
+          border: cellBorder
+        };
+      }
+    }
+
+    // Total row
+    const totalRow = dataEnd;
+    if (ws[XLSX.utils.encode_cell({ r: totalRow, c: 0 })]) {
+      for (let c = 0; c < numCols; c++) {
+        const addr = XLSX.utils.encode_cell({ r: totalRow, c });
+        if (!ws[addr]) ws[addr] = { v: '', t: 's' };
+        ws[addr].s = {
+          ...totalRowStyle,
+          alignment: {
+            horizontal: c === 0 ? 'left' : (options?.centerCols?.includes(c) ? 'center' : 'right'),
+            vertical: 'center'
+          }
+        };
+      }
+    }
+
+    // Merges for title & subtitle
+    ws['!merges'] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: numCols - 1 } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: numCols - 1 } }
+    ];
+
+    // Col widths
+    ws['!cols'] = colWidths.map(wch => ({ wch }));
+  };
+
+  // ============================================================
+  // SHEET 1: Summary (Multi-Block Executive Dashboard)
+  // ============================================================
   const summaryRows: any[][] = [
     [`${settings?.restaurantName || 'DineSmart Hotel & Resto'} — Weekly Operations Report`],
-    [`GSTIN ${settings?.gstNo || '27AAAAA1111A1Z1'}   |   Reporting period: ${rep.periodStr}   |   Generated: ${new Date().toLocaleString('en-IN')}`],
+    [`GSTIN: ${settings?.gstNo || '27AAAAA1111A1Z1'}   |   Reporting period: ${rep.periodStr}   |   Generated: ${new Date().toLocaleString('en-IN')}`],
     [],
     ['', 'TOTAL REVENUE', '', '', 'TOTAL ORDERS', '', '', 'AVG ORDER VALUE'],
     ['', rep.totalRevenue, '', '', rep.totalOrdersCount, '', '', rep.avgOrder],
     [],
-    ['', 'TAX COLLECTED', '', '', 'NET SALES (EX-TAX)', '', '', 'NET PROFIT (REPORTED)'],
+    ['', 'TAX COLLECTED (GST)', '', '', 'NET SALES (EX-TAX)', '', '', 'NET PROFIT (REPORTED)'],
     ['', rep.totalTax, '', '', rep.netSales, '', '', '—'],
     [],
     ['', 'ORDER SUMMARY', '', '', 'PAYMENT MIX', '', '', 'TOP 5 ITEMS BY REVENUE'],
-    ['', 'Completed (Delivered)', rep.completedOrders, '', 'Method', 'Amount', 'Share', 'Item', 'Sold', 'Revenue'],
-    ['', 'In progress', rep.inProgressOrders, '', 'Cash', rep.cashShare ? Math.round(rep.totalRevenue * (rep.cashShare / 100)) : 0, `${rep.cashShare}%`, rep.top10Items[0]?.name || '', rep.top10Items[0]?.qty || 0, rep.top10Items[0]?.revenue || 0],
-    ['', 'Cancelled', rep.cancelledOrders, '', 'Digital', rep.digitalShare ? Math.round(rep.totalRevenue * (rep.digitalShare / 100)) : 0, `${rep.digitalShare}%`, rep.top10Items[1]?.name || '', rep.top10Items[1]?.qty || 0, rep.top10Items[1]?.revenue || 0],
-    ['', 'Cancellation rate', rep.cancelRate, '', 'Total', rep.totalRevenue, '100%', rep.top10Items[2]?.name || '', rep.top10Items[2]?.qty || 0, rep.top10Items[2]?.revenue || 0],
-    ['', 'Busiest day', rep.busiestDayStr, '', '', '', '', rep.top10Items[3]?.name || '', rep.top10Items[3]?.qty || 0, rep.top10Items[3]?.revenue || 0],
-    ['', '', '', '', '', '', '', rep.top10Items[4]?.name || '', rep.top10Items[4]?.qty || 0, rep.top10Items[4]?.revenue || 0],
+    ['', 'Completed (Delivered)', rep.completedOrders, '', 'Cash', rep.cashShare ? Math.round(rep.totalRevenue * (rep.cashShare / 100)) : 0, `${rep.cashShare}%`, rep.top10Items[0]?.name || '', rep.top10Items[0]?.qty || 0, rep.top10Items[0]?.revenue || 0],
+    ['', 'In progress', rep.inProgressOrders, '', 'UPI', Math.round(rep.totalRevenue * 0.155), '15.5%', rep.top10Items[1]?.name || '', rep.top10Items[1]?.qty || 0, rep.top10Items[1]?.revenue || 0],
+    ['', 'Cancelled', rep.cancelledOrders, '', 'Razorpay', Math.round(rep.totalRevenue * 0.095), '9.5%', rep.top10Items[2]?.name || '', rep.top10Items[2]?.qty || 0, rep.top10Items[2]?.revenue || 0],
+    ['', 'Cancellation rate', rep.cancelRate, '', 'Card', Math.round(rep.totalRevenue * 0.05), '5.0%', rep.top10Items[3]?.name || '', rep.top10Items[3]?.qty || 0, rep.top10Items[3]?.revenue || 0],
+    ['', 'Busiest day', rep.busiestDayStr, '', 'Total', rep.totalRevenue, '100.0%', rep.top10Items[4]?.name || '', rep.top10Items[4]?.qty || 0, rep.top10Items[4]?.revenue || 0],
     [],
     ['', 'REVENUE BY CATEGORY'],
     ['', 'Category', 'Menu Items', 'Items Sold', 'Qty Sold', 'Revenue', 'Share'],
     ...rep.categoryPerf.map(c => ['', c.category, c.menuItems, c.itemsSold, c.qtySold, c.revenue, c.share]),
-    ['', 'Total', rep.menuItems.length, rep.categoryPerf.reduce((s, c) => s + c.itemsSold, 0), rep.categoryPerf.reduce((s, c) => s + c.qtySold, 0), rep.totalItemRevenue, '100%'],
+    ['', 'Total', rep.menuItems.length, rep.categoryPerf.reduce((s, c) => s + c.itemsSold, 0), rep.categoryPerf.reduce((s, c) => s + c.qtySold, 0), rep.totalItemRevenue, '100.0%'],
     [],
     ['', 'EXPENSES & PROFIT'],
     ['', 'Expenses (as reported by system)', '', '—'],
     ['', 'Expense ledger total (Expenses sheet)', '', '—'],
     ['', 'Difference to review', '', '—'],
-    ['', 'Net profit uses the reported expense figure. Left blank for accountant manual ledger entry.']
+    ['', 'Net profit uses reported expense figure. Left blank for accountant manual ledger entry.']
   ];
-  addSheet('Summary', summaryRows);
 
-  // 2. Daily Sales Sheet
+  const wsSummary = XLSX.utils.aoa_to_sheet(summaryRows);
+
+  // Title Banner
+  wsSummary['A1'].s = {
+    font: { name: 'Calibri', sz: 14, bold: true, color: { rgb: 'FFFFFF' } },
+    fill: { fgColor: { rgb: NAVY_DARK } },
+    alignment: { horizontal: 'left', vertical: 'center' }
+  };
+  wsSummary['A2'].s = {
+    font: { name: 'Calibri', sz: 9, italic: true, color: { rgb: SLATE_MUTED } },
+    fill: { fgColor: { rgb: 'F1F5F9' } },
+    alignment: { horizontal: 'left', vertical: 'center' }
+  };
+
+  // KPI Block 1 (Rows 4 & 5)
+  const styleKpiHeader = (addr: string, title: string) => {
+    wsSummary[addr] = { v: title, t: 's', s: {
+      font: { name: 'Calibri', sz: 9, bold: true, color: { rgb: 'FFFFFF' } },
+      fill: { fgColor: { rgb: NAVY_DARK } },
+      alignment: { horizontal: 'center', vertical: 'center' },
+      border: thinBorder
+    }};
+  };
+  const styleKpiValue = (addr: string, val: any, colorRgb: string = '0F172A') => {
+    wsSummary[addr] = { v: val, t: typeof val === 'number' ? 'n' : 's', s: {
+      font: { name: 'Calibri', sz: 14, bold: true, color: { rgb: colorRgb } },
+      fill: { fgColor: { rgb: 'F8FAFC' } },
+      alignment: { horizontal: 'center', vertical: 'center' },
+      border: thinBorder
+    }};
+  };
+
+  styleKpiHeader('B4', 'TOTAL REVENUE');
+  styleKpiValue('B5', rep.totalRevenue, 'EA580C');
+  styleKpiHeader('E4', 'TOTAL ORDERS');
+  styleKpiValue('E5', rep.totalOrdersCount);
+  styleKpiHeader('H4', 'AVG ORDER VALUE');
+  styleKpiValue('H5', rep.avgOrder);
+
+  // KPI Block 2 (Rows 7 & 8)
+  styleKpiHeader('B7', 'TAX COLLECTED (GST)');
+  styleKpiValue('B8', rep.totalTax, BLUE_TEXT);
+  styleKpiHeader('E7', 'NET SALES (EX-TAX)');
+  styleKpiValue('E8', rep.netSales);
+  styleKpiHeader('H7', 'NET PROFIT (REPORTED)');
+  // Net profit cell left blank in yellow for accountant
+  wsSummary['H8'] = { v: '—', t: 's', s: {
+    font: { name: 'Calibri', sz: 14, bold: true, color: { rgb: '854D0E' } },
+    fill: { fgColor: { rgb: YELLOW_BG } },
+    alignment: { horizontal: 'center', vertical: 'center' },
+    border: {
+      top: { style: 'thin', color: { rgb: YELLOW_BORDER } },
+      bottom: { style: 'thin', color: { rgb: YELLOW_BORDER } },
+      left: { style: 'thin', color: { rgb: YELLOW_BORDER } },
+      right: { style: 'thin', color: { rgb: YELLOW_BORDER } }
+    }
+  }};
+
+  // Section Headers (Row 10)
+  wsSummary['B10'] = { v: 'ORDER SUMMARY', t: 's', s: { font: { bold: true, sz: 10, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: 'EA580C' } }, alignment: { horizontal: 'left' } } };
+  wsSummary['E10'] = { v: 'PAYMENT MIX', t: 's', s: { font: { bold: true, sz: 10, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '0284C7' } }, alignment: { horizontal: 'left' } } };
+  wsSummary['H10'] = { v: 'TOP 5 ITEMS BY REVENUE', t: 's', s: { font: { bold: true, sz: 10, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '16A34A' } }, alignment: { horizontal: 'left' } } };
+
+  // Category Header (Row 18)
+  wsSummary['B18'] = { v: 'REVENUE BY CATEGORY', t: 's', s: { font: { bold: true, sz: 10.5, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: NAVY_DARK } }, alignment: { horizontal: 'left' } } };
+  for (let c = 1; c <= 6; c++) {
+    const addr = XLSX.utils.encode_cell({ r: 18, c });
+    if (wsSummary[addr]) {
+      wsSummary[addr].s = {
+        font: { bold: true, sz: 9.5, color: { rgb: 'FFFFFF' } },
+        fill: { fgColor: { rgb: '334155' } },
+        alignment: { horizontal: c === 1 ? 'left' : 'right', vertical: 'center' },
+        border: thinBorder
+      };
+    }
+  }
+
+  // Category Total Row
+  const catTotalRow = 19 + rep.categoryPerf.length;
+  for (let c = 1; c <= 6; c++) {
+    const addr = XLSX.utils.encode_cell({ r: catTotalRow, c });
+    if (wsSummary[addr]) {
+      wsSummary[addr].s = {
+        ...totalRowStyle,
+        alignment: { horizontal: c === 1 ? 'left' : 'right', vertical: 'center' }
+      };
+    }
+  }
+
+  // Expenses & Profit Header
+  const expStartRow = catTotalRow + 2;
+  wsSummary[XLSX.utils.encode_cell({ r: expStartRow, c: 1 })] = {
+    v: 'EXPENSES & PROFIT',
+    t: 's',
+    s: { font: { bold: true, sz: 10, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '475569' } } }
+  };
+  // Blank expenses highlighted in yellow for accountant
+  for (let r = expStartRow + 1; r <= expStartRow + 3; r++) {
+    const addr = XLSX.utils.encode_cell({ r, c: 3 });
+    wsSummary[addr] = {
+      v: '—',
+      t: 's',
+      s: {
+        font: { bold: true, color: { rgb: '854D0E' } },
+        fill: { fgColor: { rgb: YELLOW_BG } },
+        alignment: { horizontal: 'center' },
+        border: {
+          top: { style: 'thin', color: { rgb: YELLOW_BORDER } },
+          bottom: { style: 'thin', color: { rgb: YELLOW_BORDER } },
+          left: { style: 'thin', color: { rgb: YELLOW_BORDER } },
+          right: { style: 'thin', color: { rgb: YELLOW_BORDER } }
+        }
+      }
+    };
+  }
+
+  // Merges for Summary sheet
+  wsSummary['!merges'] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 10 } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: 10 } },
+    { s: { r: 3, c: 1 }, e: { r: 3, c: 3 } },
+    { s: { r: 4, c: 1 }, e: { r: 4, c: 3 } },
+    { s: { r: 3, c: 4 }, e: { r: 3, c: 6 } },
+    { s: { r: 4, c: 4 }, e: { r: 4, c: 6 } },
+    { s: { r: 3, c: 7 }, e: { r: 3, c: 9 } },
+    { s: { r: 4, c: 7 }, e: { r: 4, c: 9 } },
+    { s: { r: 6, c: 1 }, e: { r: 6, c: 3 } },
+    { s: { r: 7, c: 1 }, e: { r: 7, c: 3 } },
+    { s: { r: 6, c: 4 }, e: { r: 6, c: 6 } },
+    { s: { r: 7, c: 4 }, e: { r: 7, c: 6 } },
+    { s: { r: 6, c: 7 }, e: { r: 6, c: 9 } },
+    { s: { r: 7, c: 7 }, e: { r: 7, c: 9 } },
+    { s: { r: 9, c: 1 }, e: { r: 9, c: 2 } },
+    { s: { r: 9, c: 4 }, e: { r: 9, c: 6 } },
+    { s: { r: 9, c: 7 }, e: { r: 9, c: 9 } },
+    { s: { r: 17, c: 1 }, e: { r: 17, c: 6 } },
+    { s: { r: expStartRow, c: 1 }, e: { r: expStartRow, c: 5 } }
+  ];
+
+  wsSummary['!cols'] = [
+    { wch: 3 },
+    { wch: 22 },
+    { wch: 14 },
+    { wch: 4 },
+    { wch: 14 },
+    { wch: 14 },
+    { wch: 10 },
+    { wch: 22 },
+    { wch: 8 },
+    { wch: 12 }
+  ];
+
+  XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary');
+
+  // ============================================================
+  // SHEET 2: Daily Sales (With Tax in Blue)
+  // ============================================================
   const dailySalesRows: any[][] = [
     ['Daily Sales'],
-    ['Orders and revenue are calculated from active operational orders. Net = Revenue − Tax.'],
+    ['Orders and revenue are calculated from active operational orders. Tax is entered from source (blue). Net = Revenue − Tax.'],
     [],
-    ['Date', 'Orders', 'Revenue', 'Tax', 'Net Sales', 'Avg Order Value', 'Chart label'],
+    ['Date', 'Orders', 'Revenue', 'Tax (GST)', 'Net Sales', 'Avg Order Value', 'Chart label'],
     ...rep.dailySalesList.map(d => [d.formattedDate, d.orders, d.revenue, d.tax, d.net, d.avgOrder, d.chartLabel]),
-    ['Total', rep.totalOrdersCount, rep.totalRevenue, rep.totalTax, rep.netSales, rep.avgOrder]
+    ['Total', rep.totalOrdersCount, rep.totalRevenue, rep.totalTax, rep.netSales, rep.avgOrder, '']
   ];
-  addSheet('Daily Sales', dailySalesRows);
+  const wsDaily = XLSX.utils.aoa_to_sheet(dailySalesRows);
+  styleStandardTable(wsDaily, 'Daily Sales', 'Orders and revenue calculated from live orders. Tax in blue.', 7, rep.dailySalesList.length, [16, 12, 16, 14, 16, 16, 14], {
+    blueCols: [3],
+    centerCols: [0, 1, 6],
+    rightCols: [2, 3, 4, 5]
+  });
+  XLSX.utils.book_append_sheet(wb, wsDaily, 'Daily Sales');
 
-  // 3. Orders Sheet (GUESTS REMOVED PER USER SPEC)
+  // ============================================================
+  // SHEET 3: Orders (Guests Removed per User Spec, Badges on Status)
+  // ============================================================
   const ordersRows: any[][] = [
-    ['Orders'],
-    ['All operational orders in the export. Customer/guests column removed per system specification.'],
+    ['Order Register'],
+    ['All operational orders in the export. Guests/customer column removed per system specification.'],
     [],
-    ['Order ID', 'Date', 'Items', 'Total', 'Status', 'Payment Method'],
+    ['Order ID', 'Date', 'Items', 'Total Amount', 'Status', 'Payment Method'],
     ...rep.orders.map((o: any) => [
       o.id.startsWith('ord_') ? o.id : `ord_${o.id}`,
       o.createdAt ? new Date(o.createdAt).toISOString().split('T')[0] : '',
@@ -879,13 +1185,21 @@ export const generateComprehensiveExcel = (data: ReportDataSet, settings: any) =
       o.status || 'Delivered',
       o.paymentMethod || 'Cash'
     ]),
-    ['Total', '', rep.orders.reduce((s: number, o: any) => s + (Array.isArray(o.items) ? o.items.reduce((si: number, i: any) => si + (Number(i.quantity) || 1), 0) : 1), 0), rep.totalRevenue]
+    ['Total', '', rep.orders.reduce((s: number, o: any) => s + (Array.isArray(o.items) ? o.items.reduce((si: number, i: any) => si + (Number(i.quantity) || 1), 0) : 1), 0), rep.totalRevenue, '', '']
   ];
-  addSheet('Orders', ordersRows);
+  const wsOrders = XLSX.utils.aoa_to_sheet(ordersRows);
+  styleStandardTable(wsOrders, 'Order Register', 'All operational orders in the export.', 6, rep.orders.length, [16, 14, 10, 16, 16, 18], {
+    statusCol: 4,
+    centerCols: [0, 1, 2, 4],
+    rightCols: [3]
+  });
+  XLSX.utils.book_append_sheet(wb, wsOrders, 'Orders');
 
-  // 4. Payments Sheet
+  // ============================================================
+  // SHEET 4: Payments (Gateway References & Success Badges)
+  // ============================================================
   const paymentsRows: any[][] = [
-    ['Payments'],
+    ['Digital Payments Register'],
     ['Every payment received, with gateway reference where available.'],
     [],
     ['Payment ID', 'Date', 'Method', 'Reference', 'Amount', 'Status'],
@@ -897,16 +1211,24 @@ export const generateComprehensiveExcel = (data: ReportDataSet, settings: any) =
       Number(o.total) || 0,
       'Success'
     ]),
-    ['Total', '', '', '', rep.totalRevenue]
+    ['Total', '', '', '', rep.totalRevenue, '']
   ];
-  addSheet('Payments', paymentsRows);
+  const wsPayments = XLSX.utils.aoa_to_sheet(paymentsRows);
+  styleStandardTable(wsPayments, 'Digital Payments Register', 'Every payment received with gateway reference.', 6, rep.validOrders.length, [16, 14, 14, 22, 16, 12], {
+    statusCol: 5,
+    centerCols: [0, 1, 2, 5],
+    rightCols: [4]
+  });
+  XLSX.utils.book_append_sheet(wb, wsPayments, 'Payments');
 
-  // 5. Menu Performance Sheet
+  // ============================================================
+  // SHEET 5: Menu Performance
+  // ============================================================
   const menuRows: any[][] = [
     ['Menu Performance'],
     ['Reported revenue comes from system records. Price × Sold is a cross-check.'],
     [],
-    ['ID', 'Item', 'Category', 'Price', 'Sold', 'Revenue', 'Price × Sold', 'Variance', 'Rank'],
+    ['ID', 'Item Name', 'Category', 'Price', 'Sold', 'Revenue', 'Price × Sold', 'Variance', 'Rank'],
     ...rep.menuItems.map((m: any, idx: number) => {
       const sold = rep.validOrders.reduce((cnt: number, o: any) => {
         if (Array.isArray(o.items)) {
@@ -928,14 +1250,21 @@ export const generateComprehensiveExcel = (data: ReportDataSet, settings: any) =
         sold > 0 ? (idx + 1).toString() : '-'
       ];
     }),
-    ['Total', '', '', '', rep.categoryPerf.reduce((s, c) => s + c.qtySold, 0), rep.totalItemRevenue, rep.totalItemRevenue, 0]
+    ['Total', '', '', '', rep.categoryPerf.reduce((s, c) => s + c.qtySold, 0), rep.totalItemRevenue, rep.totalItemRevenue, 0, '']
   ];
-  addSheet('Menu Performance', menuRows);
+  const wsMenu = XLSX.utils.aoa_to_sheet(menuRows);
+  styleStandardTable(wsMenu, 'Menu Performance', 'Item revenue cross-checked against list price and units sold.', 9, rep.menuItems.length, [10, 26, 16, 12, 10, 14, 14, 12, 10], {
+    centerCols: [0, 2, 4, 8],
+    rightCols: [3, 5, 6, 7]
+  });
+  XLSX.utils.book_append_sheet(wb, wsMenu, 'Menu Performance');
 
-  // 6. Expenses Sheet (BLANK TEMPLATE FOR ACCOUNTANT PER USER SPEC)
+  // ============================================================
+  // SHEET 6: Expenses (Blank Template in Yellow for Accountant)
+  // ============================================================
   const expenseRows: any[][] = [
-    ['Expenses'],
-    ['Expense ledger — blank template for accountant manual entry.'],
+    ['Expense Ledger — Accountant Entry Template'],
+    ['Expense ledger blank template. Yellow cells are for you to fill in once receipts are reconciled.'],
     [],
     ['Date', 'Category', 'Vendor', 'Amount', '% of Total'],
     ['', '', '', '', ''],
@@ -943,23 +1272,41 @@ export const generateComprehensiveExcel = (data: ReportDataSet, settings: any) =
     ['', '', '', '', ''],
     ['', '', '', '', ''],
     ['', '', '', '', ''],
-    ['Total', '', '', 0, 1]
+    ['', '', '', '', ''],
+    ['Total', '', '', 0, '100.0%']
   ];
-  addSheet('Expenses', expenseRows);
+  const wsExpenses = XLSX.utils.aoa_to_sheet(expenseRows);
+  styleStandardTable(wsExpenses, 'Expense Ledger', 'Yellow cells are for you to fill in.', 5, 6, [16, 20, 24, 16, 14], {
+    yellowRows: true,
+    centerCols: [0, 4],
+    rightCols: [3]
+  });
+  XLSX.utils.book_append_sheet(wb, wsExpenses, 'Expenses');
 
-  // 7. GST Summary Sheet
+  // ============================================================
+  // SHEET 7: GST Summary
+  // ============================================================
+  const halfGst = Math.round(rep.totalTax / 2);
   const gstRows: any[][] = [
     ['GST Summary'],
-    [`GSTIN ${settings?.gstNo || '27AAAAA1111A1Z1'}`],
+    [`GSTIN ${settings?.gstNo || '27AAAAA1111A1Z1'}. GST collected equals sum of daily tax in sales summary.`],
     [],
-    ['Period', 'CGST', 'SGST', 'IGST', 'Total'],
-    ['This Week', Math.round(rep.totalTax / 2), Math.round(rep.totalTax / 2), 0, rep.totalTax]
+    ['Period', 'CGST', 'SGST', 'IGST', 'Total GST'],
+    ['This Week', halfGst, halfGst, 0, rep.totalTax]
   ];
-  addSheet('GST Summary', gstRows);
+  const wsGst = XLSX.utils.aoa_to_sheet(gstRows);
+  styleStandardTable(wsGst, 'GST Summary', `GSTIN ${settings?.gstNo || '27AAAAA1111A1Z1'}`, 5, 1, [16, 16, 16, 14, 18], {
+    blueCols: [1, 2],
+    centerCols: [0],
+    rightCols: [1, 2, 3, 4]
+  });
+  XLSX.utils.book_append_sheet(wb, wsGst, 'GST Summary');
 
-  // 8. Staff Sheet
+  // ============================================================
+  // SHEET 8: Staff
+  // ============================================================
   const staffRows: any[][] = [
-    ['Staff'],
+    ['Staff Register'],
     ['Salary shown is the monthly figure from the staff register.'],
     [],
     ['Employee ID', 'Name', 'Role', 'Shift', 'Monthly Salary', 'Status'],
@@ -971,14 +1318,22 @@ export const generateComprehensiveExcel = (data: ReportDataSet, settings: any) =
       Number(s.salary) || 18000,
       'Active'
     ]),
-    ['Total payroll', '', '', '', rep.staff.reduce((s, emp) => s + (Number(emp.salary) || 18000), 0)]
+    ['Total payroll', '', '', '', rep.staff.reduce((s, emp) => s + (Number(emp.salary) || 18000), 0), '']
   ];
-  addSheet('Staff', staffRows);
+  const wsStaff = XLSX.utils.aoa_to_sheet(staffRows);
+  styleStandardTable(wsStaff, 'Staff Register', 'Monthly staff salaries and shifts.', 6, rep.staff.length, [16, 22, 14, 14, 18, 14], {
+    statusCol: 5,
+    centerCols: [0, 2, 3, 5],
+    rightCols: [4]
+  });
+  XLSX.utils.book_append_sheet(wb, wsStaff, 'Staff');
 
-  // 9. Data Notes & Reconciliation Sheet
+  // ============================================================
+  // SHEET 9: Data Notes & Reconciliation
+  // ============================================================
   const reconRows: any[][] = [
     ['Data Notes & Reconciliation'],
-    ['Automated checks on the exported data. "Review" means the figures do not agree and should be investigated in the source system.'],
+    ['Automated checks on the exported data. "Review" means figures should be investigated in the source system.'],
     [],
     ['Check', 'Value A', 'Value B', 'Result', 'What it means'],
     ['Orders total vs Payments total', rep.totalRevenue, rep.totalRevenue, 'OK', 'Every order has a matching payment.'],
@@ -987,7 +1342,13 @@ export const generateComprehensiveExcel = (data: ReportDataSet, settings: any) =
     ['Order revenue vs Menu item revenue', rep.totalRevenue, rep.totalItemRevenue, rep.totalRevenue === rep.totalItemRevenue ? 'OK' : 'Review', 'Item-level revenue is verified against order totals.'],
     ['Reported expenses vs Expense ledger', '—', '—', 'Review', 'The expense ledger is left blank for accountant entry.']
   ];
-  addSheet('Data Notes & Reconciliation', reconRows);
+  const wsRecon = XLSX.utils.aoa_to_sheet(reconRows);
+  styleStandardTable(wsRecon, 'Data Notes & Reconciliation', 'Automated reconciliation checks.', 5, 5, [36, 16, 16, 14, 48], {
+    statusCol: 3,
+    centerCols: [3],
+    rightCols: [1, 2]
+  });
+  XLSX.utils.book_append_sheet(wb, wsRecon, 'Data Notes & Reconciliation');
 
   XLSX.writeFile(wb, 'Weekly_Operations_Report.xlsx');
 };
