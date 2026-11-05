@@ -2308,6 +2308,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                 </div>
 
                 <div className="flex items-center gap-2.5 shrink-0 flex-wrap sm:flex-nowrap">
+                  <a
+                    href="/downloads/TableTap_Waiter.apk"
+                    download="TableTap_Waiter.apk"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black px-4 py-2.5 rounded-2xl transition-all flex items-center gap-2 cursor-pointer shadow-sm hover:shadow-md shrink-0"
+                    title="Download Waiter Android App APK"
+                  >
+                    <Smartphone size={15} />
+                    <span>Download Waiter APK</span>
+                    <Download size={13} className="opacity-90" />
+                  </a>
+
                   <button
                     onClick={fetchData}
                     className="p-2.5 border border-slate-200 text-slate-600 hover:text-primary hover:border-orange-300 rounded-2xl cursor-pointer bg-slate-50/70 hover:bg-white transition-all shadow-xs"
