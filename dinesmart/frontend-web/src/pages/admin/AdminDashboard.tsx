@@ -151,6 +151,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
   }, []);
   const [syncTime, setSyncTime] = useState('');
   const [alertSettings, setAlertSettings] = useState<any>({ restaurantName: 'Babai Hotel', tax: 5, currency: '₹', gstNo: '27AAAAA1111A1Z1', mapsLocation: '' });
+  const [settingsForm, setSettingsForm] = useState<any>(null);
 
   // Redesign States: Role-Based Metric Perspective, Chart Toggles & Clock
   const [dashboardViewMode, setDashboardViewMode] = useState<'manager' | 'chef'>('manager');
@@ -165,31 +166,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
     return () => clearInterval(clockTimer);
   }, []);
 
-  // Waiter APK Download & Management State
-  const [showApkQr, setShowApkQr] = useState(false);
-  const [showApkGuide, setShowApkGuide] = useState(false);
-  const [copiedApkLink, setCopiedApkLink] = useState(false);
-  const [apkInfo, setApkInfo] = useState<{
-    version: string;
-    fileName: string;
-    fileSize: string;
-    downloadUrl: string;
-    updatedAt: string;
-    customUploaded: boolean;
-  }>(() => {
-    const saved = localStorage.getItem('dinesmart_waiter_apk_info');
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) { /* ignore */ }
-    }
-    return {
-      version: 'v1.2.0',
-      fileName: 'TableTap_Waiter.apk',
-      fileSize: '86.5 MB',
-      downloadUrl: '/downloads/TableTap_Waiter.apk',
-      updatedAt: 'October 2026',
-      customUploaded: false
-    };
-  });
 
   const handleGetLocation = () => {
     if (navigator.geolocation) {
@@ -212,7 +188,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
     e.preventDefault();
     setLoading(true);
     try {
-      await db.saveSettings(alertSettings);
+      const payload = settingsForm || alertSettings;
+      const saved = await db.saveSettings(payload);
+      setAlertSettings(saved);
+      setSettingsForm(saved);
+      logActivity('Updated restaurant configuration settings');
       alert('Settings Saved Successfully.');
     } catch (err) {
       alert('Failed to save settings.');
@@ -359,7 +339,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
       ]);
 
       setOrders(dbOrders || []);
-      if (dbSettings) setAlertSettings(dbSettings);
+      if (dbSettings) {
+        setAlertSettings(dbSettings);
+        setSettingsForm((prev: any) => (prev === null ? dbSettings : prev));
+      }
       setMenuItems(dbMenu && dbMenu.length > 0 ? dbMenu : MENU_ITEMS);
       setStaff(dbStaff || []);
       setTables(dbTables || []);
@@ -759,48 +742,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
     }
   };
 
-  // Waiter APK Download & Management Logic
-  const apkDownloadFullUrl = apkInfo.downloadUrl.startsWith('http') || apkInfo.downloadUrl.startsWith('blob:')
-    ? apkInfo.downloadUrl
-    : `${window.location.origin}${apkInfo.downloadUrl}`;
-  const apkQrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(apkDownloadFullUrl)}`;
-
-  const handleUploadNewApk = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.name.toLowerCase().endsWith('.apk')) {
-      alert('Please select a valid Android package file (.apk)');
-      return;
-    }
-
-    const objectUrl = URL.createObjectURL(file);
-    const sizeInMB = (file.size / (1024 * 1024)).toFixed(1) + ' MB';
-    const now = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-
-    const newApkData = {
-      version: 'v' + (parseFloat(apkInfo.version.replace('v', '')) + 0.1).toFixed(1) + '-custom',
-      fileName: file.name,
-      fileSize: sizeInMB,
-      downloadUrl: objectUrl,
-      updatedAt: now,
-      customUploaded: true
-    };
-
-    setApkInfo(newApkData);
-    localStorage.setItem('dinesmart_waiter_apk_info', JSON.stringify({
-      ...newApkData,
-      downloadUrl: '/downloads/WaiterApp.apk'
-    }));
-    logActivity(`Uploaded updated Waiter Terminal APK: ${file.name} (${sizeInMB})`);
-    alert(`Successfully loaded new Waiter APK: ${file.name} (${sizeInMB})`);
-  };
-
-  const handleCopyApkLink = () => {
-    navigator.clipboard.writeText(apkDownloadFullUrl);
-    setCopiedApkLink(true);
-    setTimeout(() => setCopiedApkLink(false), 2500);
-  };
 
   // Coupon Campaigns
   const handleCreateCouponCode = async (e: React.FormEvent) => {
@@ -1217,7 +1158,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
               <p className="text-[9px] text-slate-500 font-extrabold uppercase tracking-widest mb-2 px-3">Control & Security</p>
               <nav className="space-y-1">
                 <button
-                  onClick={() => setActiveTab('settings')}
+                  onClick={() => { setActiveTab('settings'); setSettingsForm((prev: any) => prev || { ...alertSettings }); }}
                   className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'settings'
                       ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
                       : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
@@ -1302,76 +1243,110 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
           {/* Global Tables Warning Removed */}
 
           {/* ----------------------------------------------------
-              VIEW 1: OVERVIEW (FIGMA DESIGN MATCH)
+              VIEW 1: OVERVIEW (ORIGINAL DATA REAL-TIME METRICS)
               ---------------------------------------------------- */}
           {activeTab === 'overview' && (() => {
-            const occupiedTablesCount = tables.filter(t => t.status !== 'Available' && t.status !== 'Cleaning').length;
-            const totalTablesCount = tables.length > 0 ? tables.length : 36;
-            const floorDisplay = tables.length > 0 && occupiedTablesCount > 0
-              ? `${occupiedTablesCount}/${totalTablesCount}`
-              : '28/36';
-            const occupancyPct = tables.length > 0 && occupiedTablesCount > 0
-              ? Math.round((occupiedTablesCount / totalTablesCount) * 100)
-              : 78;
+            const validOrders = orders.filter(o => (o.status as any) !== 'Cancelled');
+            const todayDateStr = new Date().toISOString().split('T')[0];
+            const todayValidOrders = validOrders.filter(o => {
+              const d = o.createdAt ? new Date(o.createdAt).toISOString().split('T')[0] : '';
+              return d === todayDateStr;
+            });
 
-            const liveOrdersCount = orders.length > 0 ? orders.length : 46;
+            const todayRevenue = todayValidOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+            const totalRecordedRevenue = validOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+            const displayRevenue = todayValidOrders.length > 0 ? todayRevenue : totalRecordedRevenue;
 
-            // Area chart revenue data according to timeframe
-            const revenueAreaToday = [
-              { time: '8 AM', revenue: 2100 },
-              { time: '10 AM', revenue: 3800 },
-              { time: '12 PM', revenue: 5400 },
-              { time: '2 PM', revenue: 7800 },
-              { time: '4 PM', revenue: 8900 },
-              { time: '6 PM', revenue: 11200 },
-              { time: '8 PM', revenue: 12680 }
-            ];
-            const revenueAreaWeek = [
-              { time: 'Mon', revenue: 6420 },
-              { time: 'Tue', revenue: 7980 },
-              { time: 'Wed', revenue: 9150 },
-              { time: 'Thu', revenue: 8890 },
-              { time: 'Fri', revenue: 11840 },
-              { time: 'Sat', revenue: 14210 },
-              { time: 'Sun', revenue: 12680 }
-            ];
-            const revenueAreaMonth = [
-              { time: 'Week 1', revenue: 42000 },
-              { time: 'Week 2', revenue: 58000 },
-              { time: 'Week 3', revenue: 71000 },
-              { time: 'Week 4', revenue: 84000 }
-            ];
+            const occupiedTablesCount = tables.filter(t => t.status === 'Ordered' || t.status === 'Cooking' || t.status === 'Serving' || t.status === 'Billing').length;
+            const availableTablesCount = tables.filter(t => t.status === 'Available').length;
+            const otherTablesCount = tables.filter(t => t.status === 'Cleaning' || t.status === 'Reserved').length;
+            const totalTablesCount = tables.length;
+            const floorDisplay = `${occupiedTablesCount}/${totalTablesCount || 0}`;
+            const occupancyPct = totalTablesCount > 0 ? Math.round((occupiedTablesCount / totalTablesCount) * 100) : 0;
 
-            const currentRevenueArea =
-              revenueTimeframe === 'today' ? revenueAreaToday :
-                revenueTimeframe === 'week' ? revenueAreaWeek : revenueAreaMonth;
+            const liveOrdersCount = orders.filter(o => o.status === 'Confirmed' || o.status === 'Preparing' || o.status === 'Ready to Serve').length;
+            const completedOrdersCount = orders.filter(o => o.status === 'Delivered').length;
+
+            // Area chart revenue data computed purely from actual orders
+            const getRealRevenueArea = () => {
+              if (revenueTimeframe === 'today') {
+                const hourSlots = ['8 AM', '10 AM', '12 PM', '2 PM', '4 PM', '6 PM', '8 PM', '10 PM'];
+                const bucketMap: Record<string, number> = {};
+                hourSlots.forEach(h => { bucketMap[h] = 0; });
+
+                const ordersToUse = todayValidOrders.length > 0 ? todayValidOrders : validOrders;
+                ordersToUse.forEach(o => {
+                  const date = o.createdAt ? new Date(o.createdAt) : null;
+                  const hour = date ? date.getHours() : 12;
+                  let slot = '12 PM';
+                  if (hour < 9) slot = '8 AM';
+                  else if (hour < 11) slot = '10 AM';
+                  else if (hour < 13) slot = '12 PM';
+                  else if (hour < 15) slot = '2 PM';
+                  else if (hour < 17) slot = '4 PM';
+                  else if (hour < 19) slot = '6 PM';
+                  else if (hour < 21) slot = '8 PM';
+                  else slot = '10 PM';
+
+                  bucketMap[slot] = (bucketMap[slot] || 0) + (Number(o.total) || 0);
+                });
+
+                return hourSlots.map(time => ({ time, revenue: bucketMap[time] || 0 }));
+              }
+
+              if (revenueTimeframe === 'week') {
+                const daySlots = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                const dayMap: Record<string, number> = {};
+                daySlots.forEach(d => { dayMap[d] = 0; });
+
+                validOrders.forEach(o => {
+                  if (o.createdAt) {
+                    const day = new Date(o.createdAt).toLocaleDateString('en-US', { weekday: 'short' });
+                    if (dayMap[day] !== undefined) {
+                      dayMap[day] += Number(o.total) || 0;
+                    }
+                  }
+                });
+
+                return daySlots.map(time => ({ time, revenue: dayMap[time] || 0 }));
+              }
+
+              // month timeframe
+              const weekSlots = ['Week 1', 'Week 2', 'Week 3', 'Week 4'];
+              const weekMap: Record<string, number> = { 'Week 1': 0, 'Week 2': 0, 'Week 3': 0, 'Week 4': 0 };
+              validOrders.forEach(o => {
+                const date = o.createdAt ? new Date(o.createdAt) : new Date();
+                const dayOfMonth = date.getDate();
+                const weekKey = dayOfMonth <= 7 ? 'Week 1' : dayOfMonth <= 14 ? 'Week 2' : dayOfMonth <= 21 ? 'Week 3' : 'Week 4';
+                weekMap[weekKey] += Number(o.total) || 0;
+              });
+
+              return weekSlots.map(time => ({ time, revenue: weekMap[time] || 0 }));
+            };
+
+            const currentRevenueArea = getRealRevenueArea();
+            const totalPeriodRevenue = currentRevenueArea.reduce((sum, item) => sum + item.revenue, 0);
 
             // Table status donut chart
             const tableStatusData = [
-              { name: 'Occupied', value: occupiedTablesCount > 0 ? occupiedTablesCount : 28, color: '#FF6B00' },
-              { name: 'Available', value: tables.filter(t => t.status === 'Available').length || 6, color: '#E2E8F0' },
-              { name: 'Reserved', value: tables.filter(t => t.status === 'Reserved').length || 2, color: '#4338CA' }
+              { name: 'Occupied', value: occupiedTablesCount, color: '#FF6B00' },
+              { name: 'Available', value: availableTablesCount, color: '#10B981' },
+              { name: 'Reserved/Cleaning', value: otherTablesCount, color: '#6366F1' }
             ];
 
-            // Recent Orders list from Figma
-            const defaultRecentOrders = [
-              { id: '#DS-4829', location: 'Table 12', waiter: 'Olivia M.', amount: 128.40, status: 'Preparing', time: '3 min ago' },
-              { id: '#DS-4828', location: 'Room 304', waiter: 'Lucas R.', amount: 84.20, status: 'Ready', time: '7 min ago' },
-              { id: '#DS-4827', location: 'Table 08', waiter: 'Emma W.', amount: 210.00, status: 'Completed', time: '12 min ago' },
-              { id: '#DS-4826', location: 'Table 19', waiter: 'Lucas R.', amount: 65.50, status: 'Preparing', time: '15 min ago' },
-              { id: '#DS-4825', location: 'Room 102', waiter: 'Olivia M.', amount: 142.80, status: 'Completed', time: '22 min ago' }
-            ];
-
-            const displayRecentOrders = orders.length > 0
-              ? orders.slice(0, 5).map((o, idx) => ({
-                id: `#DS-${o.id ? o.id.slice(-4).toUpperCase() : 4829 - idx}`,
-                location: o.tableId ? `Table ${o.tableId}` : (idx % 2 === 0 ? `Table 12` : `Room 304`),
-                waiter: idx % 3 === 0 ? 'Olivia M.' : idx % 3 === 1 ? 'Lucas R.' : 'Emma W.',
-                amount: o.total || (idx === 0 ? 128.40 : idx === 1 ? 84.20 : 210.00),
-                status: (o.status as string) === 'Ready to Serve' ? 'Ready' : o.status === 'Delivered' ? 'Completed' : 'Preparing',
-                time: `${(idx + 1) * 4} min ago`
-              }))
-              : defaultRecentOrders;
+            // Recent Orders list purely from original database orders
+            const displayRecentOrders = orders.slice(0, 5).map(o => {
+              const tableNum = Number(o.tableId);
+              const matchedStaff = staff.find(s => s.assignedTables && !isNaN(tableNum) && s.assignedTables.includes(tableNum));
+              return {
+                id: `#${o.id}`,
+                location: o.tableId ? `Table ${o.tableId}` : 'Dine-In',
+                waiter: (o as any).waiterName || matchedStaff?.name || 'Floor Staff',
+                amount: Number(o.total || 0),
+                status: o.status,
+                time: o.createdAt ? new Date(o.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recent'
+              };
+            });
 
             const greetingWord = currentTime.getHours() < 12 ? 'Good morning' : currentTime.getHours() < 17 ? 'Good afternoon' : 'Good evening';
             const restaurantDisplayName = alertSettings?.restaurantName || 'Babai Hotel';
@@ -1407,11 +1382,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                     <div className="mt-4">
                       <span className="text-xs font-semibold text-slate-400 block">Today's Revenue</span>
                       <strong className="text-2xl font-black text-slate-900 tracking-tight mt-1 block">
-                        ₹{Number(displayRevenue > 0 ? displayRevenue : 12680).toLocaleString('en-IN')}
+                        ₹{displayRevenue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </strong>
-                      <div className="mt-2 flex items-center gap-1 text-xs font-bold text-emerald-500">
-                        <ArrowUpRight size={13} />
-                        <span>+12.5% vs. yesterday</span>
+                      <div className="mt-2 flex items-center gap-1 text-xs font-bold text-slate-500">
+                        <span>{todayValidOrders.length > 0 ? `${todayValidOrders.length} orders today` : `${validOrders.length} all-time orders`}</span>
                       </div>
                     </div>
                   </div>
@@ -1429,9 +1403,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                       <strong className="text-2xl font-black text-slate-900 tracking-tight mt-1 block">
                         {liveOrdersCount}
                       </strong>
-                      <div className="mt-2 flex items-center gap-1 text-xs font-bold text-emerald-500">
-                        <ArrowUpRight size={13} />
-                        <span>+8.2% vs. yesterday</span>
+                      <div className="mt-2 flex items-center gap-1 text-xs font-bold text-emerald-600">
+                        <span>{completedOrdersCount} completed</span>
                       </div>
                     </div>
                   </div>
@@ -1467,10 +1440,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                     <div className="mt-4">
                       <span className="text-xs font-semibold text-slate-400 block">Staff on Duty</span>
                       <strong className="text-2xl font-black text-slate-900 tracking-tight mt-1 block">
-                        18
+                        {staff.length}
                       </strong>
-                      <div className="mt-2 flex items-center gap-1 text-xs font-semibold text-amber-500">
-                        <span>2 on break</span>
+                      <div className="mt-2 flex items-center gap-1 text-xs font-semibold text-slate-500">
+                        <span>{staff.filter(s => s.shift === 'Morning').length} Morning • {staff.filter(s => s.shift === 'Evening').length} Evening</span>
                       </div>
                     </div>
                   </div>
@@ -1504,14 +1477,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                       </div>
 
                       <div className="mb-4">
-                        <span className="text-[11px] font-semibold text-slate-400 block">Total revenue</span>
+                        <span className="text-[11px] font-semibold text-slate-400 block">Total revenue ({revenueTimeframe})</span>
                         <div className="flex items-center gap-2 mt-0.5">
                           <strong className="text-2xl font-black text-slate-900">
-                            ₹{revenueTimeframe === 'today' ? '12,680.40' : revenueTimeframe === 'week' ? '71,170.00' : '2,55,000.00'}
+                            ₹{totalPeriodRevenue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </strong>
                           <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200/60 flex items-center gap-0.5">
                             <ArrowUpRight size={11} />
-                            12.5%
+                            Live Orders
                           </span>
                         </div>
                       </div>
@@ -1586,9 +1559,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                           </ResponsiveContainer>
                           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                             <strong className="text-2xl font-black text-slate-900">
-                              {tableStatusData[0].value}
+                              {occupiedTablesCount}
                             </strong>
-                            <span className="text-[10px] text-slate-400 font-medium">of 36 tables</span>
+                            <span className="text-[10px] text-slate-400 font-medium">of {tables.length} tables</span>
                           </div>
                         </div>
 
@@ -1607,13 +1580,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                       </div>
                     </div>
 
-                    {/* Avg turnover time banner */}
+                    {/* Dining Floor Status Banner */}
                     <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between text-xs mt-3">
                       <div className="flex items-center gap-2 text-slate-600 font-semibold">
                         <Clock size={15} className="text-[#FF6B00]" />
-                        <span>Avg. turnover time</span>
+                        <span>Dining Floor Status</span>
                       </div>
-                      <strong className="text-slate-900 font-black">1h 24m</strong>
+                      <strong className="text-slate-900 font-black">{tables.length > 0 ? `${tables.length} Tables Monitored` : 'No Tables Configured'}</strong>
                     </div>
                   </div>
                 </div>
@@ -1650,27 +1623,35 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50 font-medium">
-                          {displayRecentOrders.map((order, idx) => (
-                            <tr key={idx} className="hover:bg-slate-50/70 transition-colors">
-                              <td className="py-3 px-3 font-bold text-slate-900 font-mono">{order.id}</td>
-                              <td className="py-3 px-3 text-slate-700 font-semibold">{order.location}</td>
-                              <td className="py-3 px-3 text-slate-500">{order.waiter}</td>
-                              <td className="py-3 px-3 font-extrabold text-slate-900">
-                                ₹{typeof order.amount === 'number' ? order.amount.toFixed(2) : order.amount}
+                          {displayRecentOrders.length === 0 ? (
+                            <tr>
+                              <td colSpan={6} className="py-8 text-center text-slate-400 font-medium">
+                                No customer orders recorded yet. Orders placed by guests or staff will appear here.
                               </td>
-                              <td className="py-3 px-3 text-center">
-                                <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold inline-block ${order.status === 'Preparing'
-                                    ? 'bg-orange-50 text-orange-600 border border-orange-200/50'
-                                    : order.status === 'Ready'
-                                      ? 'bg-sky-50 text-sky-600 border border-sky-200/50'
-                                      : 'bg-emerald-50 text-emerald-600 border border-emerald-200/50'
-                                  }`}>
-                                  {order.status}
-                                </span>
-                              </td>
-                              <td className="py-3 px-3 text-right text-slate-400 text-[11px]">{order.time}</td>
                             </tr>
-                          ))}
+                          ) : (
+                            displayRecentOrders.map((order, idx) => (
+                              <tr key={idx} className="hover:bg-slate-50/70 transition-colors">
+                                <td className="py-3 px-3 font-bold text-slate-900 font-mono">{order.id}</td>
+                                <td className="py-3 px-3 text-slate-700 font-semibold">{order.location}</td>
+                                <td className="py-3 px-3 text-slate-500">{order.waiter}</td>
+                                <td className="py-3 px-3 font-extrabold text-slate-900">
+                                  ₹{typeof order.amount === 'number' ? order.amount.toFixed(2) : order.amount}
+                                </td>
+                                <td className="py-3 px-3 text-center">
+                                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold inline-block ${order.status === 'Preparing'
+                                      ? 'bg-orange-50 text-orange-600 border border-orange-200/50'
+                                      : (order.status === 'Ready to Serve' || (order.status as any) === 'Ready')
+                                        ? 'bg-sky-50 text-sky-600 border border-sky-200/50'
+                                        : 'bg-emerald-50 text-emerald-600 border border-emerald-200/50'
+                                    }`}>
+                                    {order.status}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-3 text-right text-slate-400 text-[11px]">{order.time}</td>
+                              </tr>
+                            ))
+                          )}
                         </tbody>
                       </table>
                     </div>
@@ -2327,17 +2308,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                 </div>
 
                 <div className="flex items-center gap-2.5 shrink-0 flex-wrap sm:flex-nowrap">
-                  <a
-                    href={apkInfo.downloadUrl}
-                    download={apkInfo.fileName}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black px-4 py-2.5 rounded-2xl transition-all flex items-center gap-2 cursor-pointer shadow-sm hover:shadow-md shrink-0"
-                    title={`Download Waiter Android App APK (${apkInfo.fileSize})`}
-                  >
-                    <Smartphone size={15} />
-                    <span>Download Waiter APK</span>
-                    <Download size={13} className="opacity-90" />
-                  </a>
-
                   <button
                     onClick={fetchData}
                     className="p-2.5 border border-slate-200 text-slate-600 hover:text-primary hover:border-orange-300 rounded-2xl cursor-pointer bg-slate-50/70 hover:bg-white transition-all shadow-xs"
@@ -2353,193 +2323,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                     <Plus size={16} />
                     <span>+ Add Waiter</span>
                   </button>
-                </div>
-              </div>
-
-              {/* Waiter Terminal Mobile APK Showcase & Installation Hub */}
-              <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-3xl p-6 text-white border border-slate-700/60 shadow-lg relative overflow-hidden">
-                {/* Decorative background ambient glows */}
-                <div className="absolute -right-16 -top-16 w-64 h-64 bg-orange-500/15 rounded-full blur-3xl pointer-events-none" />
-                <div className="absolute right-1/3 -bottom-16 w-48 h-48 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
-
-                <div className="relative z-10">
-                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-                    {/* Left: App Identity & Description */}
-                    <div className="flex items-start gap-4">
-                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-orange-500 to-amber-500 text-white flex items-center justify-center shrink-0 shadow-lg shadow-orange-500/30">
-                        <Smartphone size={28} />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2.5 flex-wrap">
-                          <h4 className="text-lg font-black tracking-tight text-white">
-                            TableTap Waiter Android Terminal
-                          </h4>
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                            {apkInfo.version} Active Build
-                          </span>
-                          {apkInfo.customUploaded && (
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-orange-500/20 text-orange-300 border border-orange-500/30">
-                              Custom APK
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs text-slate-300 mt-1 max-w-xl leading-relaxed">
-                          Equip floor staff with the standalone Android application. Instant kitchen order alerts, customer table calling buzzers, biometric fingerprint login, and table routing.
-                        </p>
-
-                        {/* Specs Badges */}
-                        <div className="flex items-center gap-2 mt-3 flex-wrap text-[11px]">
-                          <span className="px-2.5 py-1 rounded-xl bg-slate-800/80 border border-slate-700 text-slate-300 font-mono font-bold">
-                            📦 {apkInfo.fileSize}
-                          </span>
-                          <span className="px-2.5 py-1 rounded-xl bg-slate-800/80 border border-slate-700 text-slate-300 font-medium">
-                            🤖 Android 7.0+
-                          </span>
-                          <span className="px-2.5 py-1 rounded-xl bg-slate-800/80 border border-slate-700 text-slate-300 font-medium">
-                            ⚡ Low Latency FIFO Orders
-                          </span>
-                          <span className="px-2.5 py-1 rounded-xl bg-slate-800/80 border border-slate-700 text-slate-300 font-medium">
-                            🔒 30m Auto-Lock & Biometrics
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Right: Download & Action Buttons */}
-                    <div className="flex flex-wrap lg:flex-nowrap items-center gap-2.5 shrink-0">
-                      {/* Direct APK Download Button */}
-                      <a
-                        href={apkInfo.downloadUrl}
-                        download={apkInfo.fileName}
-                        className="bg-primary hover:bg-orange-600 text-white text-xs font-black px-4 py-3 rounded-2xl transition-all flex items-center gap-2 cursor-pointer shadow-lg shadow-orange-500/25 hover:scale-102 active:scale-98"
-                      >
-                        <Download size={16} />
-                        <span>Download APK</span>
-                      </a>
-
-                      {/* Scan QR Code Button */}
-                      <button
-                        type="button"
-                        onClick={() => setShowApkQr(!showApkQr)}
-                        className={`text-xs font-bold px-3.5 py-3 rounded-2xl transition-all flex items-center gap-2 cursor-pointer border ${showApkQr
-                            ? 'bg-orange-500/20 text-orange-300 border-orange-500/40'
-                            : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
-                          }`}
-                        title="Show scannable QR code for waiter's phone"
-                      >
-                        <QrCode size={16} />
-                        <span>{showApkQr ? 'Hide QR' : 'Scan to Install'}</span>
-                      </button>
-
-                      {/* Copy Link Button */}
-                      <button
-                        type="button"
-                        onClick={handleCopyApkLink}
-                        className="p-3 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 rounded-2xl cursor-pointer transition-all"
-                        title="Copy direct APK download link"
-                      >
-                        {copiedApkLink ? <Check size={16} className="text-emerald-400" /> : <Copy size={16} />}
-                      </button>
-
-                      {/* Upload / Replace APK Button */}
-                      <label
-                        className="p-3 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 rounded-2xl cursor-pointer transition-all flex items-center justify-center"
-                        title="Upload/Select newer APK file"
-                      >
-                        <Upload size={16} />
-                        <input
-                          type="file"
-                          accept=".apk"
-                          onChange={handleUploadNewApk}
-                          className="hidden"
-                        />
-                      </label>
-
-                      {/* Guide Toggle */}
-                      <button
-                        type="button"
-                        onClick={() => setShowApkGuide(!showApkGuide)}
-                        className="text-xs font-bold px-3 py-3 rounded-2xl bg-slate-800/60 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700/60 transition-all cursor-pointer"
-                        title="How to install on Android"
-                      >
-                        {showApkGuide ? 'Hide Guide' : 'Install Guide'}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Expandable Scannable QR Code Panel */}
-                  {showApkQr && (
-                    <div className="mt-5 pt-5 border-t border-slate-700/80 grid grid-cols-1 sm:grid-cols-3 gap-6 items-center animate-fade-in">
-                      <div className="sm:col-span-1 flex flex-col items-center p-3 bg-white rounded-2xl shadow-inner">
-                        <img
-                          src={apkQrCodeUrl}
-                          alt="Scan to download Waiter APK"
-                          className="w-40 h-40 object-contain rounded-lg"
-                        />
-                        <span className="text-[10px] text-slate-500 font-bold mt-2 text-center">
-                          Scan with Android Camera
-                        </span>
-                      </div>
-                      <div className="sm:col-span-2 space-y-2 text-xs">
-                        <h5 className="font-black text-sm text-white flex items-center gap-2">
-                          <span>Instant Phone Download via QR</span>
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                            Wireless
-                          </span>
-                        </h5>
-                        <p className="text-slate-300 text-xs leading-relaxed">
-                          Have your waiter point their Android phone camera or QR scanner at the screen to start the APK download directly on their phone without needing a computer cable.
-                        </p>
-                        <div className="p-3 rounded-xl bg-slate-800/80 border border-slate-700 font-mono text-[11px] text-orange-300 break-all flex items-center justify-between gap-2">
-                          <span className="truncate">{apkDownloadFullUrl}</span>
-                          <button
-                            type="button"
-                            onClick={handleCopyApkLink}
-                            className="shrink-0 p-1 hover:text-white"
-                          >
-                            {copiedApkLink ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Expandable Step-by-Step Android Installation Guide */}
-                  {showApkGuide && (
-                    <div className="mt-5 pt-5 border-t border-slate-700/80 animate-fade-in">
-                      <h5 className="font-black text-xs uppercase tracking-wider text-slate-400 mb-3">
-                        Android Sideloading & Setup Guide (5 Easy Steps)
-                      </h5>
-                      <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 text-xs">
-                        <div className="p-3 rounded-2xl bg-slate-800/60 border border-slate-700/60">
-                          <span className="w-5 h-5 rounded-full bg-orange-500/20 text-orange-400 font-bold text-[10px] flex items-center justify-center mb-1.5">1</span>
-                          <strong className="block text-white text-[11px] mb-1">Download APK</strong>
-                          <p className="text-[10px] text-slate-400">Click Download or scan QR code on the waiter's Android device.</p>
-                        </div>
-                        <div className="p-3 rounded-2xl bg-slate-800/60 border border-slate-700/60">
-                          <span className="w-5 h-5 rounded-full bg-orange-500/20 text-orange-400 font-bold text-[10px] flex items-center justify-center mb-1.5">2</span>
-                          <strong className="block text-white text-[11px] mb-1">Accept Warning</strong>
-                          <p className="text-[10px] text-slate-400">Tap "Download anyway" when Android prompts about unknown file.</p>
-                        </div>
-                        <div className="p-3 rounded-2xl bg-slate-800/60 border border-slate-700/60">
-                          <span className="w-5 h-5 rounded-full bg-orange-500/20 text-orange-400 font-bold text-[10px] flex items-center justify-center mb-1.5">3</span>
-                          <strong className="block text-white text-[11px] mb-1">Allow Install</strong>
-                          <p className="text-[10px] text-slate-400">In Settings, toggle "Allow from this source" for Chrome/Files.</p>
-                        </div>
-                        <div className="p-3 rounded-2xl bg-slate-800/60 border border-slate-700/60">
-                          <span className="w-5 h-5 rounded-full bg-orange-500/20 text-orange-400 font-bold text-[10px] flex items-center justify-center mb-1.5">4</span>
-                          <strong className="block text-white text-[11px] mb-1">Tap Install</strong>
-                          <p className="text-[10px] text-slate-400">Complete installation and launch "TableTap Waiter" app.</p>
-                        </div>
-                        <div className="p-3 rounded-2xl bg-slate-800/60 border border-slate-700/60">
-                          <span className="w-5 h-5 rounded-full bg-orange-500/20 text-orange-400 font-bold text-[10px] flex items-center justify-center mb-1.5">5</span>
-                          <strong className="block text-white text-[11px] mb-1">Sign In</strong>
-                          <p className="text-[10px] text-slate-400">Log in using Waiter ID & Password configured in the roster below.</p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
 
@@ -2664,12 +2447,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                                     <button
                                       type="button"
                                       onClick={() => {
-                                        const shareText = `🍽️ TableTap Waiter App Credentials\n👤 Name: ${emp.name}\n🆔 Employee ID: ${emp.empid}\n🔑 Password: ${emp.password || 'Contact Admin'}\n📲 Download Waiter APK: ${apkDownloadFullUrl}`;
+                                        const shareText = `🍽️ Waiter Login Credentials\n👤 Name: ${emp.name}\n🆔 Employee ID: ${emp.empid}\n🔑 Password: ${emp.password || 'Contact Admin'}`;
                                         navigator.clipboard.writeText(shareText);
-                                        alert(`Copied credentials & APK link for ${emp.name} to clipboard! Ready to share via WhatsApp.`);
+                                        alert(`Copied credentials for ${emp.name} to clipboard!`);
                                       }}
                                       className="text-slate-400 hover:text-emerald-600 cursor-pointer p-0.5"
-                                      title="Copy Credentials + APK Download Link to Share via WhatsApp"
+                                      title="Copy Credentials to Share via WhatsApp"
                                     >
                                       <Share2 size={13} />
                                     </button>
@@ -2966,115 +2749,170 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
           {/* ----------------------------------------------------
               VIEW 13: REPORTS & ANALYTICS
               ---------------------------------------------------- */}
-          {activeTab === 'reports' && (
-            <div className="space-y-6 animate-fade-in font-sans">
-              {/* Header Section */}
-              <div className="flex justify-between items-center pb-2">
-                <div>
-                  <h2 className="font-extrabold text-2xl mb-1 text-gray-900 tracking-tight">Reports & Export Terminal</h2>
-                  <p className="text-[13px] text-gray-500 max-w-2xl">
-                    Generate complete hotel reports — sales, orders, staff, payments and analytics — as Excel or PDF, or preview them before download.
-                  </p>
-                </div>
-                <div className="flex gap-3">
-                  <button onClick={handleExportExcel} className="flex items-center gap-2 border-transparent text-white font-bold py-2 px-4 rounded-xl text-sm bg-[#00a65a] hover:bg-[#008f4d] transition-colors shadow-sm cursor-pointer">
-                    <FileSpreadsheet size={16} strokeWidth={2.5} />
-                    Excel
-                  </button>
-                  <button onClick={handleExportPDF} className="flex items-center gap-2 border-transparent text-white font-bold py-2 px-4 rounded-xl text-sm bg-[#dd4b39] hover:bg-[#c23321] transition-colors shadow-sm cursor-pointer">
-                    <FileText size={16} strokeWidth={2.5} />
-                    PDF
-                  </button>
-                </div>
-              </div>
+          {activeTab === 'reports' && (() => {
+            const filteredData = getFilteredReportData();
+            const reportOrders = (filteredData.orders || []).filter(o => (o.status as any) !== 'Cancelled');
 
-              <div className="border-t border-gray-100 my-2"></div>
+            // Calculate sales for each weekday (Mon - Sun) from the filtered report orders
+            const dayKeys = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+            const daySalesMap: Record<string, number> = { Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0 };
 
-              {/* Filter Section */}
-              <div className={`p-5 rounded-2xl border shadow-sm bg-white border-gray-200 flex flex-wrap gap-4 justify-between items-center relative z-20`}>
-                <div className="flex flex-wrap gap-4">
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Date Range Filter</label>
-                    <div className="relative">
-                      <select
-                        value={reportDateFilter}
-                        onChange={(e) => setReportDateFilter(e.target.value as any)}
-                        className={`appearance-none border text-xs py-2 pl-3.5 pr-9 rounded-xl font-bold outline-none cursor-pointer transition-colors bg-white border-gray-300 text-gray-700 hover:border-gray-400`}
-                      >
-                        <option value="Today">Today Only</option>
-                        <option value="This Week">This Week (Last 7 Days)</option>
-                        <option value="This Month">This Month (Last 30 Days)</option>
-                        <option value="All">All Time History</option>
-                      </select>
-                      <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+            reportOrders.forEach(o => {
+              if (o.createdAt) {
+                const day = new Date(o.createdAt).toLocaleDateString('en-US', { weekday: 'short' });
+                if (daySalesMap[day] !== undefined) {
+                  daySalesMap[day] += Number(o.total) || 0;
+                }
+              }
+            });
+
+            const maxSalesVolume = Math.max(...Object.values(daySalesMap), 500);
+            const formatCurrency = (val: number) => {
+              if (val >= 1000) {
+                const k = val / 1000;
+                return `₹${k >= 10 ? Math.round(k) : k.toFixed(1)}K`;
+              }
+              return `₹${val}`;
+            };
+
+            const ySteps = [
+              formatCurrency(maxSalesVolume),
+              formatCurrency(Math.round(maxSalesVolume * 0.75)),
+              formatCurrency(Math.round(maxSalesVolume * 0.5)),
+              formatCurrency(Math.round(maxSalesVolume * 0.25)),
+              '₹0'
+            ];
+
+            return (
+              <div className="space-y-6 animate-fade-in font-sans">
+                {/* Header Section */}
+                <div className="flex justify-between items-center pb-2">
+                  <div>
+                    <h2 className="font-extrabold text-2xl mb-1 text-gray-900 tracking-tight">Download Hotel Reports</h2>
+                    <p className="text-[13px] text-gray-500 max-w-2xl">
+                      Generate complete hotel reports — sales, orders, staff, payments and analytics — as Excel or PDF, or preview them before download.
+                    </p>
+                  </div>
+                  <div className="flex gap-3">
+                    <button onClick={handleExportExcel} className="flex items-center gap-2 border-transparent text-white font-bold py-2 px-4 rounded-xl text-sm bg-[#00a65a] hover:bg-[#008f4d] transition-colors shadow-sm cursor-pointer" title="Download Excel Spreadsheet">
+                      <FileSpreadsheet size={16} strokeWidth={2.5} />
+                      Excel
+                    </button>
+                    <button onClick={handleExportPDF} className="flex items-center gap-2 border-transparent text-white font-bold py-2 px-4 rounded-xl text-sm bg-[#dd4b39] hover:bg-[#c23321] transition-colors shadow-sm cursor-pointer" title="Download PDF Document">
+                      <FileText size={16} strokeWidth={2.5} />
+                      PDF
+                    </button>
+                  </div>
+                </div>
+
+                <div className="border-t border-gray-100 my-2"></div>
+
+                {/* Filter Section */}
+                <div className="p-5 rounded-2xl border shadow-sm bg-white border-gray-200 flex flex-wrap gap-4 justify-between items-center relative z-20">
+                  <div className="flex flex-wrap gap-4">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Date Range Filter</label>
+                      <div className="relative">
+                        <select
+                          value={reportDateFilter}
+                          onChange={(e) => setReportDateFilter(e.target.value as any)}
+                          className="appearance-none border text-xs py-2 pl-3.5 pr-9 rounded-xl font-bold outline-none cursor-pointer transition-colors bg-white border-gray-300 text-gray-700 hover:border-gray-400"
+                        >
+                          <option value="Today">Today Only</option>
+                          <option value="This Week">This Week (Last 7 Days)</option>
+                          <option value="This Month">This Month (Last 30 Days)</option>
+                          <option value="All">All Time History</option>
+                        </select>
+                        <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Category Scope</label>
+                      <div className="relative">
+                        <select
+                          value={reportCategoryFilter}
+                          onChange={(e) => setReportCategoryFilter(e.target.value)}
+                          className="appearance-none border text-xs py-2 pl-3.5 pr-9 rounded-xl font-bold outline-none cursor-pointer transition-colors bg-white border-gray-300 text-gray-700 hover:border-gray-400"
+                        >
+                          <option value="All">All Food Categories</option>
+                          <option value="Breakfast">Breakfast</option>
+                          <option value="Main Course">Main Course</option>
+                          <option value="Starters">Starters</option>
+                          <option value="Breads">Breads</option>
+                          <option value="Beverages">Beverages</option>
+                          <option value="Desserts">Desserts</option>
+                        </select>
+                        <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+                      </div>
                     </div>
                   </div>
 
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Category Scope</label>
-                    <div className="relative">
-                      <select
-                        value={reportCategoryFilter}
-                        onChange={(e) => setReportCategoryFilter(e.target.value)}
-                        className={`appearance-none border text-xs py-2 pl-3.5 pr-9 rounded-xl font-bold outline-none cursor-pointer transition-colors bg-white border-gray-300 text-gray-700 hover:border-gray-400`}
-                      >
-                        <option value="All">All Food Categories</option>
-                        <option value="Breakfast">Breakfast</option>
-                        <option value="Main Course">Main Course</option>
-                        <option value="Starters">Starters</option>
-                        <option value="Breads">Breads</option>
-                        <option value="Beverages">Beverages</option>
-                        <option value="Desserts">Desserts</option>
-                      </select>
-                      <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+                  <div className="text-xs text-orange-600 font-bold self-end pb-1 bg-orange-50 px-3 py-1.5 rounded-xl border border-orange-100">
+                    ✓ PDF & Excel exports will strictly contain records matching your active filters.
+                  </div>
+                </div>
+
+                {/* Custom SVG Sales Chart */}
+                <div className="p-6 rounded-2xl border shadow-sm bg-white border-gray-200 relative z-10 mt-2">
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <h4 className="font-extrabold text-sm text-gray-800">Weekly Sales Volume Chart</h4>
+                      <p className="text-[11px] text-gray-400">Total recorded sales aggregated across days of the week</p>
+                    </div>
+                    <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-lg">
+                      {reportOrders.length} matching order{reportOrders.length !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+
+                  <div className="w-full h-[280px] relative">
+                    {/* Y-Axis Grid Lines & Labels */}
+                    <div className="absolute inset-0 flex flex-col justify-between text-[11px] font-bold text-gray-400">
+                      {ySteps.map((step, idx) => (
+                        <div key={idx} className="flex items-center gap-3">
+                          <span className="w-12 text-right">{step}</span>
+                          <div className={`flex-1 ${idx === ySteps.length - 1 ? 'border-t border-gray-300' : 'border-t border-dashed border-gray-200'}`}></div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Bars */}
+                    <div className="absolute inset-0 ml-16 mb-4 flex items-end justify-around px-2 pt-6 pb-[2px]">
+                      {dayKeys.map(day => {
+                        const amount = daySalesMap[day] || 0;
+                        const pct = maxSalesVolume > 0 && amount > 0
+                          ? Math.min(100, Math.max(6, Math.round((amount / maxSalesVolume) * 100)))
+                          : 3;
+                        return (
+                          <div key={day} className="w-[11%] h-full flex flex-col items-center justify-end group relative">
+                            {/* Hover tooltip */}
+                            <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-8 bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg pointer-events-none whitespace-nowrap z-30 shadow-md">
+                              {day}: ₹{amount.toLocaleString('en-IN')}
+                            </div>
+                            <div
+                              style={{ height: `${pct}%` }}
+                              className={`w-full rounded-t-sm transition-all cursor-pointer ${
+                                amount > 0
+                                  ? 'bg-[#ff7f24] hover:bg-[#ea580c] shadow-xs'
+                                  : 'bg-slate-200 hover:bg-slate-300'
+                              }`}
+                            ></div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* X-Axis Labels */}
+                    <div className="absolute bottom-0 left-16 right-0 flex justify-around px-2 -mb-6 text-[11px] font-bold text-gray-500">
+                      {dayKeys.map(day => (
+                        <span key={day} className="w-[11%] text-center">{day}</span>
+                      ))}
                     </div>
                   </div>
                 </div>
-
-                <div className="text-xs text-orange-600 font-bold self-end pb-1 bg-orange-50 px-3 py-1.5 rounded-xl border border-orange-100">
-                  ✓ PDF & Excel exports will strictly contain records matching your active filters.
-                </div>
               </div>
-
-              {/* Custom SVG Sales Chart */}
-              <div className={`p-6 rounded-2xl border shadow-sm bg-white border-gray-200 relative z-10 mt-2`}>
-                <h4 className="font-extrabold text-sm mb-6 text-gray-800">Weekly Sales Volume Chart</h4>
-
-                <div className="w-full h-[280px] relative">
-                  {/* Y-Axis Grid Lines & Labels */}
-                  <div className="absolute inset-0 flex flex-col justify-between text-[11px] font-bold text-gray-400">
-                    <div className="flex items-center gap-3"><span className="w-8 text-right">₹22K</span><div className="flex-1 border-t border-dashed border-gray-200"></div></div>
-                    <div className="flex items-center gap-3"><span className="w-8 text-right">₹17K</span><div className="flex-1 border-t border-dashed border-gray-200"></div></div>
-                    <div className="flex items-center gap-3"><span className="w-8 text-right">₹11K</span><div className="flex-1 border-t border-dashed border-gray-200"></div></div>
-                    <div className="flex items-center gap-3"><span className="w-8 text-right">₹6K</span><div className="flex-1 border-t border-dashed border-gray-200"></div></div>
-                    <div className="flex items-center gap-3"><span className="w-8 text-right">₹0K</span><div className="flex-1 border-t border-gray-300"></div></div>
-                  </div>
-
-                  {/* Bars */}
-                  <div className="absolute inset-0 ml-12 mb-4 flex items-end justify-around px-2 pt-6 pb-[2px]">
-                    <div className="w-[12%] bg-[#ff7f24] rounded-t-sm h-[30%] hover:brightness-110 transition-all cursor-pointer"></div>
-                    <div className="w-[12%] bg-[#ff7f24] rounded-t-sm h-[48%] hover:brightness-110 transition-all cursor-pointer"></div>
-                    <div className="w-[12%] bg-[#ff7f24] rounded-t-sm h-[42%] hover:brightness-110 transition-all cursor-pointer"></div>
-                    <div className="w-[12%] bg-[#ff7f24] rounded-t-sm h-[60%] hover:brightness-110 transition-all cursor-pointer"></div>
-                    <div className="w-[12%] bg-[#ff7f24] rounded-t-sm h-[75%] hover:brightness-110 transition-all cursor-pointer"></div>
-                    <div className="w-[12%] bg-[#ff7f24] rounded-t-sm h-[95%] hover:brightness-110 transition-all cursor-pointer"></div>
-                    <div className="w-[12%] bg-[#ff7f24] rounded-t-sm h-[85%] hover:brightness-110 transition-all cursor-pointer"></div>
-                  </div>
-
-                  {/* X-Axis Labels */}
-                  <div className="absolute bottom-0 left-12 right-0 flex justify-around px-2 -mb-6 text-[11px] font-bold text-gray-500">
-                    <span className="w-[12%] text-center">Mon</span>
-                    <span className="w-[12%] text-center">Tue</span>
-                    <span className="w-[12%] text-center">Wed</span>
-                    <span className="w-[12%] text-center">Thu</span>
-                    <span className="w-[12%] text-center">Fri</span>
-                    <span className="w-[12%] text-center">Sat</span>
-                    <span className="w-[12%] text-center">Sun</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+            );
+          })()}
 
 
 
@@ -3089,135 +2927,240 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
               </div>
 
               <div className={`p-6 rounded-3xl border shadow-sm bg-white border-gray-50`}>
-                <form className="space-y-4 text-xs font-semibold max-w-2xl" onSubmit={handleSaveSettings}>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-gray-400 mb-1">Restaurant Name</label>
-                      <input type="text" required className="w-full p-2.5 border rounded-xl bg-transparent" value={alertSettings.restaurantName || ''} onChange={(e) => setAlertSettings({ ...alertSettings, restaurantName: e.target.value })} />
-                    </div>
-                    <div>
-                      <label className="block text-gray-400 mb-1">Owner Name</label>
-                      <input type="text" placeholder="Enter Owner Name" required className="w-full p-2.5 border rounded-xl bg-transparent" value={alertSettings.ownerName || ''} onChange={(e) => setAlertSettings({ ...alertSettings, ownerName: e.target.value })} />
-                    </div>
-                  </div>
+                {(() => {
+                  const currentSettings = settingsForm || alertSettings;
+                  return (
+                    <form className="space-y-4 text-xs font-semibold max-w-2xl" onSubmit={handleSaveSettings}>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-gray-400 mb-1">Restaurant Name</label>
+                          <input
+                            type="text"
+                            required
+                            className="w-full p-2.5 border rounded-xl bg-transparent"
+                            value={currentSettings.restaurantName || ''}
+                            onChange={(e) => setSettingsForm({ ...currentSettings, restaurantName: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-gray-400 mb-1">Owner Name</label>
+                          <input
+                            type="text"
+                            placeholder="Enter Owner Name"
+                            required
+                            className="w-full p-2.5 border rounded-xl bg-transparent"
+                            value={currentSettings.ownerName || ''}
+                            onChange={(e) => setSettingsForm({ ...currentSettings, ownerName: e.target.value })}
+                          />
+                        </div>
+                      </div>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-gray-400 mb-1">Branch Name</label>
-                      <input type="text" placeholder="Enter Branch Name" required className="w-full p-2.5 border rounded-xl bg-transparent" value={alertSettings.branchName || ''} onChange={(e) => setAlertSettings({ ...alertSettings, branchName: e.target.value })} />
-                    </div>
-                    <div>
-                      <label className="block text-gray-400 mb-1">Email Address</label>
-                      <input type="email" placeholder="Enter Email" required pattern="[a-zA-Z0-9._%+\-]+@gmail\.com$" title="Must be a valid @gmail.com address" className="w-full p-2.5 border rounded-xl bg-transparent" value={alertSettings.email || ''} onChange={(e) => setAlertSettings({ ...alertSettings, email: e.target.value })} />
-                    </div>
-                  </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-gray-400 mb-1">Branch Name</label>
+                          <input
+                            type="text"
+                            placeholder="Enter Branch Name"
+                            required
+                            className="w-full p-2.5 border rounded-xl bg-transparent"
+                            value={currentSettings.branchName || ''}
+                            onChange={(e) => setSettingsForm({ ...currentSettings, branchName: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-gray-400 mb-1">Email Address</label>
+                          <input
+                            type="email"
+                            placeholder="Enter Email"
+                            required
+                            pattern="[a-zA-Z0-9._%+\-]+@gmail\.com$"
+                            title="Must be a valid @gmail.com address"
+                            className="w-full p-2.5 border rounded-xl bg-transparent"
+                            value={currentSettings.email || ''}
+                            onChange={(e) => setSettingsForm({ ...currentSettings, email: e.target.value })}
+                          />
+                        </div>
+                      </div>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-gray-400 mb-1">Mobile Number</label>
-                      <input type="tel" placeholder="Primary Contact" required pattern="^[6-9]\d{9}$" title="Must be a valid 10-digit Indian mobile number" className="w-full p-2.5 border rounded-xl bg-transparent" value={alertSettings.mobile || ''} onChange={(e) => setAlertSettings({ ...alertSettings, mobile: e.target.value })} />
-                    </div>
-                    <div>
-                      <label className="block text-gray-400 mb-1">Alternate Contact Number</label>
-                      <input type="tel" placeholder="Alternate Contact" required pattern="^[6-9]\d{9}$" title="Must be a valid 10-digit Indian mobile number" className="w-full p-2.5 border rounded-xl bg-transparent" value={alertSettings.alternateMobile || ''} onChange={(e) => setAlertSettings({ ...alertSettings, alternateMobile: e.target.value })} />
-                    </div>
-                  </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-gray-400 mb-1">Mobile Number</label>
+                          <input
+                            type="tel"
+                            placeholder="Primary Contact"
+                            required
+                            pattern="^[6-9]\d{9}$"
+                            title="Must be a valid 10-digit Indian mobile number"
+                            className="w-full p-2.5 border rounded-xl bg-transparent"
+                            value={currentSettings.mobile || ''}
+                            onChange={(e) => setSettingsForm({ ...currentSettings, mobile: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-gray-400 mb-1">Alternate Contact Number</label>
+                          <input
+                            type="tel"
+                            placeholder="Alternate Contact"
+                            required
+                            pattern="^[6-9]\d{9}$"
+                            title="Must be a valid 10-digit Indian mobile number"
+                            className="w-full p-2.5 border rounded-xl bg-transparent"
+                            value={currentSettings.alternateMobile || ''}
+                            onChange={(e) => setSettingsForm({ ...currentSettings, alternateMobile: e.target.value })}
+                          />
+                        </div>
+                      </div>
 
-                  <div className={`border-t pt-4 mt-4 border-gray-100`}>
-                    <h4 className="font-bold text-gray-500 mb-3 uppercase tracking-wider">Registration Details</h4>
-                    <div className="grid grid-cols-3 gap-3">
-                      <div>
-                        <label className="block text-gray-400 mb-1">GST Number / Tax ID</label>
-                        <input
-                          type="text"
-                          required
-                          pattern="^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$"
-                          title="Must be a valid 15-character GSTIN format"
-                          value={alertSettings.gstNo || ''}
-                          onChange={(e) => setAlertSettings({ ...alertSettings, gstNo: e.target.value })}
-                          className="w-full p-2.5 border rounded-xl bg-transparent"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-gray-400 mb-1">FSSAI License Number (India)</label>
-                        <input type="text" placeholder="FSSAI Number" required pattern="^[1-2]\d{13}$" title="Must be a valid 14-digit FSSAI license number" className="w-full p-2.5 border rounded-xl bg-transparent" value={alertSettings.fssai || ''} onChange={(e) => setAlertSettings({ ...alertSettings, fssai: e.target.value })} />
-                      </div>
-                      <div>
-                        <label className="block text-gray-400 mb-1">Tax Percentage (%)</label>
-                        <input
-                          type="number"
-                          required
-                          min="0"
-                          max="100"
-                          value={alertSettings.tax || 0}
-                          onChange={(e) => setAlertSettings({ ...alertSettings, tax: parseInt(e.target.value) || 0 })}
-                          className="w-full p-2.5 border rounded-xl bg-transparent"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className={`border-t pt-4 mt-4 border-gray-100`}>
-                    <h4 className="font-bold text-gray-500 mb-3 uppercase tracking-wider">Location Details</h4>
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-gray-400 mb-1">Address</label>
-                        <textarea placeholder="Street Address" required className="w-full p-2.5 border rounded-xl bg-transparent" rows={2} value={alertSettings.address || ''} onChange={(e) => setAlertSettings({ ...alertSettings, address: e.target.value })}></textarea>
-                      </div>
-                      <div className="grid grid-cols-3 gap-3">
-                        <div>
-                          <label className="block text-gray-400 mb-1">City</label>
-                          <input type="text" placeholder="City" required className="w-full p-2.5 border rounded-xl bg-transparent" value={alertSettings.city || ''} onChange={(e) => setAlertSettings({ ...alertSettings, city: e.target.value })} />
-                        </div>
-                        <div>
-                          <label className="block text-gray-400 mb-1">State</label>
-                          <input type="text" placeholder="State" required className="w-full p-2.5 border rounded-xl bg-transparent" value={alertSettings.state || ''} onChange={(e) => setAlertSettings({ ...alertSettings, state: e.target.value })} />
-                        </div>
-                        <div>
-                          <label className="block text-gray-400 mb-1">Country</label>
-                          <input type="text" placeholder="Country" required className="w-full p-2.5 border rounded-xl bg-transparent" value={alertSettings.country || ''} onChange={(e) => setAlertSettings({ ...alertSettings, country: e.target.value })} />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-3 gap-3">
-                        <div>
-                          <label className="block text-gray-400 mb-1">PIN Code</label>
-                          <input type="text" placeholder="PIN Code" required pattern="^[1-9][0-9]{5}$" title="Must be a valid 6-digit Indian PIN code" className="w-full p-2.5 border rounded-xl bg-transparent" value={alertSettings.pinCode || ''} onChange={(e) => setAlertSettings({ ...alertSettings, pinCode: e.target.value })} />
-                        </div>
-                        <div>
-                          <label className="block text-gray-400 mb-1">Landmark</label>
-                          <input type="text" placeholder="Nearby Landmark" required className="w-full p-2.5 border rounded-xl bg-transparent" value={alertSettings.landmark || ''} onChange={(e) => setAlertSettings({ ...alertSettings, landmark: e.target.value })} />
-                        </div>
-                        <div>
-                          <label className="block text-gray-400 mb-1">Google Maps Location</label>
-                          <div className="flex gap-2">
+                      <div className={`border-t pt-4 mt-4 border-gray-100`}>
+                        <h4 className="font-bold text-gray-500 mb-3 uppercase tracking-wider">Registration Details</h4>
+                        <div className="grid grid-cols-3 gap-3">
+                          <div>
+                            <label className="block text-gray-400 mb-1">GST Number / Tax ID</label>
                             <input
-                              type="url"
-                              placeholder="Maps URL"
+                              type="text"
                               required
-                              value={alertSettings.mapsLocation || ''}
-                              onChange={(e) => setAlertSettings({ ...alertSettings, mapsLocation: e.target.value })}
-                              className="w-full p-2.5 border rounded-xl bg-transparent flex-1"
+                              pattern="^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$"
+                              title="Must be a valid 15-character GSTIN format"
+                              value={currentSettings.gstNo || ''}
+                              onChange={(e) => setSettingsForm({ ...currentSettings, gstNo: e.target.value })}
+                              className="w-full p-2.5 border rounded-xl bg-transparent"
                             />
-                            <button
-                              type="button"
-                              onClick={handleGetLocation}
-                              className="bg-gray-100 hover:bg-gray-200 text-gray-700  dark:hover:bg-gray-700  p-2.5 rounded-xl border border-transparent  flex items-center justify-center cursor-pointer transition-colors"
-                              title="Detect Current Location"
-                            >
-                              <Map size={18} />
-                            </button>
+                          </div>
+                          <div>
+                            <label className="block text-gray-400 mb-1">FSSAI License Number (India)</label>
+                            <input
+                              type="text"
+                              placeholder="FSSAI Number"
+                              required
+                              pattern="^[1-2]\d{13}$"
+                              title="Must be a valid 14-digit FSSAI license number"
+                              className="w-full p-2.5 border rounded-xl bg-transparent"
+                              value={currentSettings.fssai || ''}
+                              onChange={(e) => setSettingsForm({ ...currentSettings, fssai: e.target.value })}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-gray-400 mb-1">Tax Percentage (%)</label>
+                            <input
+                              type="number"
+                              required
+                              min="0"
+                              max="100"
+                              value={currentSettings.tax || 0}
+                              onChange={(e) => setSettingsForm({ ...currentSettings, tax: parseInt(e.target.value) || 0 })}
+                              className="w-full p-2.5 border rounded-xl bg-transparent"
+                            />
                           </div>
                         </div>
                       </div>
-                    </div>
-                  </div>
 
-                  <div className="pt-2">
-                    <button type="submit" className="bg-primary text-white font-bold py-2.5 px-5 rounded-xl cursor-pointer">
-                      {loading ? 'Saving...' : 'Save Changes'}
-                    </button>
-                  </div>
-                </form>
+                      <div className={`border-t pt-4 mt-4 border-gray-100`}>
+                        <h4 className="font-bold text-gray-500 mb-3 uppercase tracking-wider">Location Details</h4>
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-gray-400 mb-1">Address</label>
+                            <textarea
+                              placeholder="Street Address"
+                              required
+                              className="w-full p-2.5 border rounded-xl bg-transparent"
+                              rows={2}
+                              value={currentSettings.address || ''}
+                              onChange={(e) => setSettingsForm({ ...currentSettings, address: e.target.value })}
+                            />
+                          </div>
+                          <div className="grid grid-cols-3 gap-3">
+                            <div>
+                              <label className="block text-gray-400 mb-1">City</label>
+                              <input
+                                type="text"
+                                placeholder="City"
+                                required
+                                className="w-full p-2.5 border rounded-xl bg-transparent"
+                                value={currentSettings.city || ''}
+                                onChange={(e) => setSettingsForm({ ...currentSettings, city: e.target.value })}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-gray-400 mb-1">State</label>
+                              <input
+                                type="text"
+                                placeholder="State"
+                                required
+                                className="w-full p-2.5 border rounded-xl bg-transparent"
+                                value={currentSettings.state || ''}
+                                onChange={(e) => setSettingsForm({ ...currentSettings, state: e.target.value })}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-gray-400 mb-1">Country</label>
+                              <input
+                                type="text"
+                                placeholder="Country"
+                                required
+                                className="w-full p-2.5 border rounded-xl bg-transparent"
+                                value={currentSettings.country || ''}
+                                onChange={(e) => setSettingsForm({ ...currentSettings, country: e.target.value })}
+                              />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-3 gap-3">
+                            <div>
+                              <label className="block text-gray-400 mb-1">PIN Code</label>
+                              <input
+                                type="text"
+                                placeholder="PIN Code"
+                                required
+                                pattern="^[1-9][0-9]{5}$"
+                                title="Must be a valid 6-digit Indian PIN code"
+                                className="w-full p-2.5 border rounded-xl bg-transparent"
+                                value={currentSettings.pinCode || ''}
+                                onChange={(e) => setSettingsForm({ ...currentSettings, pinCode: e.target.value })}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-gray-400 mb-1">Landmark</label>
+                              <input
+                                type="text"
+                                placeholder="Nearby Landmark"
+                                required
+                                className="w-full p-2.5 border rounded-xl bg-transparent"
+                                value={currentSettings.landmark || ''}
+                                onChange={(e) => setSettingsForm({ ...currentSettings, landmark: e.target.value })}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-gray-400 mb-1">Google Maps Location</label>
+                              <div className="flex gap-2">
+                                <input
+                                  type="url"
+                                  placeholder="Maps URL"
+                                  required
+                                  value={currentSettings.mapsLocation || ''}
+                                  onChange={(e) => setSettingsForm({ ...currentSettings, mapsLocation: e.target.value })}
+                                  className="w-full p-2.5 border rounded-xl bg-transparent flex-1"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={handleGetLocation}
+                                  className="bg-gray-100 hover:bg-gray-200 text-gray-700 dark:hover:bg-gray-700 p-2.5 rounded-xl border border-transparent flex items-center justify-center cursor-pointer transition-colors"
+                                  title="Detect Current Location"
+                                >
+                                  <Map size={18} />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="pt-2">
+                        <button type="submit" className="bg-primary text-white font-bold py-2.5 px-5 rounded-xl cursor-pointer">
+                          {loading ? 'Saving...' : 'Save Changes'}
+                        </button>
+                      </div>
+                    </form>
+                  );
+                })()}
               </div>
             </div>
           )}

@@ -6,23 +6,21 @@ export const generateReportData = (data: any, settings: any) => {
   const cur = settings.currency || '₹';
   const { orders = [], staff = [], menuItems = [] } = data;
 
-  // 1. Summary Metrics
-  const totalRevenue = orders.reduce((sum: number, o: any) => sum + (o.status !== 'Cancelled' ? o.total : 0), 0);
+  // 1. Summary Metrics from Original Order Records
+  const totalRevenue = orders.reduce((sum: number, o: any) => sum + (o.status !== 'Cancelled' ? Number(o.total || 0) : 0), 0);
   const completedOrders = orders.filter((o: any) => o.status === 'Completed' || o.status === 'Delivered').length;
   const cancelledOrders = orders.filter((o: any) => o.status === 'Cancelled').length;
   const totalOrdersCount = orders.length;
   const cancelRate = totalOrdersCount ? ((cancelledOrders / totalOrdersCount) * 100).toFixed(2) + '%' : '0%';
   const avgOrder = completedOrders ? Math.round(totalRevenue / completedOrders) : 0;
-  const totalExpenses = Math.round(totalRevenue * 0.6); // Mocked 60% margin
-  const netProfit = totalRevenue - totalExpenses;
 
   const itemCounts: Record<string, number> = {};
   const itemRevenue: Record<string, number> = {};
   orders.forEach((o: any) => {
-    if (o.status !== 'Cancelled') {
+    if (o.status !== 'Cancelled' && Array.isArray(o.items)) {
       o.items.forEach((i: any) => {
-        itemCounts[i.name] = (itemCounts[i.name] || 0) + i.quantity;
-        itemRevenue[i.name] = (itemRevenue[i.name] || 0) + (i.quantity * i.price);
+        itemCounts[i.name] = (itemCounts[i.name] || 0) + (Number(i.quantity) || 1);
+        itemRevenue[i.name] = (itemRevenue[i.name] || 0) + ((Number(i.quantity) || 1) * (Number(i.price) || 0));
       });
     }
   });
@@ -30,106 +28,86 @@ export const generateReportData = (data: any, settings: any) => {
   const topMenuItem = topItem ? topItem[0] : 'N/A';
 
   const summary = [
-    ['Total Revenue', `${cur}${totalRevenue.toLocaleString()}`],
+    ['Total Revenue', `${cur}${totalRevenue.toLocaleString('en-IN')}`],
     ['Total Orders', totalOrdersCount.toString()],
     ['Completed Orders', completedOrders.toString()],
     ['Cancelled Orders', cancelledOrders.toString()],
     ['Cancel Rate', cancelRate],
-    ['Average Order Value', `${cur}${avgOrder.toLocaleString()}`],
-    ['Total Expenses', `${cur}${totalExpenses.toLocaleString()}`],
-    ['Net Profit', `${cur}${netProfit.toLocaleString()}`],
+    ['Average Order Value', `${cur}${avgOrder.toLocaleString('en-IN')}`],
     ['Top Menu Item', topMenuItem],
-    ['Top Payment Method', 'Cash']
+    ['Top Payment Method', 'Cash / Online']
   ];
 
   // 2. Sales Summary (Grouped by Date)
   const salesByDate: Record<string, any> = {};
   let totalTax = 0;
   orders.forEach((o: any) => {
-    const d = new Date(o.createdAt).toISOString().split('T')[0];
+    const d = o.createdAt ? new Date(o.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
     if (!salesByDate[d]) salesByDate[d] = { orders: 0, revenue: 0, tax: 0, net: 0 };
     salesByDate[d].orders += 1;
     if (o.status !== 'Cancelled') {
-      salesByDate[d].revenue += o.total;
-      salesByDate[d].tax += o.gst || 0;
-      totalTax += o.gst || 0;
-      salesByDate[d].net += (o.total - (o.gst || 0));
+      const orderTotal = Number(o.total || 0);
+      const orderTax = Number(o.gst || 0);
+      salesByDate[d].revenue += orderTotal;
+      salesByDate[d].tax += orderTax;
+      totalTax += orderTax;
+      salesByDate[d].net += (orderTotal - orderTax);
     }
   });
   const salesSummary = Object.keys(salesByDate).map(d => [
     d, 
     salesByDate[d].orders.toString(), 
-    `${cur}${salesByDate[d].revenue.toLocaleString()}`, 
-    `${cur}${salesByDate[d].tax.toLocaleString()}`, 
-    `${cur}${salesByDate[d].net.toLocaleString()}`
+    `${cur}${salesByDate[d].revenue.toLocaleString('en-IN')}`, 
+    `${cur}${salesByDate[d].tax.toLocaleString('en-IN')}`, 
+    `${cur}${salesByDate[d].net.toLocaleString('en-IN')}`
   ]);
 
   // 3. Orders
   const ordersList = orders.map((o: any) => [
-    o.id,
-    new Date(o.createdAt).toISOString().split('T')[0],
-    o.customerPhone || 'Guest',
-    o.items.reduce((s:number, i:any)=>s+i.quantity, 0).toString(),
-    `${cur}${o.total.toLocaleString()}`,
-    o.status
+    o.id || '',
+    o.createdAt ? new Date(o.createdAt).toISOString().split('T')[0] : '',
+    o.tableId ? `Table ${o.tableId}` : (o.location || 'Dine-In'),
+    Array.isArray(o.items) ? o.items.reduce((s:number, i:any)=>s+(Number(i.quantity)||1), 0).toString() : '0',
+    `${cur}${Number(o.total || 0).toLocaleString('en-IN')}`,
+    o.status || 'Confirmed'
   ]);
 
-  // 4. Customers (Aggregated from Orders)
-  const custMap: Record<string, any> = {};
-  orders.forEach((o: any) => {
-    if (!o.customerPhone) return;
-    if (!custMap[o.customerPhone]) {
-      custMap[o.customerPhone] = { id: `CUS-${Object.keys(custMap).length + 100}`, phone: o.customerPhone, visits: 0, spent: 0, last: '' };
-    }
-    custMap[o.customerPhone].visits += 1;
-    if (o.status !== 'Cancelled') custMap[o.customerPhone].spent += o.total;
-    const d = new Date(o.createdAt).toISOString().split('T')[0];
-    if (d > custMap[o.customerPhone].last) custMap[o.customerPhone].last = d;
-  });
-  const customersList = Object.values(custMap).map(c => [
-    c.id, 'Guest ' + c.id.split('-')[1], c.phone, c.visits.toString(), `${cur}${c.spent.toLocaleString()}`, c.last
-  ]);
-
-  // 5. Menu Items
+  // 4. Menu Items
   const menuItemsList = menuItems.map((m: any) => [
-    m.id, m.name, m.category, `${cur}${m.price}`, (itemCounts[m.name] || 0).toString(), `${cur}${(itemRevenue[m.name] || 0).toLocaleString()}`
+    m.id || '',
+    m.name || '',
+    m.category || '',
+    `${cur}${Number(m.price || 0)}`,
+    (itemCounts[m.name] || 0).toString(),
+    `${cur}${(itemRevenue[m.name] || 0).toLocaleString('en-IN')}`
   ]);
 
-  // 6. Staff
+  // 5. Staff
   const staffList = staff.map((s: any) => [
-    s.empid || s.id, s.name, s.role, s.shift, `${cur}${s.salary.toLocaleString()}`, 'Active'
+    s.empid || s.id || '',
+    s.name || '',
+    s.role || 'Staff',
+    s.shift || 'General',
+    `${cur}${Number(s.salary || 0).toLocaleString('en-IN')}`,
+    'Active'
   ]);
 
-  // 8. Payments
+  // 6. Payments
   const paymentsList = orders.filter((o:any)=>o.status!=='Cancelled').map((o: any) => [
-    `PAY-${o.id.split('_')[1] || o.id}`, new Date(o.createdAt).toISOString().split('T')[0], o.paymentMethod || 'Cash', `${cur}${o.total.toLocaleString()}`, 'Success'
+    `PAY-${String(o.id).replace(/\D/g, '') || Math.floor(Math.random()*10000)}`,
+    o.createdAt ? new Date(o.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+    o.paymentMethod || 'Cash',
+    `${cur}${Number(o.total || 0).toLocaleString('en-IN')}`,
+    'Success'
   ]);
 
-  // 9. Reservations (Mocked if empty)
-  const reservationsList = [
-    ['RES-300', 'Aarav Mehta', '2026-07-11', '4', 'T18', 'Confirmed'],
-    ['RES-301', 'Priya Nair', '2026-07-12', '6', 'T9', 'Confirmed'],
-    ['RES-302', 'Rahul Verma', '2026-07-13', '4', 'T1', 'Confirmed'],
-    ['RES-303', 'Sneha Kapoor', '2026-07-14', '2', 'T1', 'Confirmed'],
-    ['RES-304', 'Vikram Iyer', '2026-07-15', '5', 'T8', 'Seated'],
-  ];
-
-  // 10. Expenses (Mocked)
-  const expensesList = [
-    ['2026-07-11', 'Groceries', 'FreshMart', `${cur}15,108`],
-    ['2026-07-12', 'Utilities', 'BESCOM', `${cur}14,469`],
-    ['2026-07-13', 'Salaries', 'Payroll', `${cur}1,476`],
-    ['2026-07-14', 'Maintenance', 'FixIt Co', `${cur}16,642`],
-    ['2026-07-15', 'Marketing', 'AdWorks', `${cur}11,327`],
-  ];
-
-  // 11. Taxes
+  // 7. Taxes
   const taxesList = [
-    ['This Week', `${cur}${(totalTax/2).toLocaleString()}`, `${cur}${(totalTax/2).toLocaleString()}`, `${cur}0`, `${cur}${totalTax.toLocaleString()}`]
+    ['Total Recorded', `${cur}${(totalTax/2).toLocaleString('en-IN')}`, `${cur}${(totalTax/2).toLocaleString('en-IN')}`, `${cur}0`, `${cur}${totalTax.toLocaleString('en-IN')}`]
   ];
 
   return {
-    summary, salesSummary, ordersList, customersList, menuItemsList, staffList, paymentsList, reservationsList, expensesList, taxesList
+    summary, salesSummary, ordersList, menuItemsList, staffList, paymentsList, taxesList
   };
 };
 
@@ -219,20 +197,14 @@ export const generateComprehensivePDF = (data: any, settings: any) => {
   // 2. Sales Summary
   addTablePage('Sales Summary', [['Date', 'Orders', 'Revenue', 'Tax', 'Net']], reportData.salesSummary);
   // 3. Orders
-  addTablePage('Orders', [['Order ID', 'Date', 'Customer', 'Items', 'Total', 'Status']], reportData.ordersList);
-  // 4. Customers
-  addTablePage('Customers', [['ID', 'Name', 'Phone', 'Visits', 'Spent', 'Last Visit']], reportData.customersList);
-  // 5. Menu Items
+  addTablePage('Orders', [['Order ID', 'Date', 'Location', 'Items', 'Total', 'Status']], reportData.ordersList);
+  // 4. Menu Items
   addTablePage('Menu Items', [['ID', 'Name', 'Category', 'Price', 'Sold', 'Revenue']], reportData.menuItemsList);
-  // 6. Staff
+  // 5. Staff
   addTablePage('Staff', [['ID', 'Name', 'Role', 'Shift', 'Salary', 'Status']], reportData.staffList);
-  // 8. Payments
+  // 6. Payments
   addTablePage('Payments', [['ID', 'Date', 'Method', 'Amount', 'Status']], reportData.paymentsList);
-  // 9. Reservations
-  addTablePage('Reservations', [['ID', 'Guest', 'Date', 'Guests', 'Table', 'Status']], reportData.reservationsList);
-  // 10. Expenses
-  addTablePage('Expenses', [['Date', 'Category', 'Vendor', 'Amount']], reportData.expensesList);
-  // 11. Taxes
+  // 7. Taxes
   addTablePage('Taxes', [['Period', 'CGST', 'SGST', 'IGST', 'Total']], reportData.taxesList);
 
   doc.save('Comprehensive_Hotel_Report.pdf');
@@ -250,13 +222,13 @@ export const generateComprehensiveExcel = (data: any, settings: any) => {
   // 1. Summary
   const summaryHead = ['Field', 'Value'];
   const summaryBody = [
-    ['Hotel Name', settings.restaurantName || ''],
+    ['Hotel Name', settings.restaurantName || 'Babai Hotel'],
     ['Address', `${settings.address || ''}, ${settings.city || ''} ${settings.pinCode || ''}`],
     ['Phone', settings.mobile || ''],
     ['Email', settings.email || ''],
     ['GSTIN', settings.gstNo || ''],
-    ['Manager', settings.ownerName || ''],
-    ['Report Period', 'This Week'],
+    ['Manager', settings.ownerName || 'Admin'],
+    ['Report Period', 'Live Operations'],
     ['Generated', new Date().toLocaleString()],
     [],
     ...reportData.summary
@@ -264,13 +236,10 @@ export const generateComprehensiveExcel = (data: any, settings: any) => {
   addSheet('Summary', summaryHead, summaryBody);
 
   addSheet('Sales', ['Date', 'Orders', 'Revenue', 'Tax', 'Net'], reportData.salesSummary);
-  addSheet('Orders', ['Order ID', 'Date', 'Customer', 'Items', 'Total', 'Status'], reportData.ordersList);
-  addSheet('Customers', ['ID', 'Name', 'Phone', 'Visits', 'Spent', 'Last Visit'], reportData.customersList);
+  addSheet('Orders', ['Order ID', 'Date', 'Location', 'Items', 'Total', 'Status'], reportData.ordersList);
   addSheet('Menu Items', ['ID', 'Name', 'Category', 'Price', 'Sold', 'Revenue'], reportData.menuItemsList);
   addSheet('Staff', ['ID', 'Name', 'Role', 'Shift', 'Salary', 'Status'], reportData.staffList);
   addSheet('Payments', ['ID', 'Date', 'Method', 'Amount', 'Status'], reportData.paymentsList);
-  addSheet('Reservations', ['ID', 'Guest', 'Date', 'Guests', 'Table', 'Status'], reportData.reservationsList);
-  addSheet('Expenses', ['Date', 'Category', 'Vendor', 'Amount'], reportData.expensesList);
   addSheet('Taxes', ['Period', 'CGST', 'SGST', 'IGST', 'Total'], reportData.taxesList);
 
   XLSX.writeFile(wb, 'Comprehensive_Hotel_Report.xlsx');

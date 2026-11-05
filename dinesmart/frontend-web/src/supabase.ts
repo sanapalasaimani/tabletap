@@ -1026,9 +1026,12 @@ export const db = {
         .from('activity_logs')
         .select('*')
         .order('timestamp', { ascending: false });
-      if (!error && data) return data;
+      if (!error && data) {
+        const userLogs = data.filter((l: any) => l.id !== 'hotel_settings_current');
+        return userLogs;
+      }
     }
-    return getMockData<any[]>('activity_log', []);
+    return getMockData<any[]>('activity_log', []).filter((l: any) => l.id !== 'hotel_settings_current');
   },
 
   saveActivityLog: async (log: any): Promise<any> => {
@@ -1316,21 +1319,13 @@ export const db = {
     saveMockData('pending_staff_meta', localMeta);
     return true;
   },
-  // 14. HOTEL SETTINGS
+  // 14. HOTEL SETTINGS (Persisted via Supabase + Local Fallback)
   getSettings: async (): Promise<any> => {
-    if (isRealSupabase) {
-      const { data, error } = await supabaseClient
-        .from('hotel_settings')
-        .select('*')
-        .eq('id', 'default')
-        .single();
-      if (!error && data) return data;
-    }
-    return getMockData<any>('hotel_settings', { 
+    const defaultFallback = { 
       tax: 5, 
       currency: '₹', 
       gstNo: '27AAAAA1111A1Z1',
-      restaurantName: 'DineSmart Hotel & Resto',
+      restaurantName: 'Babai Hotel',
       ownerName: '',
       branchName: '',
       email: '',
@@ -1344,21 +1339,65 @@ export const db = {
       pinCode: '',
       landmark: '',
       mapsLocation: ''
-    });
+    };
+
+    if (isRealSupabase) {
+      try {
+        const { data, error } = await supabaseClient
+          .from('activity_logs')
+          .select('*')
+          .eq('id', 'hotel_settings_current')
+          .single();
+        if (!error && data && data.action) {
+          const parsed = JSON.parse(data.action);
+          saveMockData('hotel_settings', parsed);
+          return { ...defaultFallback, ...parsed };
+        }
+      } catch (err) {
+        console.warn('Supabase settings query error, falling back:', err);
+      }
+    }
+    return getMockData<any>('hotel_settings', defaultFallback);
   },
 
   saveSettings: async (settings: any): Promise<any> => {
-    const defaultSettings = { ...settings, id: 'default' };
+    const payload = {
+      tax: Number(settings.tax) || 5,
+      currency: settings.currency || '₹',
+      gstNo: settings.gstNo || '27AAAAA1111A1Z1',
+      restaurantName: settings.restaurantName || 'Babai Hotel',
+      ownerName: settings.ownerName || '',
+      branchName: settings.branchName || '',
+      email: settings.email || '',
+      mobile: settings.mobile || '',
+      alternateMobile: settings.alternateMobile || '',
+      fssai: settings.fssai || '',
+      address: settings.address || '',
+      city: settings.city || '',
+      state: settings.state || '',
+      country: settings.country || '',
+      pinCode: settings.pinCode || '',
+      landmark: settings.landmark || '',
+      mapsLocation: settings.mapsLocation || ''
+    };
+
+    saveMockData('hotel_settings', payload);
+
     if (isRealSupabase) {
-      const { data, error } = await supabaseClient
-        .from('hotel_settings')
-        .upsert(defaultSettings)
-        .select()
-        .single();
-      if (!error && data) return data;
-      console.error('Supabase error saving settings:', error);
+      try {
+        await supabaseClient
+          .from('activity_logs')
+          .upsert({
+            id: 'hotel_settings_current',
+            user_role: 'system',
+            action: JSON.stringify(payload),
+            timestamp: new Date().toISOString()
+          });
+      } catch (err) {
+        console.warn('Supabase error saving settings to activity_logs:', err);
+      }
     }
-    saveMockData('hotel_settings', defaultSettings);
-    return defaultSettings;
+
+    return payload;
   }
 };
