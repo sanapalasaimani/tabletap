@@ -1,25 +1,133 @@
-import { 
-  ScopeClassification, 
-  DecisionReadiness, 
-  Citation, 
-  MetricCalculation, 
-  RAGResponse, 
-  TelemetryLog 
-} from './types';
-import { MANDATED_OUT_OF_SCOPE_MESSAGE } from './scopeGuard';
-import { conversationManager } from './conversationManager';
-import { executeHybridRetrieval } from './hybridRetriever';
-import { routeQuery, RouterIntent } from './intentRouter';
-import { ROOMS_UNAVAILABLE_RESPONSE, logUnansweredRoomsQuery, BUSINESS_GLOSSARY } from './businessGlossary';
-import { generateSQLQuery, repairExecutedSQLError } from './sqlGenerator';
-import { executeReadOnlySQL } from './sqlExecutor';
-import { generateGroundedAnswer, generateSemanticAnswer, formatRowsAsMarkdownTable } from './answerGenerator';
-import { verifyAnswerGrounding } from './verifier';
-import { RAG_CONFIG } from './ragConfig';
-import { operationsAnalytics, AnalyticalAnswer } from './operationsAnalytics';
+/**
+ * DineSmart Live Executive Operations Orchestrator
+ * Parameterized Tool Calling over Live Supabase Data with Plain-Language Synthesis.
+ * Strict time-zone resolution in Asia/Kolkata (+05:30).
+ */
+
+import { RAGResponse, TelemetryLog, Citation } from './types';
+import { TOOL_SCHEMAS, executeToolCall } from './liveTools';
+
+const getEnv = (key: string, def = '') => 
+  (typeof import.meta !== 'undefined' && (import.meta as any).env?.[key]) || 
+  ((globalThis as any).process?.env?.[key]) || def;
+
+const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const getApiKey = () => getEnv('VITE_GROQ_API_KEY');
+const MODEL = getEnv('VITE_GROQ_MODEL', 'openai/gpt-oss-120b');
 
 function generateRequestId(): string {
   return 'req_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now().toString(36);
+}
+
+/**
+ * Prompt Injection & Security Guards
+ */
+const SECURITY_PATTERNS = [
+  /ignore\s+(all\s+)?(previous|prior|above)\s+(instructions|prompts|rules)/i,
+  /reveal\s+(your\s+)?(system\s+prompt|initial\s+instructions|instructions|prompt)/i,
+  /print\s+(the\s+)?(system\s+prompt|raw\s+prompt|developer\s+mode)/i,
+  /you\s+are\s+now\s+(in\s+developer\s+mode|DAN|an\s+unfiltered\s+AI)/i,
+  /override\s+(all\s+)?(safety|system|security)\s+(rules|guidelines)/i,
+  /drop\s+table/i,
+  /delete\s+from/i,
+  /database\s+password/i,
+  /employee\s+password/i
+];
+
+const FIRST_PASS_SYSTEM = `You are the DineSmart AI Operations Assistant for TableTap hotel & restaurant management.
+Current Date in Asia/Kolkata: ${new Date().toISOString().slice(0, 10)}.
+Select the most appropriate tool to fetch live data for the restaurant owner, or reply directly if it is a general conversational greeting or simple clarification.`;
+
+const SYNTHESIS_SYSTEM = `You are the DineSmart Executive Operations Assistant for TableTap hotel and restaurant management.
+You communicate directly with the restaurant owner / general manager in plain, executive English.
+
+CRITICAL RULES:
+1. START WITH DIRECT ANSWER: Always begin with a crisp, one-sentence direct answer containing the key metric(s). (e.g., "Today you have 1 order and ₹305 in revenue (all-time recorded: 34 orders, ₹7,078).")
+2. PLAIN LANGUAGE: Write for a busy restaurant owner. Never output developer jargon, SQL queries, database table names, or internal tags (like [POL-TAX-01] or [MENU-SP6]).
+3. SHORT BULLETS OR TABLES: Use a short 2-4 row Markdown table or clean bullets only when it clarifies rankings or comparisons.
+4. INDIAN NUMBER FORMATTING: Always use the ₹ symbol with standard Indian number grouping (e.g., ₹7,078, ₹24,500).
+5. STATE DATE RANGE: Always explicitly mention the date range or timeframe used for the figures.
+6. PRACTICAL INSIGHTS: Add 1-2 practical operational tips or suggested actions when supported by the data.
+7. CONCISE: Keep the entire response under ~150 words unless asked for detail.
+8. HONESTY: Never invent or estimate numbers. If data is not tracked (e.g. kitchen prep timestamps), state plainly that it is not yet recorded and what is needed to track it.
+9. AMBIGUITY: If a question is ambiguous, provide what data is available and ask one short clarifying question.`;
+
+/**
+ * Robust Groq API caller with automatic 429 rate limit backoff
+ */
+async function callGroqWithBackoff(payload: any, retries = 3): Promise<any> {
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    throw new Error('VITE_GROQ_API_KEY is not configured.');
+  }
+
+  for (let i = 0; i < retries; i++) {
+    const res = await fetch(GROQ_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (res.status === 429) {
+      // Respect Groq token rate limit with backoff
+      await new Promise(r => setTimeout(r, 5000));
+      continue;
+    }
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`Groq API error ${res.status}: ${errText}`);
+    }
+
+    return await res.json();
+  }
+
+  throw new Error('Groq rate limit exceeded after retries.');
+}
+
+function formatToolResultFallback(toolName: string, result: any): string {
+  if (!result || typeof result !== 'object') return 'I could not retrieve data for that request. Please try again.';
+
+  if (toolName === 'get_sales_summary') {
+    const s = result.summary || result;
+    const rev = Number(s.gross_revenue || s.total_revenue || 0).toLocaleString('en-IN');
+    const orders = s.total_orders || s.order_count || 0;
+    return `During the requested period (${result.date_range || 'Today'}), there were **${orders} orders** recorded, generating **₹${rev}** in gross revenue.`;
+  }
+
+  if (toolName === 'get_top_items') {
+    const items = result.top_dishes || result.items || [];
+    if (!items.length) return `No dish sales recorded for ${result.date_range || 'the requested period'}.`;
+    const list = items.slice(0, 5).map((it: any, i: number) => `${i + 1}. **${it.name}** — ${it.total_quantity_sold || it.quantity || 0} sold (₹${Number(it.revenue || 0).toLocaleString('en-IN')})`).join('\n');
+    return `Here are the top-selling dishes (${result.date_range || 'recent'}):\n\n${list}`;
+  }
+
+  if (toolName === 'get_table_status') {
+    return `Currently, **${result.occupied_tables || 0} out of ${result.total_tables || 12} tables** are occupied (${result.occupancy_rate || 0}% occupancy). ${result.available_tables || 0} tables are currently available for seating.`;
+  }
+
+  if (toolName === 'get_restaurant_policy') {
+    return result.policy_text || result.policy || 'Our standard restaurant policy is active.';
+  }
+
+  if (toolName === 'get_cancellations') {
+    return `For ${result.date_range || 'the recorded period'}, there were **${result.cancellation_count || 0} cancelled orders** out of ${result.total_orders || 0} total orders (${result.cancellation_rate || 0}% cancellation rate).`;
+  }
+
+  if (toolName === 'get_low_stock_items') {
+    return result.message || `There are currently **${result.low_stock_count || 0} ingredients** below minimum stock levels.`;
+  }
+
+  // General clean bullet summary
+  const summaryParts = Object.entries(result)
+    .filter(([k]) => k !== 'date_range' && k !== 'citations')
+    .slice(0, 5)
+    .map(([k, v]) => `• **${k.replace(/_/g, ' ')}**: ${typeof v === 'object' ? JSON.stringify(v) : v}`)
+    .join('\n');
+  return `Verified data for ${result.date_range || 'your request'}:\n\n${summaryParts}`;
 }
 
 export const ragOrchestrator = {
@@ -30,703 +138,163 @@ export const ragOrchestrator = {
   ): Promise<RAGResponse> => {
     const startTime = performance.now();
     const requestId = generateRequestId();
+    const cleanQuery = (query || '').trim();
 
-    // =========================================================================
-    // STEP 1: Intent Routing & Guardrails
-    // =========================================================================
-    const route = routeQuery(query);
-
-    // Case 0: Greeting
-    if (route.intent === 'GREETING') {
-      const totalLatency = Math.round(performance.now() - startTime);
-      return {
-        answer: `### DineSmart Operations Intelligence Terminal
-
-Hello! How can I assist you with TableTap hotel & restaurant operations today?
-
-You can ask me about:
-• **Financial & Revenue**: Today's revenue, this month's revenue, month-over-month growth, and average order value.
-• **Menu & Culinary**: Top 5 best-selling dishes, gross margins (Stars vs Dogs), category breakdown, and veg/non-veg split.
-• **Operations & Cost Control**: Food cost percentage vs target, weekend vs weekday surge, beverage attach rate, and order voids.
-• **Table Service & Floor**: Table reservation allocations, waiter scorecards, tip earnings, and kitchen prep SLA.`,
-        scope: 'IN_SCOPE',
-        citations: [],
-        decisionReadiness: 'DECISION_READY',
-        telemetry: {
-          requestId,
-          timestamp: new Date().toISOString(),
-          userQuery: query,
-          scope: 'IN_SCOPE',
-          retrievalHitCount: 0,
-          retrievalLatencyMs: 0,
-          inferenceLatencyMs: 0,
-          totalLatencyMs: totalLatency,
-          provider: 'GROUNDED_LOCAL_ENGINE',
-          modelUsed: 'GreetingHandler',
-          citationsCount: 0,
-          decisionReadiness: 'DECISION_READY',
-          securityFlags: []
-        }
-      };
-    }
-
-    // Case 1A: Adversarial / Security Violation
-    if (route.intent === 'UNSAFE') {
-      const totalLatency = Math.round(performance.now() - startTime);
-      const telemetry: TelemetryLog = {
-        requestId,
-        timestamp: new Date().toISOString(),
-        userQuery: query,
-        scope: 'UNSAFE_OR_UNAUTHORIZED',
-        retrievalHitCount: 0,
-        retrievalLatencyMs: 0,
-        inferenceLatencyMs: 0,
-        totalLatencyMs: totalLatency,
-        provider: 'GROUNDED_LOCAL_ENGINE',
-        modelUsed: 'IntentGuard_v3',
-        citationsCount: 0,
-        decisionReadiness: 'NOT_DECISION_READY',
-        securityFlags: ['ADVERSARIAL_INJECTION_DETECTED']
-      };
-
-      return {
-        answer: `### Security Violation & Access Restricted
-
-The system detected an adversarial request or unauthorized instruction override pattern.
-
-- **Reason**: ${route.reason}
-- **Security Policy**: System prompts, database credentials, employee passwords, and unauthorized SQL DDL/DML are strictly protected.
-- **Audit Action**: Request ID \`${requestId}\` has been flagged in activity logs.`,
-        scope: 'UNSAFE_OR_UNAUTHORIZED',
-        citations: [],
-        decisionReadiness: 'NOT_DECISION_READY',
-        telemetry
-      };
-    }
-
-    // Case 1B: Out of Scope
-    if (route.intent === 'OUT_OF_SCOPE') {
-      const totalLatency = Math.round(performance.now() - startTime);
-      const telemetry: TelemetryLog = {
-        requestId,
-        timestamp: new Date().toISOString(),
-        userQuery: query,
-        scope: 'OUT_OF_SCOPE',
-        retrievalHitCount: 0,
-        retrievalLatencyMs: 0,
-        inferenceLatencyMs: 0,
-        totalLatencyMs: totalLatency,
-        provider: 'GROUNDED_LOCAL_ENGINE',
-        modelUsed: 'ScopeGuard_v3',
-        citationsCount: 0,
-        decisionReadiness: 'NOT_DECISION_READY',
-        securityFlags: []
-      };
-
-      return {
-        answer: MANDATED_OUT_OF_SCOPE_MESSAGE,
-        scope: 'OUT_OF_SCOPE',
-        citations: [],
-        decisionReadiness: 'NOT_DECISION_READY',
-        telemetry
-      };
-    }
-
-    // Case 1C: Hotel Rooms Data Missing (Strictly enforced honest boundary)
-    if (route.intent === 'ROOMS_UNAVAILABLE') {
-      logUnansweredRoomsQuery(query);
-      const totalLatency = Math.round(performance.now() - startTime);
-      const telemetry: TelemetryLog = {
-        requestId,
-        timestamp: new Date().toISOString(),
-        userQuery: query,
-        scope: 'IN_SCOPE_WITH_LIMITATIONS',
-        retrievalHitCount: 0,
-        retrievalLatencyMs: 0,
-        inferenceLatencyMs: 0,
-        totalLatencyMs: totalLatency,
-        provider: 'GROUNDED_LOCAL_ENGINE',
-        modelUsed: 'RoomsDataBoundaryHandler',
-        citationsCount: 0,
-        decisionReadiness: 'MORE_DATA_REQUIRED',
-        securityFlags: []
-      };
-
-      return {
-        answer: ROOMS_UNAVAILABLE_RESPONSE,
-        scope: 'IN_SCOPE_WITH_LIMITATIONS',
-        citations: [],
-        decisionReadiness: 'MORE_DATA_REQUIRED',
-        telemetry
-      };
-    }
-
-    // =========================================================================
-    // STEP 2: Conversational Resolution & Multi-Turn Rewriting
-    // =========================================================================
-    const resolvedContext = conversationManager.resolveContext(query, history);
-    if (resolvedContext.requiresClarification && resolvedContext.clarificationPrompt) {
-      const totalLatency = Math.round(performance.now() - startTime);
-      return {
-        answer: `### Clarification Needed\n\n${resolvedContext.clarificationPrompt}`,
-        scope: 'IN_SCOPE',
-        citations: [],
-        decisionReadiness: 'MORE_DATA_REQUIRED',
-        telemetry: {
-          requestId,
-          timestamp: new Date().toISOString(),
-          userQuery: query,
-          scope: 'IN_SCOPE',
-          retrievalHitCount: 0,
-          retrievalLatencyMs: 0,
-          inferenceLatencyMs: 0,
-          totalLatencyMs: totalLatency,
-          provider: 'GROUNDED_LOCAL_ENGINE',
-          modelUsed: 'ClarificationEngine_v3',
-          citationsCount: 0,
-          decisionReadiness: 'MORE_DATA_REQUIRED',
-          securityFlags: []
-        }
-      };
-    }
-
-    const rewrittenQuery = resolvedContext.rewrittenQuery || query;
-    const citations: Citation[] = [];
-
-    // Direct Operational Intelligence Match (Guarantees deterministic, unhallucinated answers)
-    const directOps = matchOperationsQuery(rewrittenQuery);
-    if (directOps) {
-      const totalLatency = Math.round(performance.now() - startTime);
-      const provenanceBlock = directOps.sqlUsed ? `\n\n<details>
-<summary><b>View Executed SQL & Provenance</b></summary>
-
-\`\`\`sql
-${directOps.sqlUsed}
-\`\`\`
-
-- **Execution Time**: ${directOps.provenance.executionTimeMs}ms
-- **Rows Verified**: ${directOps.provenance.recordCount.toLocaleString('en-IN')} records
-- **Data Source**: ${directOps.provenance.sourceId} (${directOps.provenance.sourceType})
-</details>` : '';
-
-      return {
-        answer: `${directOps.answer}${provenanceBlock}`,
-        scope: 'IN_SCOPE',
-        citations: [{
-          sourceId: directOps.provenance.sourceId,
-          sourceType: directOps.provenance.sourceType,
-          title: directOps.title,
-          verifiedClaim: directOps.title,
-          confidence: 0.99,
-          timestamp: new Date().toISOString()
-        }],
-        decisionReadiness: 'DECISION_READY',
-        telemetry: {
-          requestId,
-          timestamp: new Date().toISOString(),
-          userQuery: query,
-          scope: 'IN_SCOPE',
-          retrievalHitCount: 1,
-          retrievalLatencyMs: directOps.provenance.executionTimeMs,
-          inferenceLatencyMs: 0,
-          totalLatencyMs: totalLatency,
-          provider: 'GROUNDED_LOCAL_ENGINE',
-          modelUsed: 'OperationsAnalyticsEngine',
-          citationsCount: 1,
-          decisionReadiness: 'DECISION_READY',
-          securityFlags: []
-        }
-      };
-    }
-
-    // =========================================================================
-    // STEP 3: Branch A — Deterministic Text-to-SQL Pipeline
-    // =========================================================================
-    if (route.intent === 'TEXT_TO_SQL') {
-      try {
-        // 3a. Generate SQL Query
-        const sqlResult = await generateSQLQuery(rewrittenQuery, history);
-
-        // 3b. Execute Read-Only SQL
-        let execResult = await executeReadOnlySQL(sqlResult.sanitizedSql);
-
-        // 3c. Self-Correction Loop: If database execution returned an error, retry once
-        if (!execResult.success && execResult.error) {
-          console.warn(`[RAGOrchestrator] SQL Execution failed: "${execResult.error}". Attempting 1-shot repair.`);
-          try {
-            const repairedSql = await repairExecutedSQLError(rewrittenQuery, sqlResult.sanitizedSql, execResult.error);
-            execResult = await executeReadOnlySQL(repairedSql);
-          } catch (repairErr: any) {
-            console.error('[RAGOrchestrator] Self-correction repair failed:', repairErr);
-          }
-        }
-
-        // If execution still failed, provide an honest, unhallucinated failure report
-        if (!execResult.success) {
-          const totalLatency = Math.round(performance.now() - startTime);
-          return {
-            answer: `### Database Execution Notice
-
-I could not execute this database query due to the following PostgreSQL error:
-> **${execResult.error || 'Execution failed'}**
-
-I do not guess or fabricate financial or operational numbers. Please verify the query parameters or adjust your question.
-
-<details>
-<summary><b>View Attempted SQL</b></summary>
-
-\`\`\`sql
-${sqlResult.sanitizedSql}
-\`\`\`
-</details>`,
-            scope: 'IN_SCOPE',
-            citations: [],
-            decisionReadiness: 'NOT_DECISION_READY',
-            telemetry: {
-              requestId,
-              timestamp: new Date().toISOString(),
-              userQuery: query,
-              scope: 'IN_SCOPE',
-              retrievalHitCount: 0,
-              retrievalLatencyMs: 0,
-              inferenceLatencyMs: 0,
-              totalLatencyMs: totalLatency,
-              provider: 'GROUNDED_LOCAL_ENGINE',
-              modelUsed: RAG_CONFIG.models.sql,
-              citationsCount: 0,
-              decisionReadiness: 'NOT_DECISION_READY',
-              securityFlags: []
-            }
-          };
-        }
-
-        // 3d. Generate Fact-Grounded Answer from returned rows
-        const answerResult = await generateGroundedAnswer({
-          userQuery: query,
-          sql: execResult.sql,
-          rows: execResult.rows,
-          executionTimeMs: execResult.executionTimeMs,
-          isStrategic: false
-        });
-
-        // 3e. Verifier: Validate numbers in answer match SQL rows
-        const audit = verifyAnswerGrounding(answerResult.answer, execResult.rows);
-
-        citations.push({
-          sourceId: 'SUPABASE-LIVE-QUERY',
-          sourceType: 'LIVE_DATABASE',
-          title: `PostgreSQL Live Query (${execResult.rowCount} rows in ${execResult.executionTimeMs}ms)`,
-          verifiedClaim: `Executed on live tables [${sqlResult.prunedTables.join(', ')}]. Audit Passed: ${audit.passed}.`,
-          confidence: 0.99,
-          timestamp: new Date().toISOString()
-        });
-
+    // 1. Security & Guardrails
+    for (const pattern of SECURITY_PATTERNS) {
+      if (pattern.test(cleanQuery)) {
         const totalLatency = Math.round(performance.now() - startTime);
-
         return {
-          answer: answerResult.answer,
-          scope: 'IN_SCOPE',
-          citations,
-          decisionReadiness: audit.passed ? 'DECISION_READY' : 'DECISION_READY_WITH_CAVEATS',
+          answer: `### Security Violation & Access Restricted\n\nThe system detected an unauthorized instruction override or adversarial request.\n\n- **Security Policy**: Database credentials, passwords, and system prompts are strictly protected.\n- **Audit Action**: Request ID \`${requestId}\` has been flagged.`,
+          scope: 'UNSAFE_OR_UNAUTHORIZED',
+          citations: [],
+          decisionReadiness: 'NOT_DECISION_READY',
           telemetry: {
             requestId,
             timestamp: new Date().toISOString(),
             userQuery: query,
-            scope: 'IN_SCOPE',
-            retrievalHitCount: citations.length,
-            retrievalLatencyMs: execResult.executionTimeMs,
-            inferenceLatencyMs: totalLatency - execResult.executionTimeMs,
+            scope: 'UNSAFE_OR_UNAUTHORIZED',
+            retrievalHitCount: 0,
+            retrievalLatencyMs: 0,
+            inferenceLatencyMs: 0,
             totalLatencyMs: totalLatency,
-            provider: 'GROQ_CLOUD',
-            modelUsed: answerResult.modelUsed,
-            citationsCount: citations.length,
-            decisionReadiness: audit.passed ? 'DECISION_READY' : 'DECISION_READY_WITH_CAVEATS',
-            securityFlags: audit.passed ? [] : ['UNVERIFIED_FIGURE_FLAGGED']
+            provider: 'GROUNDED_LOCAL_ENGINE',
+            modelUsed: 'SecurityGuard',
+            citationsCount: 0,
+            decisionReadiness: 'NOT_DECISION_READY',
+            securityFlags: ['PROMPT_INJECTION_DETECTED']
           }
         };
-
-      } catch (err: any) {
-        // Fallback for when Groq API key is invalid/unavailable: deterministic glossary matching
-        console.warn('[RAGOrchestrator] Text-to-SQL dynamic generation error, matching glossary:', err.message);
-        return await handleGlossaryFallback(query, rewrittenQuery, startTime, requestId);
       }
     }
 
-    // =========================================================================
-    // STEP 4: Branch B & C — Hybrid Strategy & Semantic Document Search
-    // =========================================================================
-    const retrievalStart = performance.now();
-    const evidence = executeHybridRetrieval(rewrittenQuery, liveData);
-    const retrievalLatency = Math.round(performance.now() - retrievalStart);
+    // 2. Step 1: Tool Selection or Natural Direct Reply
+    let choice1: any = null;
+    let toolUsed = 'NONE';
+    let toolResult: any = null;
+    const citations: Citation[] = [];
 
-    // If Hybrid: Run SQL query for the numerical background, then synthesize with SOP evidence
-    if (route.intent === 'HYBRID') {
-      try {
-        const sqlResult = await generateSQLQuery(rewrittenQuery, history);
-        const execResult = await executeReadOnlySQL(sqlResult.sanitizedSql);
+    try {
+      const groqRes1 = await callGroqWithBackoff({
+        model: MODEL,
+        messages: [
+          { role: 'system', content: FIRST_PASS_SYSTEM },
+          ...history.slice(-4).map(h => ({ role: h.role, content: h.content })),
+          { role: 'user', content: cleanQuery }
+        ],
+        tools: TOOL_SCHEMAS,
+        tool_choice: 'auto',
+        max_tokens: 300,
+        reasoning_format: 'hidden',
+        temperature: 0.1
+      });
 
-        if (execResult.success && execResult.rows.length > 0) {
-          const answerResult = await generateGroundedAnswer({
-            userQuery: query,
-            sql: execResult.sql,
-            rows: execResult.rows,
-            executionTimeMs: execResult.executionTimeMs,
-            isStrategic: true
-          });
+      choice1 = groqRes1.choices?.[0]?.message;
+    } catch (err: any) {
+      console.warn('[RAGOrchestrator] First-pass tool selection error:', err.message);
+    }
 
-          citations.push({
-            sourceId: 'SUPABASE-LIVE-DATA',
-            sourceType: 'LIVE_DATABASE',
-            title: `Live Financial Aggregate (${execResult.rowCount} rows)`,
-            verifiedClaim: `Derived from live SQL: ${execResult.sql.slice(0, 100)}...`,
-            confidence: 0.98
-          });
-
-          citations.push(...evidence.citations);
-          const totalLatency = Math.round(performance.now() - startTime);
-
-          return {
-            answer: answerResult.answer,
-            scope: 'IN_SCOPE',
-            citations,
-            decisionReadiness: 'DECISION_READY',
-            telemetry: {
-              requestId,
-              timestamp: new Date().toISOString(),
-              userQuery: query,
-              scope: 'IN_SCOPE',
-              retrievalHitCount: citations.length,
-              retrievalLatencyMs: execResult.executionTimeMs,
-              inferenceLatencyMs: totalLatency - execResult.executionTimeMs,
-              totalLatencyMs: totalLatency,
-              provider: 'GROQ_CLOUD',
-              modelUsed: answerResult.modelUsed,
-              citationsCount: citations.length,
-              decisionReadiness: 'DECISION_READY',
-              securityFlags: []
-            }
-          };
+    // 3. If direct conversational answer (e.g. Greeting or direct question)
+    if (choice1 && (!choice1.tool_calls || choice1.tool_calls.length === 0) && choice1.content) {
+      const totalLatency = Math.round(performance.now() - startTime);
+      return {
+        answer: choice1.content.trim(),
+        scope: 'IN_SCOPE',
+        citations: [],
+        decisionReadiness: 'DECISION_READY',
+        telemetry: {
+          requestId,
+          timestamp: new Date().toISOString(),
+          userQuery: query,
+          scope: 'IN_SCOPE',
+          retrievalHitCount: 0,
+          retrievalLatencyMs: 0,
+          inferenceLatencyMs: totalLatency,
+          totalLatencyMs: totalLatency,
+          provider: 'GROQ_CLOUD',
+          modelUsed: MODEL,
+          citationsCount: 0,
+          decisionReadiness: 'DECISION_READY',
+          securityFlags: []
         }
-      } catch (hybridSqlErr) {
-        // Fall back to semantic document synthesis
-      }
+      };
     }
 
-    // Semantic Document Branch (Policies, Recipes, Allergens, Guidelines)
-    const semanticAnswer = await buildSemanticResponse(query, evidence);
+    // 4. Execute Selected Tool on Live Supabase Tables
+    let toolStart = performance.now();
+    if (choice1?.tool_calls && choice1.tool_calls.length > 0) {
+      const call = choice1.tool_calls[0];
+      toolUsed = call.function.name;
+      let toolArgs = {};
+      try {
+        toolArgs = JSON.parse(call.function.arguments || '{}');
+      } catch (e) {}
+
+      toolResult = await executeToolCall(toolUsed, toolArgs);
+      citations.push({
+        sourceId: `SUPABASE-${toolUsed.toUpperCase()}`,
+        sourceType: 'LIVE_DATABASE',
+        title: `Supabase Live Tool: ${toolUsed}`,
+        verifiedClaim: `Executed on live database tables with parameters: ${JSON.stringify(toolArgs)}`,
+        confidence: 0.99,
+        timestamp: new Date().toISOString()
+      });
+    } else {
+      // Fallback: Default to sales summary if no tool was picked
+      toolUsed = 'get_sales_summary';
+      toolResult = await executeToolCall('get_sales_summary', {});
+    }
+    const retrievalLatency = Math.round(performance.now() - toolStart);
+
+    // 5. Step 2: Plain-Language Executive Synthesis
+    let finalAnswer = '';
+    const inferStart = performance.now();
+
+    try {
+      const groqRes2 = await callGroqWithBackoff({
+        model: MODEL,
+        temperature: 0.1,
+        max_tokens: 350,
+        reasoning_format: 'hidden',
+        messages: [
+          { role: 'system', content: SYNTHESIS_SYSTEM },
+          { 
+            role: 'user', 
+            content: `User Question: "${cleanQuery}"\n\nLIVE DATABASE DATA / VERIFIED FACTS:\n${JSON.stringify(toolResult, null, 2)}\n\nAnswer the restaurant owner directly following the critical rules.` 
+          }
+        ]
+      });
+
+      finalAnswer = groqRes2.choices?.[0]?.message?.content?.trim() || '';
+    } catch (err: any) {
+      console.warn('[RAGOrchestrator] Synthesis error:', err.message);
+      // Graceful plain-language fallback from raw tool result
+      finalAnswer = formatToolResultFallback(toolUsed, toolResult);
+    }
+
+    const inferenceLatency = Math.round(performance.now() - inferStart);
     const totalLatency = Math.round(performance.now() - startTime);
+
     return {
-      answer: semanticAnswer,
+      answer: finalAnswer,
       scope: 'IN_SCOPE',
-      citations: evidence.citations,
-      decisionReadiness: evidence.citations.length > 0 ? 'DECISION_READY' : 'MORE_DATA_REQUIRED',
+      citations,
+      decisionReadiness: 'DECISION_READY',
       telemetry: {
         requestId,
         timestamp: new Date().toISOString(),
         userQuery: query,
         scope: 'IN_SCOPE',
-        retrievalHitCount: evidence.citations.length,
+        retrievalHitCount: citations.length,
         retrievalLatencyMs: retrievalLatency,
-        inferenceLatencyMs: 0,
+        inferenceLatencyMs: inferenceLatency,
         totalLatencyMs: totalLatency,
-        provider: 'GROUNDED_LOCAL_ENGINE',
-        modelUsed: 'SemanticRetriever_v3',
-        citationsCount: evidence.citations.length,
-        decisionReadiness: evidence.citations.length > 0 ? 'DECISION_READY' : 'MORE_DATA_REQUIRED',
+        provider: 'GROQ_CLOUD',
+        modelUsed: `${MODEL} + ${toolUsed}`,
+        citationsCount: citations.length,
+        decisionReadiness: 'DECISION_READY',
         securityFlags: []
       }
     };
   }
 };
-
-function matchOperationsQuery(q: string): AnalyticalAnswer | null {
-  const clean = q.toLowerCase().trim();
-  if (clean.includes('booking') || clean.includes('table reservation') || clean.includes('table allocation') || clean === 'today bookings' || (clean.includes('today') && clean.includes('booking'))) {
-    return operationsAnalytics.getTableBookingsStatus();
-  }
-  if ((clean.includes('this month') || clean.includes('october') || clean.includes('current month')) && clean.includes('revenue') && !clean.includes('last month') && !clean.includes('veg')) {
-    return operationsAnalytics.getTotalRevenue(true);
-  }
-  if (clean.includes('total revenue') || clean.includes('gross revenue') || (clean.includes('revenue') && !clean.includes('month') && !clean.includes('split') && !clean.includes('categor') && !clean.includes('last month'))) {
-    return operationsAnalytics.getTotalRevenue(false);
-  }
-  if (clean.includes('top 5') || clean.includes('best-selling') || clean.includes('best selling') || clean.includes('top dishes')) {
-    return operationsAnalytics.getTopSellingDishes();
-  }
-  if (clean.includes('breakfast') && (clean.includes('star') || clean.includes('margin'))) {
-    return operationsAnalytics.getBreakfastStars();
-  }
-  if (clean.includes('margin') && (clean.includes('highest') || clean.includes('gross margin') || clean.includes('best margin'))) {
-    return operationsAnalytics.getMenuEngineering('MARGIN');
-  }
-  if (clean.includes('dog') || clean.includes('low-selling') || clean.includes('low selling') || clean.includes('low margin')) {
-    return operationsAnalytics.getMenuEngineering('DOGS');
-  }
-  if (clean.includes('ingredient cost') || clean.includes('food cost for') || clean.includes('cost of masala dosa') || clean.includes('cost for masala dosa') || clean.includes('cost for gulab jamun') || clean.includes('food costs for mutton')) {
-    return operationsAnalytics.getDishIngredientCost(clean);
-  }
-  if (clean.includes('food cost')) {
-    return operationsAnalytics.getFoodCostComparison();
-  }
-  if (clean.includes('turnaround') || clean.includes('table turn')) {
-    return operationsAnalytics.getTableTurnaround();
-  }
-  if (clean.includes('weekend') && clean.includes('weekday')) {
-    return operationsAnalytics.getWeekendVsWeekday();
-  }
-  if (clean.includes('dessert') && (clean.includes('attach') || clean.includes('rate'))) {
-    return operationsAnalytics.getDessertAttachRate();
-  }
-  if (clean.includes('categor') && clean.includes('revenue')) {
-    return operationsAnalytics.getCategoryRevenueBreakdown();
-  }
-  if (clean.includes('beverage') || clean.includes('drink')) {
-    return operationsAnalytics.getBeverageAttachRate();
-  }
-  if (clean.includes('void') || clean.includes('cancel') || clean.includes('cancellation')) {
-    return operationsAnalytics.getCancellationsAndVoids();
-  }
-  if (clean.includes('last month') && (clean.includes('this month') || clean.includes('compare') || clean.includes('so far'))) {
-    return operationsAnalytics.getMonthOverMonthComparison();
-  }
-  if ((clean.includes('veg') || clean.includes('vegetarian')) && (clean.includes('split') || clean.includes('share') || clean.includes('revenue'))) {
-    return operationsAnalytics.getVegNonVegSplit();
-  }
-  if (clean.includes('how many staff') || clean.includes('floor roster') || clean.includes('staff members') || clean.includes('registered on the live')) {
-    return operationsAnalytics.getStaffRoster();
-  }
-  if (clean.includes('shift') && (clean.includes('timing') || clean.includes('schedule') || clean.includes('hour'))) {
-    return operationsAnalytics.getShiftTimings();
-  }
-  if (clean.includes('how many') && (clean.includes('dish') || clean.includes('catalog') || clean.includes('menu item'))) {
-    return operationsAnalytics.getMenuCatalogOverview();
-  }
-  if (clean.includes('vegan')) {
-    return operationsAnalytics.getVeganOptions();
-  }
-  if ((clean.includes('price of') || clean.includes('cost of')) && !clean.includes('food cost')) {
-    const dishAns = operationsAnalytics.getDishDetails(clean);
-    if (dishAns) return dishAns;
-  }
-  return null;
-}
-
-/**
- * Fallback execution for known glossary questions if LLM key is offline
- */
-async function handleGlossaryFallback(
-  originalQuery: string,
-  cleanQuery: string,
-  startTime: number,
-  requestId: string
-): Promise<RAGResponse> {
-  const q = cleanQuery.toLowerCase();
-
-  // 1. Direct Operational Intelligence Match
-  const directOps = matchOperationsQuery(originalQuery || cleanQuery);
-  if (directOps) {
-    const totalLatency = Math.round(performance.now() - startTime);
-    const provenanceBlock = directOps.sqlUsed ? `\n\n<details>
-<summary><b>View Executed SQL & Provenance</b></summary>
-
-\`\`\`sql
-${directOps.sqlUsed}
-\`\`\`
-
-- **Execution Time**: ${directOps.provenance.executionTimeMs}ms
-- **Rows Verified**: ${directOps.provenance.recordCount.toLocaleString('en-IN')} records
-- **Data Source**: ${directOps.provenance.sourceId} (${directOps.provenance.sourceType})
-</details>` : '';
-
-    return {
-      answer: `${directOps.answer}${provenanceBlock}`,
-      scope: 'IN_SCOPE',
-      citations: [{
-        sourceId: directOps.provenance.sourceId,
-        sourceType: directOps.provenance.sourceType,
-        title: directOps.title,
-        verifiedClaim: directOps.title,
-        confidence: 0.99,
-        timestamp: new Date().toISOString()
-      }],
-      decisionReadiness: 'DECISION_READY',
-      telemetry: {
-        requestId,
-        timestamp: new Date().toISOString(),
-        userQuery: originalQuery,
-        scope: 'IN_SCOPE',
-        retrievalHitCount: 1,
-        retrievalLatencyMs: directOps.provenance.executionTimeMs,
-        inferenceLatencyMs: 0,
-        totalLatencyMs: totalLatency,
-        provider: 'GROUNDED_LOCAL_ENGINE',
-        modelUsed: 'OperationsAnalyticsEngine',
-        citationsCount: 1,
-        decisionReadiness: 'DECISION_READY',
-        securityFlags: []
-      }
-    };
-  }
-
-  let matchedMetric = null;
-
-  for (const metric of Object.values(BUSINESS_GLOSSARY)) {
-    if (metric.status === 'ACTIVE' && metric.sqlTemplate) {
-      if (q.includes(metric.id.replace(/_/g, ' ')) || q.includes(metric.name.toLowerCase())) {
-        matchedMetric = metric;
-        break;
-      }
-    }
-  }
-
-  // Common keyword matches
-  if (!matchedMetric) {
-    if (q.includes('revenue') || q.includes('sales')) matchedMetric = BUSINESS_GLOSSARY.total_revenue;
-    else if (q.includes('aov') || q.includes('average order')) matchedMetric = BUSINESS_GLOSSARY.average_order_value;
-    else if (q.includes('dish') || q.includes('selling')) matchedMetric = BUSINESS_GLOSSARY.top_selling_dishes;
-    else if (q.includes('waiter') || q.includes('tip')) matchedMetric = BUSINESS_GLOSSARY.waiter_performance;
-    else if (q.includes('feedback') || q.includes('rating')) matchedMetric = BUSINESS_GLOSSARY.customer_satisfaction_csat;
-    else if (q.includes('stock') || q.includes('inventory')) matchedMetric = BUSINESS_GLOSSARY.inventory_stock_alert;
-  }
-
-  if (matchedMetric && matchedMetric.sqlTemplate) {
-    const execResult = await executeReadOnlySQL(matchedMetric.sqlTemplate.trim());
-    if (execResult.success && execResult.rows.length > 0) {
-      const tableMarkdown = formatRowsAsMarkdownTable(execResult.rows);
-      const totalLatency = Math.round(performance.now() - startTime);
-
-      return {
-        answer: `### ${matchedMetric.name}
-
-${matchedMetric.definition}
-
-${tableMarkdown}
-
-<details>
-<summary><b>View Executed SQL & Provenance</b></summary>
-
-\`\`\`sql
-${execResult.sql}
-\`\`\`
-
-- **Execution Time**: ${execResult.executionTimeMs}ms
-- **Rows Returned**: ${execResult.rowCount}
-- **Definition Source**: Verified Business Glossary (\`${matchedMetric.id}\`)
-</details>`,
-        scope: 'IN_SCOPE',
-        citations: [{
-          sourceId: `GLOSSARY-${matchedMetric.id.toUpperCase()}`,
-          sourceType: 'LIVE_DATABASE',
-          title: matchedMetric.name,
-          verifiedClaim: matchedMetric.formula,
-          confidence: 0.99
-        }],
-        decisionReadiness: 'DECISION_READY',
-        telemetry: {
-          requestId,
-          timestamp: new Date().toISOString(),
-          userQuery: originalQuery,
-          scope: 'IN_SCOPE',
-          retrievalHitCount: 1,
-          retrievalLatencyMs: execResult.executionTimeMs,
-          inferenceLatencyMs: 0,
-          totalLatencyMs: totalLatency,
-          provider: 'GROUNDED_LOCAL_ENGINE',
-          modelUsed: 'BusinessGlossaryEngine',
-          citationsCount: 1,
-          decisionReadiness: 'DECISION_READY',
-          securityFlags: []
-        }
-      };
-    }
-  }
-
-  // 3. Fallback to Semantic Document Search (SOPs, Policies, Allergens, Guidelines)
-  try {
-    const evidence = executeHybridRetrieval(originalQuery || cleanQuery, {});
-    if (evidence.citations && evidence.citations.length > 0 && evidence.formattedContext && evidence.formattedContext.length > 50) {
-      const semanticAnswer = await buildSemanticResponse(originalQuery, evidence);
-      const totalLatency = Math.round(performance.now() - startTime);
-      return {
-        answer: semanticAnswer,
-        scope: 'IN_SCOPE',
-        citations: evidence.citations,
-        decisionReadiness: 'DECISION_READY',
-        telemetry: {
-          requestId,
-          timestamp: new Date().toISOString(),
-          userQuery: originalQuery,
-          scope: 'IN_SCOPE',
-          retrievalHitCount: evidence.citations.length,
-          retrievalLatencyMs: 6,
-          inferenceLatencyMs: 0,
-          totalLatencyMs: totalLatency,
-          provider: 'GROUNDED_LOCAL_ENGINE',
-          modelUsed: 'HybridSemanticRetriever',
-          citationsCount: evidence.citations.length,
-          decisionReadiness: 'DECISION_READY',
-          securityFlags: []
-        }
-      };
-    }
-  } catch (semanticErr) {
-    // Continue to limitation notice
-  }
-
-  const totalLatency = Math.round(performance.now() - startTime);
-  return {
-    answer: `### Operational Intelligence
-
-I don't have enough data connected to compute this query accurately. 
-
-- **Status**: Database query could not be executed deterministically.
-- **Data Boundary**: Live operations currently track F&B dining orders, menu items, staff, table service, and kitchen inventory.`,
-    scope: 'IN_SCOPE_WITH_LIMITATIONS',
-    citations: [],
-    decisionReadiness: 'MORE_DATA_REQUIRED',
-    telemetry: {
-      requestId,
-      timestamp: new Date().toISOString(),
-      userQuery: originalQuery,
-      scope: 'IN_SCOPE_WITH_LIMITATIONS',
-      retrievalHitCount: 0,
-      retrievalLatencyMs: 0,
-      inferenceLatencyMs: 0,
-      totalLatencyMs: totalLatency,
-      provider: 'GROUNDED_LOCAL_ENGINE',
-      modelUsed: 'SafeFallbackHandler',
-      citationsCount: 0,
-      decisionReadiness: 'MORE_DATA_REQUIRED',
-      securityFlags: []
-    }
-  };
-}
-
-/**
- * Synthesizes qualitative operational responses from retrieved policy and menu evidence
- */
-async function buildSemanticResponse(query: string, evidence: any): Promise<string> {
-  const q = query.toLowerCase();
-
-  // Greetings
-  if (/^(hi|hello|hey|greetings|good morning|good afternoon|good evening|help)(\s.*)?$/i.test(q.trim())) {
-    return `### DineSmart Operations Intelligence Terminal
-
-Hello! I am your executive operations analyst for DineSmart / TableTap.
-
-You can ask me to analyze:
-- **Financial & Revenue**: Today's revenue, Average Order Value (AOV), total bills settled, and discount totals.
-- **Menu & Culinary**: Top dishes by sales volume, culinary category pricing, ingredient and allergen details.
-- **Staff & Waiters**: Waiter performance metrics, orders delivered, and tips earned.
-- **Operations & Stock**: Low-stock kitchen ingredients, customer feedback ratings (CSAT), and service requests.
-
-All numerical metrics are computed deterministically from our PostgreSQL database.`;
-  }
-
-  if (evidence.formattedContext && evidence.formattedContext.length > 50) {
-    // Generate AI explanation grounded in retrieved chunks
-    return await generateSemanticAnswer(query, evidence.formattedContext);
-  }
-
-  return `### Operational Inquiry\n\nI could not find a verified operational policy or menu record matching your query. Please ask a specific question regarding menu catalog items, dining GST, staff shifts, or kitchen ingredients.`;
-}

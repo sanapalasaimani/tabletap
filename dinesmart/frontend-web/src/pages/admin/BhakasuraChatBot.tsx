@@ -329,7 +329,7 @@ export default function BhakasuraChatBot({ contextData }: BhakasuraChatBotProps)
         {
           id: (Date.now() + 1).toString(),
           sender: 'bot',
-          text: `### System Notice\n\nI am operating in offline safe mode. Please verify the connection or try your request again in a moment.\n\n- **Status**: Local verified dataset available\n- **Service Hours**: 7:00 AM – 11:30 PM daily\n- **Assistance**: You can ask about menu dishes, pricing, allergens, staff roster, or 1-year financial metrics.`
+          text: `I ran into a temporary issue retrieving that information. Please try your question again in a moment, or ask about today's live orders, current tables, or menu dishes.`
         }
       ]);
     } finally {

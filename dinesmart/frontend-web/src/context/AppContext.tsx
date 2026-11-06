@@ -212,14 +212,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const gst = Math.round(subtotal * 0.05); // 5% GST
     let discount = 0;
     
-    if (discountCoupon === 'WELCOME50') {
-      discount = 50;
-    } else if (discountCoupon === 'LOYA100' && profile && profile.points >= 100) {
-      discount = 100;
-      // Deduct loyalty points
-      await db.addLoyaltyPoints(phone, -100);
+    // Strict checkout validation of coupon conditions
+    if (discountCoupon) {
+      const code = discountCoupon.toUpperCase();
+      if (code === 'WELCOME50' && subtotal >= 150) {
+        discount = 50;
+        if (subtotal >= 600) discount += 25;
+      } else if ((code === 'SAVE20' || code === 'FESTIVE20') && subtotal >= 300) {
+        discount = Math.min(150, Math.round(subtotal * 0.20));
+        if (subtotal >= 800) discount += 20;
+      } else if (code === 'LOYA100' && subtotal >= 250 && profile && profile.points >= 100) {
+        discount = 100;
+        // Deduct loyalty points
+        await db.addLoyaltyPoints(phone, -100);
+      } else {
+        // Dynamic promotion check
+        try {
+          const promos = await db.getPromotions();
+          const matched = promos?.find((p: any) => p.code?.toUpperCase() === code && p.active);
+          if (matched) {
+            const minBill = Number(matched.min_bill || matched.minBill || 0);
+            if (subtotal >= minBill) {
+              if (matched.type === 'Percentage') {
+                discount = Math.round((subtotal * Number(matched.discount)) / 100);
+                if (matched.maxDiscount) discount = Math.min(discount, matched.maxDiscount);
+              } else {
+                discount = Number(matched.discount);
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('Checkout promo check error', e);
+        }
+      }
     }
 
+    discount = Math.min(discount, subtotal);
     const total = Math.max(0, subtotal + gst + tip - discount);
     
     const order = await db.placeOrder(

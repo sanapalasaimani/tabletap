@@ -15,509 +15,303 @@
   },
   "bestInHotel": [
     {
-      "id": "m_2",
-      "name": "French Fries",
-      "category": "Main Course",
-      "price": 220,
-      "compositeScore": 87.8,
-      "avgRating": 4.56,
-      "ordersCount": 4936,
-      "avgPrepDelayMin": 4.2,
-      "estimatedRevenue": 535536.5,
-      "primarySession": "Breakfast",
-      "recommendationBadge": "Chef Signature \u2022 Best in Hotel",
-      "isBestInHotel": true
-    },
-    {
-      "id": "m_1",
-      "name": "Veg Sandwich",
-      "category": "Main Course",
-      "price": 220,
-      "compositeScore": 87.7,
-      "avgRating": 4.56,
-      "ordersCount": 5008,
-      "avgPrepDelayMin": 4.3,
-      "estimatedRevenue": 598271.0,
-      "primarySession": "Breakfast",
-      "recommendationBadge": "Chef Signature \u2022 Best in Hotel",
-      "isBestInHotel": true
-    },
-    {
-      "id": "m_10",
+      "id": "bf1",
       "name": "Masala Dosa",
       "category": "Breakfast",
       "price": 90,
-      "compositeScore": 87.7,
-      "avgRating": 4.57,
-      "ordersCount": 4844,
-      "avgPrepDelayMin": 4.3,
-      "estimatedRevenue": 510492.67,
+      "compositeScore": 94.8,
+      "avgRating": 4.8,
+      "ordersCount": 5120,
+      "avgPrepDelayMin": 4.1,
+      "estimatedRevenue": 460800,
       "primarySession": "Breakfast",
-      "recommendationBadge": "Chef Signature \u2022 Best in Hotel",
+      "recommendationBadge": "Chef Signature • Best in Hotel",
       "isBestInHotel": true
     },
     {
-      "id": "m_11",
-      "name": "Cheese Pizza",
+      "id": "bf2",
+      "name": "Idli Sambar",
+      "category": "Breakfast",
+      "price": 60,
+      "compositeScore": 93.2,
+      "avgRating": 4.7,
+      "ordersCount": 4980,
+      "avgPrepDelayMin": 3.8,
+      "estimatedRevenue": 298800,
+      "primarySession": "Breakfast",
+      "recommendationBadge": "Morning Favourite",
+      "isBestInHotel": true
+    },
+    {
+      "id": "bf10",
+      "name": "Poori Bhaji",
+      "category": "Breakfast",
+      "price": 80,
+      "compositeScore": 91.5,
+      "avgRating": 4.7,
+      "ordersCount": 4210,
+      "avgPrepDelayMin": 4.5,
+      "estimatedRevenue": 336800,
+      "primarySession": "Breakfast",
+      "recommendationBadge": "Popular Breakfast",
+      "isBestInHotel": true
+    },
+    {
+      "id": "mc3",
+      "name": "Hyderabadi Chicken Biryani",
+      "category": "Main Course",
+      "price": 280,
+      "compositeScore": 96.4,
+      "avgRating": 4.9,
+      "ordersCount": 6840,
+      "avgPrepDelayMin": 5.2,
+      "estimatedRevenue": 1915200,
+      "primarySession": "Lunch & Dinner",
+      "recommendationBadge": "Chef Signature • All Time Star",
+      "isBestInHotel": true
+    },
+    {
+      "id": "mc1",
+      "name": "Paneer Butter Masala",
+      "category": "Main Course",
+      "price": 260,
+      "compositeScore": 92.9,
+      "avgRating": 4.7,
+      "ordersCount": 5420,
+      "avgPrepDelayMin": 5,
+      "estimatedRevenue": 1409200,
+      "primarySession": "Lunch & Dinner",
+      "recommendationBadge": "Bestseller Veg Mains",
+      "isBestInHotel": true
+    },
+    {
+      "id": "mc2",
+      "name": "Murgh Makhani (Butter Chicken)",
+      "category": "Main Course",
+      "price": 320,
+      "compositeScore": 93.7,
+      "avgRating": 4.8,
+      "ordersCount": 5110,
+      "avgPrepDelayMin": 5.4,
+      "estimatedRevenue": 1635200,
+      "primarySession": "Lunch & Dinner",
+      "recommendationBadge": "Chef Special Non-Veg",
+      "isBestInHotel": true
+    },
+    {
+      "id": "st2",
+      "name": "Paneer Tikka",
+      "category": "Starters",
+      "price": 260,
+      "compositeScore": 90.4,
+      "avgRating": 4.6,
+      "ordersCount": 4120,
+      "avgPrepDelayMin": 4.8,
+      "estimatedRevenue": 1071200,
+      "primarySession": "Lunch & Dinner",
+      "recommendationBadge": "Tandoori Special",
+      "isBestInHotel": true
+    },
+    {
+      "id": "st1",
+      "name": "Gobi Manchurian",
+      "category": "Starters",
+      "price": 180,
+      "compositeScore": 88.6,
+      "avgRating": 4.5,
+      "ordersCount": 3890,
+      "avgPrepDelayMin": 4.2,
+      "estimatedRevenue": 700200,
+      "primarySession": "All Day",
+      "recommendationBadge": "Crispy Favorite",
+      "isBestInHotel": true
+    },
+    {
+      "id": "mc4",
+      "name": "Dal Makhani",
       "category": "Main Course",
       "price": 220,
-      "compositeScore": 87.6,
-      "avgRating": 4.56,
-      "ordersCount": 4887,
-      "avgPrepDelayMin": 4.3,
-      "estimatedRevenue": 688711.67,
-      "primarySession": "Breakfast",
-      "recommendationBadge": "Chef Signature \u2022 Best in Hotel",
+      "compositeScore": 89.8,
+      "avgRating": 4.6,
+      "ordersCount": 3950,
+      "avgPrepDelayMin": 4.6,
+      "estimatedRevenue": 869000,
+      "primarySession": "Lunch & Dinner",
+      "recommendationBadge": "Slow-Cooked Classic",
       "isBestInHotel": true
     },
     {
-      "id": "m_4",
-      "name": "Lemon Ice Tea",
-      "category": "Main Course",
-      "price": 220,
-      "compositeScore": 87.0,
-      "avgRating": 4.47,
-      "ordersCount": 6892,
-      "avgPrepDelayMin": 5.0,
-      "estimatedRevenue": 767601.17,
-      "primarySession": "Lunch",
-      "recommendationBadge": "Chef Signature \u2022 Best in Hotel",
+      "id": "br1",
+      "name": "Garlic Naan",
+      "category": "Breads",
+      "price": 60,
+      "compositeScore": 92.1,
+      "avgRating": 4.7,
+      "ordersCount": 6120,
+      "avgPrepDelayMin": 3.2,
+      "estimatedRevenue": 367200,
+      "primarySession": "Lunch & Dinner",
+      "recommendationBadge": "Top Bread Pairing",
       "isBestInHotel": true
     },
     {
-      "id": "m_9",
-      "name": "Cold Coffee",
-      "category": "Beverages",
-      "price": 90,
-      "compositeScore": 87.0,
-      "avgRating": 4.47,
-      "ordersCount": 7228,
-      "avgPrepDelayMin": 5.1,
-      "estimatedRevenue": 910453.33,
-      "primarySession": "Lunch",
-      "recommendationBadge": "Chef Signature \u2022 Best in Hotel",
-      "isBestInHotel": true
-    },
-    {
-      "id": "m_5",
+      "id": "ds1",
       "name": "Gulab Jamun",
       "category": "Desserts",
       "price": 80,
-      "compositeScore": 84.3,
-      "avgRating": 4.41,
-      "ordersCount": 5004,
-      "avgPrepDelayMin": 5.6,
-      "estimatedRevenue": 540504.17,
-      "primarySession": "Lunch",
-      "recommendationBadge": "Bestseller",
+      "compositeScore": 91,
+      "avgRating": 4.7,
+      "ordersCount": 4650,
+      "avgPrepDelayMin": 2.5,
+      "estimatedRevenue": 372000,
+      "primarySession": "All Day",
+      "recommendationBadge": "Sweet Classic",
       "isBestInHotel": true
     },
     {
-      "id": "m_6",
-      "name": "Chocolate Brownie",
-      "category": "Main Course",
-      "price": 220,
-      "compositeScore": 84.1,
-      "avgRating": 4.41,
-      "ordersCount": 5015,
-      "avgPrepDelayMin": 5.7,
-      "estimatedRevenue": 653263.17,
-      "primarySession": "Lunch",
-      "recommendationBadge": "Bestseller",
+      "id": "ds4",
+      "name": "Rasmalai",
+      "category": "Desserts",
+      "price": 100,
+      "compositeScore": 92.5,
+      "avgRating": 4.8,
+      "ordersCount": 4230,
+      "avgPrepDelayMin": 2.5,
+      "estimatedRevenue": 423000,
+      "primarySession": "All Day",
+      "recommendationBadge": "Royal Dessert",
       "isBestInHotel": true
     },
     {
-      "id": "m_7",
-      "name": "Paneer Butter Masala",
-      "category": "Main Course",
-      "price": 210,
-      "compositeScore": 81.4,
-      "avgRating": 4.34,
-      "ordersCount": 3821,
-      "avgPrepDelayMin": 6.3,
-      "estimatedRevenue": 600863.0,
-      "primarySession": "Lunch",
-      "recommendationBadge": "Bestseller",
+      "id": "bv8",
+      "name": "Cold Coffee",
+      "category": "Beverages",
+      "price": 90,
+      "compositeScore": 89.2,
+      "avgRating": 4.5,
+      "ordersCount": 4890,
+      "avgPrepDelayMin": 3,
+      "estimatedRevenue": 440100,
+      "primarySession": "All Day",
+      "recommendationBadge": "Chilled Beverage",
       "isBestInHotel": true
     },
     {
-      "id": "m_14",
-      "name": "Dal Tadka",
-      "category": "Main Course",
-      "price": 220,
-      "compositeScore": 81.2,
-      "avgRating": 4.33,
-      "ordersCount": 3809,
-      "avgPrepDelayMin": 6.4,
-      "estimatedRevenue": 548010.33,
-      "primarySession": "Lunch",
-      "recommendationBadge": "Bestseller",
-      "isBestInHotel": true
-    },
-    {
-      "id": "m_12",
-      "name": "Veg Pulao",
-      "category": "Main Course",
-      "price": 220,
-      "compositeScore": 81.0,
-      "avgRating": 4.31,
-      "ordersCount": 3840,
-      "avgPrepDelayMin": 6.4,
-      "estimatedRevenue": 567585.67,
-      "primarySession": "Lunch",
-      "recommendationBadge": "Bestseller",
-      "isBestInHotel": true
-    },
-    {
-      "id": "m_13",
-      "name": "Chicken Biryani",
-      "category": "Main Course",
-      "price": 220,
-      "compositeScore": 81.0,
-      "avgRating": 4.32,
-      "ordersCount": 3737,
-      "avgPrepDelayMin": 6.4,
-      "estimatedRevenue": 642461.67,
-      "primarySession": "Lunch",
-      "recommendationBadge": "Bestseller",
-      "isBestInHotel": true
-    },
-    {
-      "id": "m_3",
-      "name": "Chilli Chicken",
-      "category": "Main Course",
-      "price": 220,
-      "compositeScore": 80.9,
-      "avgRating": 4.31,
-      "ordersCount": 3849,
-      "avgPrepDelayMin": 6.5,
-      "estimatedRevenue": 637321.0,
-      "primarySession": "Lunch",
-      "recommendationBadge": "Bestseller",
-      "isBestInHotel": true
-    },
-    {
-      "id": "m_8",
-      "name": "Fish Curry",
-      "category": "Main Course",
-      "price": 330,
-      "compositeScore": 80.4,
-      "avgRating": 4.29,
-      "ordersCount": 3728,
-      "avgPrepDelayMin": 6.6,
-      "estimatedRevenue": 641204.67,
-      "primarySession": "Lunch",
-      "recommendationBadge": "Bestseller",
+      "id": "bv1",
+      "name": "Mango Lassi",
+      "category": "Beverages",
+      "price": 110,
+      "compositeScore": 93.8,
+      "avgRating": 4.8,
+      "ordersCount": 5340,
+      "avgPrepDelayMin": 3,
+      "estimatedRevenue": 587400,
+      "primarySession": "All Day",
+      "recommendationBadge": "Refreshing Bestseller",
       "isBestInHotel": true
     }
   ],
   "dishAffinities": {
-    "Lemon Ice Tea": [
+    "Hyderabadi Chicken Biryani": [
       {
-        "pairedWith": "Cold Coffee",
-        "confidence": 28.9,
-        "coOrders": 1989
-      },
-      {
-        "pairedWith": "French Fries",
-        "confidence": 21.6,
-        "coOrders": 1492
-      },
-      {
-        "pairedWith": "Cheese Pizza",
-        "confidence": 21.3,
-        "coOrders": 1467
-      },
-      {
-        "pairedWith": "Veg Sandwich",
-        "confidence": 21.3,
-        "coOrders": 1468
-      }
-    ],
-    "Gulab Jamun": [
-      {
-        "pairedWith": "Cold Coffee",
-        "confidence": 24.5,
-        "coOrders": 1225
-      },
-      {
-        "pairedWith": "Lemon Ice Tea",
-        "confidence": 23.7,
-        "coOrders": 1187
-      },
-      {
-        "pairedWith": "Chocolate Brownie",
-        "confidence": 23.1,
-        "coOrders": 1156
-      },
-      {
-        "pairedWith": "Paneer Butter Masala",
-        "confidence": 16.3,
-        "coOrders": 814
-      }
-    ],
-    "Chocolate Brownie": [
-      {
-        "pairedWith": "Lemon Ice Tea",
-        "confidence": 23.4,
-        "coOrders": 1172
+        "pairedWith": "Mango Lassi",
+        "confidence": 42.1,
+        "coOrders": 2880
       },
       {
         "pairedWith": "Gulab Jamun",
-        "confidence": 23.1,
-        "coOrders": 1156
+        "confidence": 35.4,
+        "coOrders": 2420
       },
       {
-        "pairedWith": "Cold Coffee",
-        "confidence": 23.1,
-        "coOrders": 1159
-      },
-      {
-        "pairedWith": "Paneer Butter Masala",
-        "confidence": 17.3,
-        "coOrders": 867
+        "pairedWith": "Gobi Manchurian",
+        "confidence": 28.2,
+        "coOrders": 1930
       }
     ],
     "Paneer Butter Masala": [
       {
-        "pairedWith": "Chocolate Brownie",
-        "confidence": 22.7,
-        "coOrders": 867
+        "pairedWith": "Garlic Naan",
+        "confidence": 56.8,
+        "coOrders": 3080
       },
       {
-        "pairedWith": "Chilli Chicken",
-        "confidence": 22.5,
-        "coOrders": 860
+        "pairedWith": "Butter Naan",
+        "confidence": 44.2,
+        "coOrders": 2390
       },
       {
-        "pairedWith": "Cold Coffee",
-        "confidence": 22.3,
-        "coOrders": 852
-      },
-      {
-        "pairedWith": "Veg Pulao",
-        "confidence": 22.1,
-        "coOrders": 843
+        "pairedWith": "Sweet Lassi",
+        "confidence": 26.5,
+        "coOrders": 1430
       }
     ],
-    "French Fries": [
+    "Murgh Makhani (Butter Chicken)": [
       {
-        "pairedWith": "Veg Sandwich",
-        "confidence": 31.4,
-        "coOrders": 1548
+        "pairedWith": "Garlic Naan",
+        "confidence": 58.4,
+        "coOrders": 2980
       },
       {
-        "pairedWith": "Cold Coffee",
-        "confidence": 30.6,
-        "coOrders": 1511
+        "pairedWith": "Butter Naan",
+        "confidence": 41.6,
+        "coOrders": 2120
       },
       {
-        "pairedWith": "Lemon Ice Tea",
-        "confidence": 30.2,
-        "coOrders": 1492
-      },
-      {
-        "pairedWith": "Cheese Pizza",
-        "confidence": 30.2,
-        "coOrders": 1490
-      }
-    ],
-    "Cold Coffee": [
-      {
-        "pairedWith": "Lemon Ice Tea",
-        "confidence": 27.5,
-        "coOrders": 1989
-      },
-      {
-        "pairedWith": "Veg Sandwich",
-        "confidence": 21.2,
-        "coOrders": 1532
-      },
-      {
-        "pairedWith": "Cheese Pizza",
-        "confidence": 21.0,
-        "coOrders": 1517
-      },
-      {
-        "pairedWith": "French Fries",
-        "confidence": 20.9,
-        "coOrders": 1511
+        "pairedWith": "Rasmalai",
+        "confidence": 31.2,
+        "coOrders": 1590
       }
     ],
     "Masala Dosa": [
       {
-        "pairedWith": "Cheese Pizza",
-        "confidence": 30.8,
-        "coOrders": 1493
+        "pairedWith": "Medu Vada",
+        "confidence": 48.6,
+        "coOrders": 2490
       },
       {
-        "pairedWith": "Cold Coffee",
-        "confidence": 30.6,
-        "coOrders": 1481
+        "pairedWith": "Filter Coffee",
+        "confidence": 41.2,
+        "coOrders": 2110
       },
       {
-        "pairedWith": "Veg Sandwich",
-        "confidence": 30.5,
-        "coOrders": 1476
-      },
-      {
-        "pairedWith": "French Fries",
-        "confidence": 30.1,
-        "coOrders": 1457
+        "pairedWith": "Idli Sambar",
+        "confidence": 32.5,
+        "coOrders": 1660
       }
     ],
-    "Cheese Pizza": [
+    "Idli Sambar": [
       {
-        "pairedWith": "Veg Sandwich",
-        "confidence": 31.3,
-        "coOrders": 1532
-      },
-      {
-        "pairedWith": "Cold Coffee",
-        "confidence": 31.0,
-        "coOrders": 1517
+        "pairedWith": "Medu Vada",
+        "confidence": 52.3,
+        "coOrders": 2600
       },
       {
         "pairedWith": "Masala Dosa",
-        "confidence": 30.6,
-        "coOrders": 1493
+        "confidence": 34.1,
+        "coOrders": 1700
       },
       {
-        "pairedWith": "French Fries",
-        "confidence": 30.5,
-        "coOrders": 1490
+        "pairedWith": "Filter Coffee",
+        "confidence": 38,
+        "coOrders": 1890
       }
     ],
-    "Veg Pulao": [
-      {
-        "pairedWith": "Cold Coffee",
-        "confidence": 23.2,
-        "coOrders": 890
-      },
-      {
-        "pairedWith": "Chilli Chicken",
-        "confidence": 22.2,
-        "coOrders": 851
-      },
+    "Garlic Naan": [
       {
         "pairedWith": "Paneer Butter Masala",
-        "confidence": 22.0,
-        "coOrders": 843
+        "confidence": 50.3,
+        "coOrders": 3080
       },
       {
-        "pairedWith": "Chicken Biryani",
-        "confidence": 21.8,
-        "coOrders": 838
-      }
-    ],
-    "Chilli Chicken": [
-      {
-        "pairedWith": "Dal Tadka",
-        "confidence": 22.9,
-        "coOrders": 880
+        "pairedWith": "Murgh Makhani (Butter Chicken)",
+        "confidence": 48.7,
+        "coOrders": 2980
       },
       {
-        "pairedWith": "Cold Coffee",
-        "confidence": 22.6,
-        "coOrders": 870
-      },
-      {
-        "pairedWith": "Paneer Butter Masala",
-        "confidence": 22.3,
-        "coOrders": 860
-      },
-      {
-        "pairedWith": "Veg Pulao",
-        "confidence": 22.1,
-        "coOrders": 851
-      }
-    ],
-    "Veg Sandwich": [
-      {
-        "pairedWith": "French Fries",
-        "confidence": 30.9,
-        "coOrders": 1548
-      },
-      {
-        "pairedWith": "Cold Coffee",
-        "confidence": 30.6,
-        "coOrders": 1532
-      },
-      {
-        "pairedWith": "Cheese Pizza",
-        "confidence": 30.6,
-        "coOrders": 1532
-      },
-      {
-        "pairedWith": "Masala Dosa",
-        "confidence": 29.5,
-        "coOrders": 1476
-      }
-    ],
-    "Chicken Biryani": [
-      {
-        "pairedWith": "Veg Pulao",
-        "confidence": 22.4,
-        "coOrders": 838
-      },
-      {
-        "pairedWith": "Chilli Chicken",
-        "confidence": 22.2,
-        "coOrders": 829
-      },
-      {
-        "pairedWith": "Dal Tadka",
-        "confidence": 21.9,
-        "coOrders": 818
-      },
-      {
-        "pairedWith": "Lemon Ice Tea",
-        "confidence": 21.2,
-        "coOrders": 791
-      }
-    ],
-    "Fish Curry": [
-      {
-        "pairedWith": "Cold Coffee",
-        "confidence": 22.9,
-        "coOrders": 855
-      },
-      {
-        "pairedWith": "Veg Pulao",
-        "confidence": 22.0,
-        "coOrders": 819
-      },
-      {
-        "pairedWith": "Lemon Ice Tea",
-        "confidence": 21.7,
-        "coOrders": 808
-      },
-      {
-        "pairedWith": "Chocolate Brownie",
-        "confidence": 21.6,
-        "coOrders": 805
-      }
-    ],
-    "Dal Tadka": [
-      {
-        "pairedWith": "Chilli Chicken",
-        "confidence": 23.1,
-        "coOrders": 880
-      },
-      {
-        "pairedWith": "Cold Coffee",
-        "confidence": 22.0,
-        "coOrders": 838
-      },
-      {
-        "pairedWith": "Chicken Biryani",
-        "confidence": 21.5,
-        "coOrders": 818
-      },
-      {
-        "pairedWith": "Fish Curry",
-        "confidence": 21.1,
-        "coOrders": 802
+        "pairedWith": "Dal Makhani",
+        "confidence": 36.2,
+        "coOrders": 2210
       }
     ]
   },
@@ -535,9 +329,9 @@
       "hour": 9,
       "label": "09:00",
       "orderVolume": 1406,
-      "surgeIndex": 52.0,
+      "surgeIndex": 52,
       "avgBill": 320.3,
-      "avgPrepTimeMin": 15.0,
+      "avgPrepTimeMin": 15,
       "isPeakHour": false
     },
     {
@@ -562,7 +356,7 @@
       "hour": 13,
       "label": "13:00",
       "orderVolume": 2704,
-      "surgeIndex": 100.0,
+      "surgeIndex": 100,
       "avgBill": 419.9,
       "avgPrepTimeMin": 25.9,
       "isPeakHour": true
@@ -618,7 +412,7 @@
       "orderVolume": 1875,
       "surgeIndex": 69.3,
       "avgBill": 398.4,
-      "avgPrepTimeMin": 25.0,
+      "avgPrepTimeMin": 25,
       "isPeakHour": false
     },
     {
@@ -626,8 +420,8 @@
       "label": "21:00",
       "orderVolume": 1957,
       "surgeIndex": 72.4,
-      "avgBill": 395.0,
-      "avgPrepTimeMin": 25.0,
+      "avgBill": 395,
+      "avgPrepTimeMin": 25,
       "isPeakHour": true
     },
     {
@@ -645,14 +439,14 @@
       "totalRevenue": 8953131.5,
       "totalOrders": 23708,
       "avgDailyRevenue": 24529.13,
-      "avgDailyOrders": 65.0,
+      "avgDailyOrders": 65,
       "avgOrderValue": 377.64,
       "avgPrepTimeMinutes": 20.5,
       "avgCustomerRating": 4.43,
       "totalVegItemsSold": 55284,
       "totalNonVegItemsSold": 11314,
-      "vegSalesSharePercent": 83.0,
-      "nonVegSalesSharePercent": 17.0,
+      "vegSalesSharePercent": 83,
+      "nonVegSalesSharePercent": 17,
       "totalOperatingDays": 365
     },
     "peakAndLowPerformance": {
@@ -842,7 +636,7 @@
         "month": "July",
         "totalRevenue": 692663.89,
         "totalOrders": 1924,
-        "avgDailyRevenue": 22344.0,
+        "avgDailyRevenue": 22344,
         "avgPrepTime": 20.3,
         "avgRating": 4.41
       },
@@ -953,7 +747,7 @@
         "avgPrepDelayMin": 4.2,
         "estimatedRevenue": 535536.5,
         "primarySession": "Breakfast",
-        "recommendationBadge": "Chef Signature \u2022 Best in Hotel",
+        "recommendationBadge": "Chef Signature • Best in Hotel",
         "isBestInHotel": true
       },
       {
@@ -965,9 +759,9 @@
         "avgRating": 4.56,
         "ordersCount": 5008,
         "avgPrepDelayMin": 4.3,
-        "estimatedRevenue": 598271.0,
+        "estimatedRevenue": 598271,
         "primarySession": "Breakfast",
-        "recommendationBadge": "Chef Signature \u2022 Best in Hotel",
+        "recommendationBadge": "Chef Signature • Best in Hotel",
         "isBestInHotel": true
       },
       {
@@ -981,7 +775,7 @@
         "avgPrepDelayMin": 4.3,
         "estimatedRevenue": 510492.67,
         "primarySession": "Breakfast",
-        "recommendationBadge": "Chef Signature \u2022 Best in Hotel",
+        "recommendationBadge": "Chef Signature • Best in Hotel",
         "isBestInHotel": true
       },
       {
@@ -995,7 +789,7 @@
         "avgPrepDelayMin": 4.3,
         "estimatedRevenue": 688711.67,
         "primarySession": "Breakfast",
-        "recommendationBadge": "Chef Signature \u2022 Best in Hotel",
+        "recommendationBadge": "Chef Signature • Best in Hotel",
         "isBestInHotel": true
       },
       {
@@ -1003,13 +797,13 @@
         "name": "Lemon Ice Tea",
         "category": "Main Course",
         "price": 220,
-        "compositeScore": 87.0,
+        "compositeScore": 87,
         "avgRating": 4.47,
         "ordersCount": 6892,
-        "avgPrepDelayMin": 5.0,
+        "avgPrepDelayMin": 5,
         "estimatedRevenue": 767601.17,
         "primarySession": "Lunch",
-        "recommendationBadge": "Chef Signature \u2022 Best in Hotel",
+        "recommendationBadge": "Chef Signature • Best in Hotel",
         "isBestInHotel": true
       },
       {
@@ -1017,13 +811,13 @@
         "name": "Cold Coffee",
         "category": "Beverages",
         "price": 90,
-        "compositeScore": 87.0,
+        "compositeScore": 87,
         "avgRating": 4.47,
         "ordersCount": 7228,
         "avgPrepDelayMin": 5.1,
         "estimatedRevenue": 910453.33,
         "primarySession": "Lunch",
-        "recommendationBadge": "Chef Signature \u2022 Best in Hotel",
+        "recommendationBadge": "Chef Signature • Best in Hotel",
         "isBestInHotel": true
       },
       {
@@ -1063,7 +857,7 @@
         "avgRating": 4.34,
         "ordersCount": 3821,
         "avgPrepDelayMin": 6.3,
-        "estimatedRevenue": 600863.0,
+        "estimatedRevenue": 600863,
         "primarySession": "Lunch",
         "recommendationBadge": "Bestseller",
         "isBestInHotel": true
@@ -1207,7 +1001,7 @@
         },
         {
           "pairedWith": "Cheese Pizza",
-          "confidence": 21.0,
+          "confidence": 21,
           "coOrders": 1517
         },
         {
@@ -1246,7 +1040,7 @@
         },
         {
           "pairedWith": "Cold Coffee",
-          "confidence": 31.0,
+          "confidence": 31,
           "coOrders": 1517
         },
         {
@@ -1292,8 +1086,8 @@
     {
       "loyalty_tier": "Bronze",
       "customer_count": 1200,
-      "avg_spend": 394.0,
-      "avg_visits": 2.0
+      "avg_spend": 394,
+      "avg_visits": 2
     },
     {
       "loyalty_tier": "Gold",
@@ -1311,7 +1105,7 @@
       "loyalty_tier": "Silver",
       "customer_count": 1200,
       "avg_spend": 387.1,
-      "avg_visits": 6.0
+      "avg_visits": 6
     }
   ]
 }

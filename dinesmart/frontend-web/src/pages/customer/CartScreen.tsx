@@ -136,6 +136,33 @@ export const CartScreen: React.FC<CartScreenProps> = ({ onOrderPlaced, onNavigat
     setCustomTip('');
   };
 
+  // Automatically re-validate active coupon whenever cart/subtotal changes
+  useEffect(() => {
+    if (!activeCoupon) return;
+
+    let minOrder = 0;
+    const foundPromo = promotions.find(p => p.code.toUpperCase() === activeCoupon && p.active);
+    if (foundPromo) {
+      minOrder = Number(foundPromo.min_bill || foundPromo.minBill || 0);
+    } else if (activeCoupon === 'WELCOME50') {
+      minOrder = 150;
+    } else if (activeCoupon === 'SAVE20' || activeCoupon === 'FESTIVE20') {
+      minOrder = 300;
+    } else if (activeCoupon === 'LOYA100') {
+      minOrder = 250;
+    }
+
+    if (subtotal < minOrder) {
+      setActiveCoupon(null);
+      setCouponSuccess('');
+      setCouponError(`Coupon ${activeCoupon} removed: minimum order of ₹${minOrder} is required (cart is now ₹${subtotal}).`);
+    } else if (activeCoupon === 'LOYA100' && (!profile || profile.points < 100)) {
+      setActiveCoupon(null);
+      setCouponSuccess('');
+      setCouponError('Coupon LOYA100 removed: 100 loyalty points required.');
+    }
+  }, [subtotal, cart, activeCoupon, promotions, profile]);
+
   const handleCustomTipChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.replace(/\D/g, '');
     setCustomTip(val);

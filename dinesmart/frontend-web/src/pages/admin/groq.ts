@@ -256,7 +256,7 @@ export async function getAIBusinessSuggestions(orders: any[], menu: any[]): Prom
     }
   ]`;
 
-  const userPrompt = `We have menu: ${JSON.stringify(menu.slice(0, 15).map(m => ({name: m.name, price: m.price})))} and order count: ${orders.length}. Suggest pricing optimization, combos, and items to highlight.`;
+  const userPrompt = `We have menu: ${JSON.stringify(menu.slice(0, 15).map(m => ({ name: m.name, price: m.price })))} and order count: ${orders.length}. Suggest pricing optimization, combos, and items to highlight.`;
 
   try {
     return await callGroqAPI(systemPrompt, userPrompt, 0.3) as BusinessSuggestion[];
@@ -376,7 +376,7 @@ function retrieveRelevantContext(query: string, liveData: any): string {
     const itemDesc = (item.description || '').toLowerCase();
 
     if (q.includes(itemName) || itemName.split(' ').some((w: string) => w.length > 3 && q.includes(w)) ||
-        q.includes(itemCat) || (q.includes('veg') && item.isVeg) || (q.includes('gluten') && item.dietary.includes('Gluten-Free'))) {
+      q.includes(itemCat) || (q.includes('veg') && item.isVeg) || (q.includes('gluten') && item.dietary.includes('Gluten-Free'))) {
       matchedDishes.push(item);
     }
   }
@@ -384,14 +384,14 @@ function retrieveRelevantContext(query: string, liveData: any): string {
   // If general inquiry or no direct match, provide popular representative dishes
   const selectedDishes = matchedDishes.length > 0 ? matchedDishes.slice(0, 8) : ENRICHED_MENU.slice(0, 6);
 
-  const menuChunk = selectedDishes.map(d => 
+  const menuChunk = selectedDishes.map(d =>
     `• ${d.name} (Category: ${d.category}) | Price: ₹${d.price} | Veg: ${d.isVeg ? 'Yes' : 'No'} | Spice: ${d.spicyLevel}/3 | Calories: ${d.calories} kcal | Allergens: ${d.allergens.join(', ')} | Description: ${d.description}`
   ).join('\n');
 
   // Match policies
-  const matchedPolicies = RESTAURANT_KNOWLEDGE_BASE.policies.filter(p => 
-    q.includes(p.topic.toLowerCase()) || 
-    q.includes('tax') || q.includes('gst') || q.includes('cancel') || q.includes('allergen') || 
+  const matchedPolicies = RESTAURANT_KNOWLEDGE_BASE.policies.filter(p =>
+    q.includes(p.topic.toLowerCase()) ||
+    q.includes('tax') || q.includes('gst') || q.includes('cancel') || q.includes('allergen') ||
     q.includes('payment') || q.includes('tip') || q.includes('reserve') || q.includes('hour') || q.includes('time')
   );
 
@@ -415,11 +415,11 @@ function retrieveRelevantContext(query: string, liveData: any): string {
   let operationalSummary = 'Live operational metrics: Normal service in progress.';
   if (liveData) {
     const ordersCount = Array.isArray(liveData.orders) ? liveData.orders.length : 0;
-    const totalRev = Array.isArray(liveData.orders) 
+    const totalRev = Array.isArray(liveData.orders)
       ? liveData.orders.reduce((sum: number, o: any) => sum + (o.total || o.subtotal || 0), 0)
       : 0;
-    const activeTables = Array.isArray(liveData.tables) 
-      ? liveData.tables.filter((t: any) => t.status !== 'Available').length 
+    const activeTables = Array.isArray(liveData.tables)
+      ? liveData.tables.filter((t: any) => t.status !== 'Available').length
       : 0;
     const staffCount = Array.isArray(liveData.staff) ? liveData.staff.length : 0;
 
@@ -428,7 +428,7 @@ function retrieveRelevantContext(query: string, liveData: any): string {
 
   // Top 5 Best in Hotel dishes from ML model and order analytics
   const topDishes = (liveData?.mlBestDishes || mlData.bestInHotel || []).slice(0, 5);
-  const topDishesChunk = topDishes.map((d: any, idx: number) => 
+  const topDishesChunk = topDishes.map((d: any, idx: number) =>
     `#${idx + 1}: ${d.name} | Category: ${d.category} | Price: ₹${d.price} | Rating: ${d.avgRating || 4.8}★ | Orders: ${d.ordersCount || 890}+ | Badge: ${d.recommendationBadge || 'Chef Signature'}`
   ).join('\n');
 
@@ -514,15 +514,15 @@ export async function askBhakasuraAI(history: { role: string; content: string }[
     return result.answer;
   } catch (error) {
     console.error('RAG Orchestrator error in askBhakasuraAI:', error);
-    return `### Service Notice
+    const validOrders = (contextData?.orders || []).filter((o: any) => o.status !== 'Cancelled');
+    const totalRev = validOrders.reduce((sum: number, o: any) => sum + (Number(o.total) || 0), 0);
+    const activeCount = validOrders.filter((o: any) => o.status === 'Confirmed' || o.status === 'Preparing' || o.status === 'Ready to Serve').length;
+    const occupiedTables = (contextData?.tables || []).filter((t: any) => t.status !== 'Available').length;
+    const totalTables = (contextData?.tables || []).length;
 
-I am operating in verified safe mode with TableTap's 1-year historical dataset and live operations.
+    return `Currently monitoring live operations. You have **${activeCount} active orders** in progress, **${occupiedTables}/${totalTables || 12} tables occupied**, and **₹${totalRev.toLocaleString('en-IN')}** recorded revenue.
 
-- **Verified Track Record**: ₹89,53,131.50 gross revenue across 23,708 dining orders.
-- **Operating Status**: 7:00 AM – 11:30 PM daily service.
-- **GST Standard**: 5% dining GST.
-
-Please ask any specific question regarding menu items, kitchen preparation times, pricing, or hotel revenue metrics.`;
+Please feel free to ask about our menu dishes, pricing, dietary options (veg/vegan), or staff on duty.`;
   }
 }
 

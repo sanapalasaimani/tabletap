@@ -143,6 +143,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
 
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [ordersSearchQuery, setOrdersSearchQuery] = useState('');
+  const [ordersStatusFilter, setOrdersStatusFilter] = useState<string>('All');
+  const [ordersCurrentPage, setOrdersCurrentPage] = useState(1);
 
   // Strictly enforce clean white mode
   useEffect(() => {
@@ -1042,13 +1045,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                 <button
                   onClick={() => setActiveTab('overview')}
                   className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'overview'
-                      ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
+                    ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
                     }`}
                 >
                   <LayoutDashboard size={15} className={activeTab === 'overview' ? 'text-[#FF6B00]' : 'text-slate-400'} />
                   <span>Overview & Home</span>
                   {activeTab === 'overview' && <ChevronRight size={13} className="ml-auto text-[#FF6B00]" />}
+                </button>
+                <button
+                  onClick={() => { setActiveTab('orders'); setOrdersStatusFilter('All'); setOrdersCurrentPage(1); }}
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'orders'
+                    ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
+                    }`}
+                >
+                  <ShoppingBag size={15} className={activeTab === 'orders' ? 'text-[#FF6B00]' : 'text-slate-400'} />
+                  <span>Orders Management</span>
+                  {activeTab === 'orders' && <ChevronRight size={13} className="ml-auto text-[#FF6B00]" />}
                 </button>
               </nav>
             </div>
@@ -1059,8 +1073,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                 <button
                   onClick={() => setActiveTab('menu')}
                   className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'menu'
-                      ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
+                    ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
                     }`}
                 >
                   <BookOpen size={15} className={activeTab === 'menu' ? 'text-[#FF6B00]' : 'text-slate-400'} />
@@ -1070,8 +1084,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                 <button
                   onClick={() => setActiveTab('qrcodes')}
                   className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'qrcodes'
-                      ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
+                    ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
                     }`}
                 >
                   <QrCode size={15} className={activeTab === 'qrcodes' ? 'text-[#FF6B00]' : 'text-slate-400'} />
@@ -1087,8 +1101,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                 <button
                   onClick={() => setActiveTab('staff')}
                   className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'staff'
-                      ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
+                    ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
                     }`}
                 >
                   <UserCheck size={15} className={activeTab === 'staff' ? 'text-[#FF6B00]' : 'text-slate-400'} />
@@ -1104,8 +1118,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                 <button
                   onClick={() => setActiveTab('loyalty')}
                   className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'loyalty'
-                      ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
+                    ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
                     }`}
                 >
                   <Award size={15} className={activeTab === 'loyalty' ? 'text-[#FF6B00]' : 'text-slate-400'} />
@@ -1115,8 +1129,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                 <button
                   onClick={() => setActiveTab('promotions')}
                   className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'promotions'
-                      ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
+                    ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
                     }`}
                 >
                   <Megaphone size={15} className={activeTab === 'promotions' ? 'text-[#FF6B00]' : 'text-slate-400'} />
@@ -1132,8 +1146,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                 <button
                   onClick={() => setActiveTab('reports')}
                   className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'reports'
-                      ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
+                    ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
                     }`}
                 >
                   <BarChart3 size={15} className={activeTab === 'reports' ? 'text-[#FF6B00]' : 'text-slate-400'} />
@@ -1143,8 +1157,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                 <button
                   onClick={() => setActiveTab('reviews')}
                   className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'reviews'
-                      ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
+                    ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
                     }`}
                 >
                   <MessageSquare size={15} className={activeTab === 'reviews' ? 'text-[#FF6B00]' : 'text-slate-400'} />
@@ -1160,8 +1174,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                 <button
                   onClick={() => { setActiveTab('settings'); setSettingsForm((prev: any) => prev || { ...alertSettings }); }}
                   className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'settings'
-                      ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
+                    ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
                     }`}
                 >
                   <Settings size={15} className={activeTab === 'settings' ? 'text-[#FF6B00]' : 'text-slate-400'} />
@@ -1171,8 +1185,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                 <button
                   onClick={() => setActiveTab('security')}
                   className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'security'
-                      ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
+                    ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
                     }`}
                 >
                   <Shield size={15} className={activeTab === 'security' ? 'text-[#FF6B00]' : 'text-slate-400'} />
@@ -1369,15 +1383,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                   </div>
                 </div>
 
-                {/* 2. TOP KPI CARDS (4 CARDS FROM FIGMA DESIGN) */}
+                {/* 2. TOP KPI CARDS (4 CLICKABLE CARDS NAVIGATING TO FILTERED VIEWS) */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   {/* Card 1: Today's Revenue */}
-                  <div className="p-5 rounded-2xl border bg-white border-slate-200/90 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between">
+                  <div
+                    onClick={() => setActiveTab('reports')}
+                    className="p-5 rounded-2xl border bg-white border-slate-200/90 shadow-2xs hover:shadow-md hover:border-[#FF6B00]/60 hover:scale-[1.01] active:scale-[0.99] transition-all flex flex-col justify-between cursor-pointer group"
+                    title="Click to view detailed Hotel Reports & Revenue Analytics"
+                  >
                     <div className="flex items-start justify-between">
-                      <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-[#FF6B00]">
+                      <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-[#FF6B00] group-hover:bg-[#FF6B00] group-hover:text-white transition-colors">
                         <CreditCard size={18} />
                       </div>
-                      <span className="text-slate-300 font-bold tracking-widest text-xs cursor-pointer hover:text-slate-500">•••</span>
+                      <span className="text-xs font-bold text-slate-400 group-hover:text-[#FF6B00] flex items-center gap-0.5 transition-colors">
+                        <span>Reports</span>
+                        <ArrowUpRight size={14} />
+                      </span>
                     </div>
                     <div className="mt-4">
                       <span className="text-xs font-semibold text-slate-400 block">Today's Revenue</span>
@@ -1391,12 +1412,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                   </div>
 
                   {/* Card 2: Active Orders */}
-                  <div className="p-5 rounded-2xl border bg-white border-slate-200/90 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between">
+                  <div
+                    onClick={() => {
+                      setActiveTab('orders');
+                      setOrdersStatusFilter('Active');
+                      setOrdersSearchQuery('');
+                      setOrdersCurrentPage(1);
+                    }}
+                    className="p-5 rounded-2xl border bg-white border-slate-200/90 shadow-2xs hover:shadow-md hover:border-sky-400 hover:scale-[1.01] active:scale-[0.99] transition-all flex flex-col justify-between cursor-pointer group"
+                    title="Click to view Active Orders List"
+                  >
                     <div className="flex items-start justify-between">
-                      <div className="w-10 h-10 rounded-xl bg-sky-50 flex items-center justify-center text-sky-500">
+                      <div className="w-10 h-10 rounded-xl bg-sky-50 flex items-center justify-center text-sky-500 group-hover:bg-sky-500 group-hover:text-white transition-colors">
                         <Activity size={18} />
                       </div>
-                      <span className="text-slate-300 font-bold tracking-widest text-xs cursor-pointer hover:text-slate-500">•••</span>
+                      <span className="text-xs font-bold text-slate-400 group-hover:text-sky-500 flex items-center gap-0.5 transition-colors">
+                        <span>Live Orders</span>
+                        <ArrowUpRight size={14} />
+                      </span>
                     </div>
                     <div className="mt-4">
                       <span className="text-xs font-semibold text-slate-400 block">Active Orders</span>
@@ -1410,12 +1443,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                   </div>
 
                   {/* Card 3: Tables Occupied */}
-                  <div className="p-5 rounded-2xl border bg-white border-slate-200/90 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between">
+                  <div
+                    onClick={() => setActiveTab('qrcodes')}
+                    className="p-5 rounded-2xl border bg-white border-slate-200/90 shadow-2xs hover:shadow-md hover:border-indigo-400 hover:scale-[1.01] active:scale-[0.99] transition-all flex flex-col justify-between cursor-pointer group"
+                    title="Click to manage Floor Tables & QR Codes"
+                  >
                     <div className="flex items-start justify-between">
-                      <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-500">
+                      <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-500 group-hover:bg-indigo-500 group-hover:text-white transition-colors">
                         <Layers size={18} />
                       </div>
-                      <span className="text-slate-300 font-bold tracking-widest text-xs cursor-pointer hover:text-slate-500">•••</span>
+                      <span className="text-xs font-bold text-slate-400 group-hover:text-indigo-500 flex items-center gap-0.5 transition-colors">
+                        <span>Floor Plan</span>
+                        <ArrowUpRight size={14} />
+                      </span>
                     </div>
                     <div className="mt-4">
                       <span className="text-xs font-semibold text-slate-400 block">Tables Occupied</span>
@@ -1430,12 +1470,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                   </div>
 
                   {/* Card 4: Staff on Duty */}
-                  <div className="p-5 rounded-2xl border bg-white border-slate-200/90 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between">
+                  <div
+                    onClick={() => setActiveTab('staff')}
+                    className="p-5 rounded-2xl border bg-white border-slate-200/90 shadow-2xs hover:shadow-md hover:border-emerald-400 hover:scale-[1.01] active:scale-[0.99] transition-all flex flex-col justify-between cursor-pointer group"
+                    title="Click to view Staff Roster & Waiters"
+                  >
                     <div className="flex items-start justify-between">
-                      <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-500">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-500 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
                         <Users size={18} />
                       </div>
-                      <span className="text-slate-300 font-bold tracking-widest text-xs cursor-pointer hover:text-slate-500">•••</span>
+                      <span className="text-xs font-bold text-slate-400 group-hover:text-emerald-500 flex items-center gap-0.5 transition-colors">
+                        <span>Staff</span>
+                        <ArrowUpRight size={14} />
+                      </span>
                     </div>
                     <div className="mt-4">
                       <span className="text-xs font-semibold text-slate-400 block">Staff on Duty</span>
@@ -1466,8 +1513,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                               key={tf}
                               onClick={() => setRevenueTimeframe(tf)}
                               className={`px-3 py-1 rounded-lg text-xs font-bold capitalize transition-all cursor-pointer ${revenueTimeframe === tf
-                                  ? 'bg-white text-slate-900 shadow-2xs'
-                                  : 'text-slate-500 hover:text-slate-800'
+                                ? 'bg-white text-slate-900 shadow-2xs'
+                                : 'text-slate-500 hover:text-slate-800'
                                 }`}
                             >
                               {tf}
@@ -1601,7 +1648,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                         <p className="text-xs text-slate-400 mt-0.5">Latest orders across all service areas</p>
                       </div>
                       <button
-                        onClick={() => setActiveTab('orders')}
+                        onClick={() => {
+                          setActiveTab('orders');
+                          setOrdersStatusFilter('All');
+                          setOrdersSearchQuery('');
+                          setOrdersCurrentPage(1);
+                        }}
                         className="text-xs font-bold text-[#FF6B00] hover:text-orange-600 flex items-center gap-0.5 cursor-pointer"
                       >
                         <span>View all orders</span>
@@ -1640,10 +1692,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                                 </td>
                                 <td className="py-3 px-3 text-center">
                                   <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold inline-block ${order.status === 'Preparing'
-                                      ? 'bg-orange-50 text-orange-600 border border-orange-200/50'
-                                      : (order.status === 'Ready to Serve' || (order.status as any) === 'Ready')
-                                        ? 'bg-sky-50 text-sky-600 border border-sky-200/50'
-                                        : 'bg-emerald-50 text-emerald-600 border border-emerald-200/50'
+                                    ? 'bg-orange-50 text-orange-600 border border-orange-200/50'
+                                    : (order.status === 'Ready to Serve' || (order.status as any) === 'Ready')
+                                      ? 'bg-sky-50 text-sky-600 border border-sky-200/50'
+                                      : 'bg-emerald-50 text-emerald-600 border border-emerald-200/50'
                                     }`}>
                                     {order.status}
                                   </span>
@@ -1835,6 +1887,375 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
           })()}
 
           {/* ----------------------------------------------------
+              VIEW: ORDERS MANAGEMENT (FULL LIST, SEARCH & FILTERS)
+              ---------------------------------------------------- */}
+          {activeTab === 'orders' && (() => {
+            const filteredOrders = orders.filter(o => {
+              // Status filter
+              if (ordersStatusFilter === 'Active') {
+                if (!(o.status === 'Confirmed' || o.status === 'Preparing' || o.status === 'Ready to Serve')) return false;
+              } else if (ordersStatusFilter !== 'All') {
+                if (o.status !== ordersStatusFilter) return false;
+              }
+
+              // Search query filter (Order ID, Table, Customer Phone, Dish name)
+              if (ordersSearchQuery.trim()) {
+                const q = ordersSearchQuery.toLowerCase().trim();
+                const idMatch = o.id.toLowerCase().includes(q);
+                const tableMatch = String(o.tableId).toLowerCase().includes(q);
+                const phoneMatch = o.customerPhone ? o.customerPhone.toLowerCase().includes(q) : false;
+                const itemsMatch = o.items && o.items.some(it => (it.name || (it as any).menuItem?.name || '').toLowerCase().includes(q));
+                if (!idMatch && !tableMatch && !phoneMatch && !itemsMatch) return false;
+              }
+              return true;
+            });
+
+            // Pagination calculation
+            const ordersPerPage = 10;
+            const totalPages = Math.ceil(filteredOrders.length / ordersPerPage) || 1;
+            const currentPage = Math.min(Math.max(1, ordersCurrentPage), totalPages);
+            const paginatedOrders = filteredOrders.slice((currentPage - 1) * ordersPerPage, currentPage * ordersPerPage);
+
+            const activeOrdersTotal = orders.filter(o => o.status === 'Confirmed' || o.status === 'Preparing' || o.status === 'Ready to Serve').length;
+            const deliveredOrdersTotal = orders.filter(o => o.status === 'Delivered').length;
+            const cancelledOrdersTotal = orders.filter(o => o.status === 'Cancelled').length;
+            const confirmedOrdersTotal = orders.filter(o => o.status === 'Confirmed').length;
+            const preparingOrdersTotal = orders.filter(o => o.status === 'Preparing').length;
+            const readyOrdersTotal = orders.filter(o => o.status === 'Ready to Serve').length;
+
+            return (
+              <div className="space-y-6 animate-fade-in max-w-7xl mx-auto">
+                {/* Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-black uppercase tracking-widest text-[#FF6B00]">
+                        OPERATIONS
+                      </span>
+                      <span className="text-slate-300">•</span>
+                      <span className="text-xs font-bold text-slate-500">Live POS & Kitchen</span>
+                    </div>
+                    <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 mt-0.5">
+                      Orders Management
+                    </h1>
+                    <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
+                      Monitor real-time table orders, kitchen queue progression, and bill settlements.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={fetchData}
+                      className="px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:border-slate-300 hover:text-slate-900 flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                      title="Sync live orders"
+                    >
+                      <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
+                      <span>Refresh</span>
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('overview')}
+                      className="px-3.5 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 flex items-center gap-1.5 shadow-xs cursor-pointer"
+                    >
+                      <LayoutDashboard size={13} />
+                      <span>Overview</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* KPI mini-bar */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div
+                    onClick={() => { setOrdersStatusFilter('All'); setOrdersCurrentPage(1); }}
+                    className={`p-4 rounded-2xl border transition-all cursor-pointer ${ordersStatusFilter === 'All' ? 'bg-orange-50/50 border-[#FF6B00]/40 shadow-xs' : 'bg-white border-slate-200/80 hover:border-slate-300'}`}
+                  >
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Total Orders</span>
+                    <strong className="text-xl font-black text-slate-900 mt-1 block">{orders.length}</strong>
+                  </div>
+                  <div
+                    onClick={() => { setOrdersStatusFilter('Active'); setOrdersCurrentPage(1); }}
+                    className={`p-4 rounded-2xl border transition-all cursor-pointer ${ordersStatusFilter === 'Active' ? 'bg-sky-50/50 border-sky-400/40 shadow-xs' : 'bg-white border-slate-200/80 hover:border-slate-300'}`}
+                  >
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-sky-600 block">Active Orders</span>
+                    <strong className="text-xl font-black text-sky-600 mt-1 block">{activeOrdersTotal}</strong>
+                  </div>
+                  <div
+                    onClick={() => { setOrdersStatusFilter('Delivered'); setOrdersCurrentPage(1); }}
+                    className={`p-4 rounded-2xl border transition-all cursor-pointer ${ordersStatusFilter === 'Delivered' ? 'bg-emerald-50/50 border-emerald-400/40 shadow-xs' : 'bg-white border-slate-200/80 hover:border-slate-300'}`}
+                  >
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 block">Delivered</span>
+                    <strong className="text-xl font-black text-emerald-600 mt-1 block">{deliveredOrdersTotal}</strong>
+                  </div>
+                  <div
+                    onClick={() => { setOrdersStatusFilter('Cancelled'); setOrdersCurrentPage(1); }}
+                    className={`p-4 rounded-2xl border transition-all cursor-pointer ${ordersStatusFilter === 'Cancelled' ? 'bg-rose-50/50 border-rose-400/40 shadow-xs' : 'bg-white border-slate-200/80 hover:border-slate-300'}`}
+                  >
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 block">Cancelled</span>
+                    <strong className="text-xl font-black text-rose-600 mt-1 block">{cancelledOrdersTotal}</strong>
+                  </div>
+                </div>
+
+                {/* Filters, Search & Tabs */}
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs space-y-3">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                    {/* Status Tabs */}
+                    <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
+                      {[
+                        { id: 'All', label: 'All', count: orders.length },
+                        { id: 'Active', label: 'Active', count: activeOrdersTotal },
+                        { id: 'Confirmed', label: 'Confirmed', count: confirmedOrdersTotal },
+                        { id: 'Preparing', label: 'Preparing', count: preparingOrdersTotal },
+                        { id: 'Ready to Serve', label: 'Ready', count: readyOrdersTotal },
+                        { id: 'Delivered', label: 'Delivered', count: deliveredOrdersTotal },
+                        { id: 'Cancelled', label: 'Cancelled', count: cancelledOrdersTotal }
+                      ].map((tab) => {
+                        const isActive = ordersStatusFilter === tab.id;
+                        return (
+                          <button
+                            key={tab.id}
+                            onClick={() => {
+                              setOrdersStatusFilter(tab.id);
+                              setOrdersCurrentPage(1);
+                            }}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${isActive
+                              ? 'bg-[#FF6B00] text-white shadow-xs'
+                              : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                              }`}
+                          >
+                            <span>{tab.label}</span>
+                            <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${isActive ? 'bg-black/20 text-white' : 'bg-slate-200/80 text-slate-600'}`}>
+                              {tab.count}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Search Input */}
+                    <div className="relative min-w-[260px]">
+                      <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
+                        value={ordersSearchQuery}
+                        onChange={(e) => {
+                          setOrdersSearchQuery(e.target.value);
+                          setOrdersCurrentPage(1);
+                        }}
+                        placeholder="Search order ID, table, phone, dish..."
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-8 py-2 text-xs text-slate-800 placeholder-slate-400 font-medium outline-hidden focus:border-[#FF6B00] focus:bg-white transition-all"
+                      />
+                      {ordersSearchQuery && (
+                        <button
+                          onClick={() => { setOrdersSearchQuery(''); setOrdersCurrentPage(1); }}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Orders Table Container */}
+                <div className="bg-white border border-slate-200/90 rounded-2xl shadow-2xs overflow-hidden">
+                  <div className="overflow-x-auto no-scrollbar">
+                    <table className="w-full text-left text-xs">
+                      <thead className="text-[10px] uppercase font-bold tracking-wider text-slate-400 bg-slate-50/70 border-b border-slate-200/80">
+                        <tr>
+                          <th className="py-3 px-4">Order ID & Time</th>
+                          <th className="py-3 px-4">Table & Guest</th>
+                          <th className="py-3 px-4">Ordered Items</th>
+                          <th className="py-3 px-4">Amount</th>
+                          <th className="py-3 px-4">Payment</th>
+                          <th className="py-3 px-4">Status</th>
+                          <th className="py-3 px-4 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {paginatedOrders.length === 0 ? (
+                          <tr>
+                            <td colSpan={7} className="text-center py-12 text-slate-400">
+                              <ShoppingBag size={32} className="mx-auto mb-2 text-slate-300" />
+                              <p className="font-bold text-sm text-slate-600">No orders found</p>
+                              <p className="text-xs text-slate-400 mt-1">Try clearing your filters or search query.</p>
+                            </td>
+                          </tr>
+                        ) : (
+                          paginatedOrders.map((order) => {
+                            const formattedTime = order.createdAt
+                              ? new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                              : 'Just now';
+                            const formattedDate = order.createdAt
+                              ? new Date(order.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric' })
+                              : '';
+
+                            // Status badge colors
+                            let statusBadge = 'bg-slate-100 text-slate-600 border-slate-200';
+                            if (order.status === 'Confirmed') statusBadge = 'bg-blue-50 text-blue-700 border-blue-200';
+                            else if (order.status === 'Preparing') statusBadge = 'bg-amber-50 text-amber-700 border-amber-200';
+                            else if (order.status === 'Ready to Serve') statusBadge = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                            else if (order.status === 'Delivered') statusBadge = 'bg-slate-50 text-slate-700 border-slate-200';
+                            else if (order.status === 'Cancelled') statusBadge = 'bg-rose-50 text-rose-700 border-rose-200';
+
+                            return (
+                              <tr key={order.id} className="hover:bg-slate-50/50 transition-colors">
+                                {/* Order ID & Time */}
+                                <td className="py-3 px-4">
+                                  <div className="font-mono font-bold text-slate-900 text-xs">
+                                    #{order.id.slice(-6)}
+                                  </div>
+                                  <div className="text-[10px] text-slate-400 mt-0.5">
+                                    {formattedTime} • {formattedDate}
+                                  </div>
+                                </td>
+
+                                {/* Table & Guest */}
+                                <td className="py-3 px-4">
+                                  <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-orange-50 border border-orange-100 text-xs font-bold text-[#FF6B00]">
+                                    Table {order.tableId}
+                                  </div>
+                                  <div className="text-[10px] text-slate-400 mt-1">
+                                    {order.customerPhone ? `📞 ${order.customerPhone}` : 'Guest at Table'}
+                                  </div>
+                                </td>
+
+                                {/* Items Breakdown */}
+                                <td className="py-3 px-4 max-w-[280px]">
+                                  <div className="space-y-1">
+                                    {order.items && order.items.map((item, idx) => (
+                                      <div key={idx} className="text-xs text-slate-700 flex items-center justify-between">
+                                        <span className="truncate pr-2 font-medium">
+                                          <strong className="text-slate-900 font-bold">{item.quantity}x</strong> {item.name || (item as any).menuItem?.name}
+                                        </span>
+                                        <span className="text-[11px] text-slate-400">
+                                          ₹{((item.price || (item as any).menuItem?.price || 0) * item.quantity)}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </td>
+
+                                {/* Total Amount */}
+                                <td className="py-3 px-4 whitespace-nowrap">
+                                  <div className="font-extrabold text-slate-900 text-xs">
+                                    ₹{Number(order.total || 0).toLocaleString('en-IN')}
+                                  </div>
+                                  <div className="text-[10px] text-slate-400 mt-0.5">
+                                    Subtotal: ₹{order.subtotal || 0}
+                                    {Number(order.tip || 0) > 0 && ` + Tip ₹${order.tip}`}
+                                  </div>
+                                </td>
+
+                                {/* Payment Status */}
+                                <td className="py-3 px-4 whitespace-nowrap">
+                                  {order.paymentStatus === 'Paid' ? (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                      <Check size={10} />
+                                      <span>Paid ({order.paymentMethod || 'UPI'})</span>
+                                    </span>
+                                  ) : (
+                                    <div className="flex flex-col gap-1 items-start">
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                        Pending Bill
+                                      </span>
+                                      <button
+                                        onClick={() => handlePayOrder(order.id, 'Cash')}
+                                        className="text-[10px] font-bold text-[#FF6B00] hover:underline cursor-pointer"
+                                      >
+                                        Mark Paid (Cash)
+                                      </button>
+                                    </div>
+                                  )}
+                                </td>
+
+                                {/* Order Status */}
+                                <td className="py-3 px-4 whitespace-nowrap">
+                                  <span className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-bold border ${statusBadge}`}>
+                                    {order.status}
+                                  </span>
+                                </td>
+
+                                {/* Action Progression Buttons */}
+                                <td className="py-3 px-4 text-right whitespace-nowrap">
+                                  <div className="inline-flex items-center gap-1.5 justify-end">
+                                    {order.status === 'Confirmed' && (
+                                      <button
+                                        onClick={() => handleUpdateOrderStatus(order.id, 'Preparing')}
+                                        className="px-2.5 py-1 rounded-lg bg-amber-500 text-white font-bold text-[11px] hover:bg-amber-600 transition-colors shadow-2xs cursor-pointer"
+                                      >
+                                        Start Cooking
+                                      </button>
+                                    )}
+                                    {order.status === 'Preparing' && (
+                                      <button
+                                        onClick={() => handleUpdateOrderStatus(order.id, 'Ready to Serve')}
+                                        className="px-2.5 py-1 rounded-lg bg-emerald-600 text-white font-bold text-[11px] hover:bg-emerald-700 transition-colors shadow-2xs cursor-pointer"
+                                      >
+                                        Mark Ready
+                                      </button>
+                                    )}
+                                    {order.status === 'Ready to Serve' && (
+                                      <button
+                                        onClick={() => handleUpdateOrderStatus(order.id, 'Delivered')}
+                                        className="px-2.5 py-1 rounded-lg bg-slate-800 text-white font-bold text-[11px] hover:bg-slate-900 transition-colors shadow-2xs cursor-pointer"
+                                      >
+                                        Mark Delivered
+                                      </button>
+                                    )}
+                                    {order.status !== 'Delivered' && order.status !== 'Cancelled' && (
+                                      <button
+                                        onClick={() => {
+                                          if (confirm(`Cancel Order #${order.id.slice(-6)}?`)) {
+                                            handleUpdateOrderStatus(order.id, 'Cancelled');
+                                          }
+                                        }}
+                                        className="px-2 py-1 rounded-lg border border-rose-200 text-rose-600 font-bold text-[11px] hover:bg-rose-50 transition-colors cursor-pointer"
+                                        title="Cancel order"
+                                      >
+                                        Cancel
+                                      </button>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Pagination Footer */}
+                  {filteredOrders.length > 0 && (
+                    <div className="p-4 bg-slate-50/60 border-t border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-500">
+                      <div>
+                        Showing <strong className="text-slate-800">{(currentPage - 1) * ordersPerPage + 1}</strong> to <strong className="text-slate-800">{Math.min(currentPage * ordersPerPage, filteredOrders.length)}</strong> of <strong className="text-slate-800">{filteredOrders.length}</strong> orders
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          disabled={currentPage <= 1}
+                          onClick={() => setOrdersCurrentPage(prev => Math.max(1, prev - 1))}
+                          className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs cursor-pointer"
+                        >
+                          Previous
+                        </button>
+                        <span className="px-2.5 py-1 text-xs font-bold text-slate-700">
+                          {currentPage} / {totalPages}
+                        </span>
+                        <button
+                          disabled={currentPage >= totalPages}
+                          onClick={() => setOrdersCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                          className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs cursor-pointer"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* ----------------------------------------------------
               VIEW 4: MENU CATALOG
               ---------------------------------------------------- */}
           {activeTab === 'menu' && (() => {
@@ -1867,8 +2288,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                         key={cat}
                         onClick={() => setMenuFilterCategory(cat)}
                         className={`text-xs px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${menuFilterCategory === cat
-                            ? 'bg-primary text-white shadow-sm'
-                            : 'bg-gray-100  text-gray-500 hover:text-black dark:hover:text-white'
+                          ? 'bg-primary text-white shadow-sm'
+                          : 'bg-gray-100  text-gray-500 hover:text-black dark:hover:text-white'
                           }`}
                       >
                         {cat}
@@ -2902,11 +3323,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                             </div>
                             <div
                               style={{ height: `${pct}%` }}
-                              className={`w-full rounded-t-sm transition-all cursor-pointer ${
-                                amount > 0
-                                  ? 'bg-[#ff7f24] hover:bg-[#ea580c] shadow-xs'
-                                  : 'bg-slate-200 hover:bg-slate-300'
-                              }`}
+                              className={`w-full rounded-t-sm transition-all cursor-pointer ${amount > 0
+                                ? 'bg-[#ff7f24] hover:bg-[#ea580c] shadow-xs'
+                                : 'bg-slate-200 hover:bg-slate-300'
+                                }`}
                             ></div>
                           </div>
                         );
@@ -3522,51 +3942,46 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                 <div className="flex flex-wrap items-center gap-2 pt-2 border-b border-slate-200 pb-3">
                   <button
                     onClick={() => setReviewFilter('all')}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      reviewFilter === 'all'
-                        ? 'bg-slate-900 text-white shadow-xs'
-                        : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-                    }`}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${reviewFilter === 'all'
+                      ? 'bg-slate-900 text-white shadow-xs'
+                      : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                      }`}
                   >
                     All Comments ({textReviews.length})
                   </button>
                   <button
                     onClick={() => setReviewFilter('positive')}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      reviewFilter === 'positive'
-                        ? 'bg-emerald-600 text-white shadow-xs'
-                        : 'bg-white text-emerald-700 border border-emerald-200 hover:bg-emerald-50'
-                    }`}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${reviewFilter === 'positive'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'bg-white text-emerald-700 border border-emerald-200 hover:bg-emerald-50'
+                      }`}
                   >
                     Positive ({posCount})
                   </button>
                   <button
                     onClick={() => setReviewFilter('neutral')}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      reviewFilter === 'neutral'
-                        ? 'bg-slate-600 text-white shadow-xs'
-                        : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-                    }`}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${reviewFilter === 'neutral'
+                      ? 'bg-slate-600 text-white shadow-xs'
+                      : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                      }`}
                   >
                     Neutral ({neutCount})
                   </button>
                   <button
                     onClick={() => setReviewFilter('critical')}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      reviewFilter === 'critical'
-                        ? 'bg-rose-600 text-white shadow-xs'
-                        : 'bg-white text-rose-700 border border-rose-200 hover:bg-rose-50'
-                    }`}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${reviewFilter === 'critical'
+                      ? 'bg-rose-600 text-white shadow-xs'
+                      : 'bg-white text-rose-700 border border-rose-200 hover:bg-rose-50'
+                      }`}
                   >
                     Action Needed ({critCount})
                   </button>
                   <button
                     onClick={() => setReviewFilter('unreplied')}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      reviewFilter === 'unreplied'
-                        ? 'bg-[#FF6B00] text-white shadow-xs'
-                        : 'bg-white text-[#FF6B00] border border-orange-200 hover:bg-orange-50'
-                    }`}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${reviewFilter === 'unreplied'
+                      ? 'bg-[#FF6B00] text-white shadow-xs'
+                      : 'bg-white text-[#FF6B00] border border-orange-200 hover:bg-orange-50'
+                      }`}
                   >
                     Needs Reply ({unrepliedCount})
                   </button>
@@ -4020,8 +4435,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                           }));
                         }}
                         className={`p-2 rounded-xl text-[10px] font-bold border transition-all cursor-pointer ${isSelected
-                            ? 'bg-orange-500 text-white border-orange-500 shadow-xs'
-                            : 'bg-white text-slate-600 border-slate-200 hover:border-orange-500'
+                          ? 'bg-orange-500 text-white border-orange-500 shadow-xs'
+                          : 'bg-white text-slate-600 border-slate-200 hover:border-orange-500'
                           }`}
                       >
                         Table #{table.id}

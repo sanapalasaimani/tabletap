@@ -45,12 +45,14 @@ export async function executeReadOnlySQL(sanitizedSql: string): Promise<SQLExecu
     };
   }
 
+  const cleanSql = sanitizedSql.trim().replace(/;+\s*$/, '');
+
   // 1. Primary Path: Attempt secure server-side RPC proxy if available
   try {
     const proxyResponse = await fetch('/api/analytics-sql', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: sanitizedSql }),
+      body: JSON.stringify({ query: cleanSql }),
     });
 
     if (proxyResponse.ok) {
@@ -58,7 +60,7 @@ export async function executeReadOnlySQL(sanitizedSql: string): Promise<SQLExecu
       const elapsed = Math.round(performance.now() - startTime);
       return {
         success: true,
-        sql: sanitizedSql,
+        sql: cleanSql,
         rows: Array.isArray(data) ? data : (data.rows || []),
         rowCount: Array.isArray(data) ? data.length : (data.rows?.length || 0),
         executionTimeMs: elapsed,
@@ -72,7 +74,7 @@ export async function executeReadOnlySQL(sanitizedSql: string): Promise<SQLExecu
   // 2. Secondary Path: Invoke Supabase RPC `execute_readonly_sql` directly
   try {
     const { data, error } = await supabase.rpc('execute_readonly_sql', {
-      query_text: sanitizedSql
+      query_text: cleanSql
     });
 
     const elapsed = Math.round(performance.now() - startTime);
@@ -81,11 +83,20 @@ export async function executeReadOnlySQL(sanitizedSql: string): Promise<SQLExecu
       // If RPC is missing because the migration hasn't been run yet in the console:
       console.warn(`[SQLExecutor] RPC call error: ${error.message}. Attempting direct table read fallback.`);
       
-      const fromMatch = sanitizedSql.match(/\bFROM\s+([a-zA-Z0-9_]+)/i);
-      if (fromMatch && fromMatch[1]) {
-        const table = fromMatch[1].toLowerCase();
+      const knownTables = ['orders', 'menu_items', 'staff', 'reviews', 'waiter_requests', 'loyalty_profiles', 'tables'];
+      const matchedTable = knownTables.find(t => new RegExp(`\\b${t}\\b`, 'i').test(sanitizedSql));
+      
+      if (matchedTable) {
         try {
-          const { data: tableData, error: tableErr } = await supabase.from(table).select('*').limit(50);
+          let queryBuilder = supabase.from(matchedTable).select('*');
+          if (matchedTable === 'staff') {
+            // Never expose password field
+            queryBuilder = supabase.from('staff').select('id, name, mobile, role, shift, salary, attendance, performance, empid');
+          } else if (matchedTable === 'orders') {
+            queryBuilder = queryBuilder.order('created_at', { ascending: false });
+          }
+          
+          const { data: tableData, error: tableErr } = await queryBuilder.limit(50);
           if (!tableErr && tableData && tableData.length > 0) {
             return {
               success: true,
@@ -123,6 +134,36 @@ export async function executeReadOnlySQL(sanitizedSql: string): Promise<SQLExecu
     };
   } catch (rpcErr: any) {
     const elapsed = Math.round(performance.now() - startTime);
+    console.warn(`[SQLExecutor] RPC exception: ${rpcErr?.message || rpcErr}. Attempting fallback.`);
+
+    const knownTables = ['orders', 'menu_items', 'staff', 'reviews', 'waiter_requests', 'loyalty_profiles', 'tables'];
+    const matchedTable = knownTables.find(t => new RegExp(`\\b${t}\\b`, 'i').test(sanitizedSql));
+    
+    if (matchedTable) {
+      try {
+        let queryBuilder = supabase.from(matchedTable).select('*');
+        if (matchedTable === 'staff') {
+          queryBuilder = supabase.from('staff').select('id, name, mobile, role, shift, salary, attendance, performance, empid');
+        } else if (matchedTable === 'orders') {
+          queryBuilder = queryBuilder.order('created_at', { ascending: false });
+        }
+        
+        const { data: tableData, error: tableErr } = await queryBuilder.limit(50);
+        if (!tableErr && tableData && tableData.length > 0) {
+          return {
+            success: true,
+            sql: sanitizedSql,
+            rows: tableData,
+            rowCount: tableData.length,
+            executionTimeMs: elapsed,
+            sourceEngine: 'CLIENT_FALLBACK'
+          };
+        }
+      } catch (tblErr) {
+        // non-blocking
+      }
+    }
+
     return {
       success: false,
       sql: sanitizedSql,

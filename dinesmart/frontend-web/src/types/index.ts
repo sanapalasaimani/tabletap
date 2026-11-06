@@ -32,6 +32,7 @@ export interface CartItem {
 export interface Order {
   id: string;
   tableId: string;
+  customerPhone?: string;
   items: {
     menuItemId: string;
     name: string;
@@ -45,7 +46,7 @@ export interface Order {
   discount: number;
   tip: number;
   total: number;
-  status: 'Confirmed' | 'Preparing' | 'Cooking' | 'Ready to Serve' | 'Delivered';
+  status: 'Confirmed' | 'Preparing' | 'Cooking' | 'Ready to Serve' | 'Delivered' | 'Cancelled';
   createdAt: string;
   paymentStatus: 'Pending' | 'Paid';
   paymentMethod?: string;

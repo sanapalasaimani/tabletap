@@ -4,8 +4,36 @@ import { MenuItem } from '../../types';
 import { 
   User, Award, Gift, Clock, Heart, Settings, 
   HelpCircle, LogOut, ChevronRight, ArrowLeft,
-  Droplet, Inbox, FileText, ConciergeBell, CheckCircle
+  Droplet, Inbox, FileText, ConciergeBell, CheckCircle,
+  Phone, Mail, MessageSquare, ChevronDown, ChevronUp, Copy, Check, Send, Sparkles
 } from 'lucide-react';
+
+export const AVAILABLE_COUPONS = [
+  {
+    code: 'WELCOME50',
+    title: '₹50 OFF on first order',
+    description: 'Use code WELCOME50 at checkout. Min order ₹150.',
+    badge: 'Flat Discount',
+    discountLabel: '₹50 OFF',
+    minOrder: 150,
+  },
+  {
+    code: 'SAVE20',
+    title: '20% OFF Dining Delight',
+    description: 'Use code SAVE20 at checkout. Min order ₹300, max discount ₹150.',
+    badge: 'Chef Special',
+    discountLabel: '20% OFF',
+    minOrder: 300,
+  },
+  {
+    code: 'LOYA100',
+    title: '₹100 Loyalty Cash',
+    description: 'Redeem 100 reward points for cash discount. Use code LOYA100. Min order ₹250.',
+    badge: 'Loyalty Special',
+    discountLabel: '₹100 Cash',
+    minOrder: 250,
+  }
+];
 
 interface ProfileScreenProps {
   onNavigateToTab: (tab: 'home' | 'search' | 'cart' | 'orders' | 'profile') => void;
@@ -20,6 +48,14 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigateToTab, o
   const [waiterRequested, setWaiterRequested] = useState(false);
   const [waiterRequestType, setWaiterRequestType] = useState('');
 
+  // Support / Help states
+  const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
+  const [ticketCategory, setTicketCategory] = useState('Food & Service');
+  const [ticketMessage, setTicketMessage] = useState('');
+  const [ticketSubmitted, setTicketSubmitted] = useState(false);
+  const [submittedTicketId, setSubmittedTicketId] = useState('');
+  const [copiedCoupon, setCopiedCoupon] = useState<string | null>(null);
+
   const handleHelpRequest = async (type: 'Water' | 'Cutlery' | 'Tissue' | 'Call Waiter' | 'Request Bill') => {
     setWaiterRequestType(type);
     await callWaiter(type);
@@ -28,6 +64,43 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigateToTab, o
       setWaiterRequested(false);
     }, 4000);
   };
+
+  const handleCopyCoupon = (code: string) => {
+    navigator.clipboard?.writeText(code);
+    setCopiedCoupon(code);
+    setTimeout(() => setCopiedCoupon(null), 2000);
+  };
+
+  const handleSubmitTicket = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!ticketMessage.trim()) return;
+    const newId = 'TCK-' + Math.floor(1000 + Math.random() * 9000);
+    setSubmittedTicketId(newId);
+    setTicketSubmitted(true);
+    setTicketMessage('');
+    setTimeout(() => {
+      setTicketSubmitted(false);
+    }, 6000);
+  };
+
+  const faqs = [
+    {
+      q: 'How do I customize my dishes or add spice instructions?',
+      a: 'When you tap on any dish from the menu or search screen, a customization modal appears where you can choose portion sizes, add extra butter/ghee, and specify spice preferences or dietary instructions.'
+    },
+    {
+      q: 'What payment methods are supported at the table?',
+      a: 'We accept all major UPI apps (Google Pay, PhonePe, Paytm), Credit & Debit Cards, and Cash at billing. You can request your bill directly from the Help screen or call the waiter.'
+    },
+    {
+      q: 'How are loyalty reward points earned and redeemed?',
+      a: 'You earn 1 loyalty point for every ₹10 spent. You can redeem 100 points for ₹100 off your meal using the coupon code LOYA100 in the cart.'
+    },
+    {
+      q: 'Can I add more items to an existing dining order?',
+      a: 'Yes! Simply browse the menu, add items to your cart, and place the new order. Your new items will be synced to your table bill automatically.'
+    }
+  ];
 
   const getTierColor = (tier: string) => {
     if (tier === 'Platinum') return 'from-teal-400 to-emerald-500';
@@ -101,24 +174,27 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigateToTab, o
 
   if (subView === 'help') {
     const helpOptions: { type: 'Water' | 'Cutlery' | 'Tissue' | 'Call Waiter' | 'Request Bill'; label: string; icon: React.ReactNode }[] = [
-      { type: 'Water', label: 'Need Water', icon: <Droplet className="text-blue-500" size={20} /> },
-      { type: 'Cutlery', label: 'Need Cutlery', icon: <Inbox className="text-orange-500" size={20} /> },
-      { type: 'Tissue', label: 'Need Tissue', icon: <FileText className="text-purple-500" size={20} /> },
-      { type: 'Call Waiter', label: 'Call Waiter', icon: <ConciergeBell className="text-emerald-500" size={20} /> },
-      { type: 'Request Bill', label: 'Request Bill', icon: <ChevronRight className="text-rose-500" size={20} /> },
+      { type: 'Water', label: 'Need Water', icon: <Droplet className="text-blue-500" size={18} /> },
+      { type: 'Cutlery', label: 'Need Cutlery', icon: <Inbox className="text-orange-500" size={18} /> },
+      { type: 'Tissue', label: 'Need Tissue', icon: <FileText className="text-purple-500" size={18} /> },
+      { type: 'Call Waiter', label: 'Call Waiter', icon: <ConciergeBell className="text-emerald-500" size={18} /> },
+      { type: 'Request Bill', label: 'Request Bill', icon: <ChevronRight className="text-rose-500" size={18} /> },
     ];
 
     return (
       <div className="flex-1 pb-24 overflow-y-auto no-scrollbar">
         {/* Header */}
         <div className="p-5 flex items-center gap-3 border-b border-gray-50 bg-white sticky top-0 z-30">
-          <button onClick={() => setSubView('main')} className="text-gray-600">
+          <button onClick={() => setSubView('main')} className="text-gray-600 hover:text-primary transition-colors cursor-pointer">
             <ArrowLeft size={20} />
           </button>
-          <h2 className="text-lg font-bold text-brand-text">Help & Support</h2>
+          <div>
+            <h2 className="text-lg font-bold text-brand-text">Help & Support</h2>
+            <p className="text-[11px] text-gray-400">Desk assistance, table service & FAQs</p>
+          </div>
         </div>
 
-        {/* Live notification popup */}
+        {/* Live notification popup for waiter call */}
         {waiterRequested && (
           <div className="mx-5 mt-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl flex items-center gap-3 animate-fade-in shadow-sm">
             <CheckCircle className="text-emerald-500 flex-shrink-0" size={20} />
@@ -129,26 +205,143 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigateToTab, o
           </div>
         )}
 
-        {/* Support Menu */}
-        <div className="p-5 space-y-4">
-          <h3 className="text-xs text-gray-400 font-bold uppercase tracking-wider mb-2 ml-1">Quick Help</h3>
-          <div className="space-y-3">
+        {/* 1. Quick Table Assistance */}
+        <div className="p-5 pb-2 space-y-3">
+          <h3 className="text-xs text-gray-400 font-bold uppercase tracking-wider ml-1">Table Assistance</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
             {helpOptions.map((opt) => (
               <button
                 key={opt.type}
                 onClick={() => handleHelpRequest(opt.type)}
-                className="w-full flex items-center justify-between p-4 bg-white border border-gray-100/80 rounded-2xl shadow-sm hover:border-primary/20 transition-all text-left active:scale-[0.98]"
+                className="flex items-center gap-2.5 p-3 bg-white border border-gray-100 rounded-2xl shadow-2xs hover:border-primary/30 transition-all text-left active:scale-[0.98] cursor-pointer"
               >
-                <div className="flex items-center gap-3.5">
-                  <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center shadow-inner">
-                    {opt.icon}
-                  </div>
-                  <span className="font-semibold text-brand-text text-sm">{opt.label}</span>
+                <div className="w-8 h-8 bg-gray-50 rounded-xl flex items-center justify-center shadow-inner flex-shrink-0">
+                  {opt.icon}
                 </div>
-                <ChevronRight size={16} className="text-gray-400" />
+                <span className="font-semibold text-brand-text text-xs">{opt.label}</span>
               </button>
             ))}
           </div>
+        </div>
+
+        {/* 2. Direct Hotel Contact Desk */}
+        <div className="px-5 py-3">
+          <h3 className="text-xs text-gray-400 font-bold uppercase tracking-wider mb-2.5 ml-1">Contact Hotel Desk</h3>
+          <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm space-y-3">
+            <a 
+              href="tel:+919876543210"
+              className="flex items-center justify-between text-xs text-brand-text hover:text-primary transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-orange-50 text-primary flex items-center justify-center">
+                  <Phone size={15} />
+                </div>
+                <div>
+                  <strong className="block font-bold">Helpline & Manager</strong>
+                  <span className="text-gray-400 text-[10px]">+91 98765 43210</span>
+                </div>
+              </div>
+              <span className="text-[10px] bg-primary/10 text-primary font-bold px-2.5 py-1 rounded-full">Call Now</span>
+            </a>
+
+            <div className="h-px bg-gray-50"></div>
+
+            <a 
+              href="mailto:support@babaihotel.com"
+              className="flex items-center justify-between text-xs text-brand-text hover:text-primary transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center">
+                  <Mail size={15} />
+                </div>
+                <div>
+                  <strong className="block font-bold">Guest Support Email</strong>
+                  <span className="text-gray-400 text-[10px]">support@babaihotel.com</span>
+                </div>
+              </div>
+              <span className="text-[10px] bg-sky-50 text-sky-600 font-bold px-2.5 py-1 rounded-full">Email</span>
+            </a>
+          </div>
+        </div>
+
+        {/* 3. Frequently Asked Questions (Accordion) */}
+        <div className="px-5 py-3">
+          <h3 className="text-xs text-gray-400 font-bold uppercase tracking-wider mb-2.5 ml-1">Frequently Asked Questions</h3>
+          <div className="space-y-2">
+            {faqs.map((faq, idx) => {
+              const isOpen = expandedFaq === idx;
+              return (
+                <div 
+                  key={idx} 
+                  className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-2xs transition-all"
+                >
+                  <button
+                    onClick={() => setExpandedFaq(isOpen ? null : idx)}
+                    className="w-full p-3.5 flex items-center justify-between text-left text-xs font-bold text-brand-text cursor-pointer hover:bg-gray-50/50"
+                  >
+                    <span className="pr-2">{faq.q}</span>
+                    {isOpen ? <ChevronUp size={16} className="text-primary flex-shrink-0" /> : <ChevronDown size={16} className="text-gray-400 flex-shrink-0" />}
+                  </button>
+                  {isOpen && (
+                    <div className="px-3.5 pb-3.5 text-[11px] text-gray-500 leading-relaxed border-t border-gray-50 pt-2 bg-orange-50/10">
+                      {faq.a}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* 4. Submit Query / Feedback Ticket */}
+        <div className="px-5 py-3">
+          <h3 className="text-xs text-gray-400 font-bold uppercase tracking-wider mb-2.5 ml-1">Submit Query or Feedback</h3>
+          <form onSubmit={handleSubmitTicket} className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm space-y-3">
+            {ticketSubmitted && (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl flex items-center gap-2.5 text-xs animate-fade-in">
+                <CheckCircle size={16} className="text-emerald-500 flex-shrink-0" />
+                <div>
+                  <p className="font-bold">Ticket Submitted ({submittedTicketId})</p>
+                  <p className="text-[10px] text-emerald-700">Thank you! Our restaurant manager has been notified.</p>
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label className="text-[11px] font-bold text-gray-600 block mb-1">Issue Category</label>
+              <select
+                value={ticketCategory}
+                onChange={(e) => setTicketCategory(e.target.value)}
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs text-brand-text font-medium outline-hidden focus:border-primary"
+              >
+                <option value="Food & Service">Food & Service Feedback</option>
+                <option value="Billing & Payment">Billing / Payment Issue</option>
+                <option value="App & Order Assistance">App / Order Assistance</option>
+                <option value="Manager Assistance">Speak with Floor Manager</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-[11px] font-bold text-gray-600 block mb-1">Your Message</label>
+              <textarea
+                rows={3}
+                value={ticketMessage}
+                onChange={(e) => setTicketMessage(e.target.value)}
+                placeholder="Describe your inquiry or feedback..."
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-brand-text outline-hidden focus:border-primary resize-none"
+                required
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={!ticketMessage.trim()}
+              className="w-full py-2.5 bg-primary text-white text-xs font-bold rounded-xl shadow-xs hover:bg-orange-600 transition-colors disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
+            >
+              <Send size={13} />
+              <span>Submit to Manager</span>
+            </button>
+          </form>
         </div>
       </div>
     );
@@ -159,35 +352,60 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigateToTab, o
       <div className="flex-1 pb-24 overflow-y-auto no-scrollbar">
         {/* Header */}
         <div className="p-5 flex items-center gap-3 border-b border-gray-50 bg-white sticky top-0 z-30">
-          <button onClick={() => setSubView('main')} className="text-gray-600">
+          <button onClick={() => setSubView('main')} className="text-gray-600 hover:text-primary transition-colors cursor-pointer">
             <ArrowLeft size={20} />
           </button>
-          <h2 className="text-lg font-bold text-brand-text">Available Coupons</h2>
+          <div>
+            <h2 className="text-lg font-bold text-brand-text">Available Coupons</h2>
+            <p className="text-[11px] text-gray-400">{AVAILABLE_COUPONS.length} active restaurant offers</p>
+          </div>
         </div>
 
         {/* Coupons list */}
         <div className="p-5 space-y-4">
-          <div className="bg-white rounded-3xl border-2 border-dashed border-primary/20 p-5 shadow-sm relative overflow-hidden">
-            <div className="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-brand-bg rounded-full"></div>
-            <div className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-brand-bg rounded-full"></div>
-            
-            <span className="bg-primary/10 text-primary font-extrabold text-[10px] tracking-widest uppercase px-3 py-1 rounded-full">
-              Flat Discount
-            </span>
-            <h3 className="text-lg font-black text-brand-text mt-3">₹50 OFF on first order</h3>
-            <p className="text-xs text-gray-400 mt-1">Use code <strong className="text-primary uppercase">WELCOME50</strong>. Min order ₹100.</p>
-          </div>
+          {AVAILABLE_COUPONS.map((coupon) => (
+            <div 
+              key={coupon.code}
+              className="bg-white rounded-3xl border-2 border-dashed border-primary/20 p-5 shadow-sm relative overflow-hidden"
+            >
+              <div className="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-brand-bg rounded-full"></div>
+              <div className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-brand-bg rounded-full"></div>
+              
+              <div className="flex items-center justify-between">
+                <span className="bg-primary/10 text-primary font-extrabold text-[10px] tracking-widest uppercase px-3 py-1 rounded-full">
+                  {coupon.badge}
+                </span>
+                <span className="text-xs font-black text-primary">
+                  {coupon.discountLabel}
+                </span>
+              </div>
 
-          <div className="bg-white rounded-3xl border-2 border-dashed border-primary/20 p-5 shadow-sm relative overflow-hidden">
-            <div className="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-brand-bg rounded-full"></div>
-            <div className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-brand-bg rounded-full"></div>
-            
-            <span className="bg-orange-500/10 text-orange-500 font-extrabold text-[10px] tracking-widest uppercase px-3 py-1 rounded-full">
-              Loyalty Special
-            </span>
-            <h3 className="text-lg font-black text-brand-text mt-3">₹100 Loyalty Cash</h3>
-            <p className="text-xs text-gray-400 mt-1">Redeem 100 reward points. Use code <strong className="text-primary uppercase">LOYA100</strong>.</p>
-          </div>
+              <h3 className="text-lg font-black text-brand-text mt-3">{coupon.title}</h3>
+              <p className="text-xs text-gray-400 mt-1">{coupon.description}</p>
+
+              <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
+                <div className="inline-block bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-xl font-mono text-xs font-black text-brand-text tracking-wider">
+                  {coupon.code}
+                </div>
+                <button
+                  onClick={() => handleCopyCoupon(coupon.code)}
+                  className="flex items-center gap-1.5 text-xs font-bold text-primary hover:text-orange-600 px-3 py-1.5 rounded-xl bg-primary/10 hover:bg-primary/15 transition-all cursor-pointer"
+                >
+                  {copiedCoupon === coupon.code ? (
+                    <>
+                      <Check size={14} className="text-emerald-600" />
+                      <span className="text-emerald-600 font-bold">Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={14} />
+                      <span>Copy Code</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     );
@@ -236,7 +454,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigateToTab, o
             </div>
             <div>
               <span className="font-semibold text-brand-text text-sm block">Coupons</span>
-              <span className="text-[10px] text-gray-400 mt-0.5 block">3 discount codes available</span>
+              <span className="text-[10px] text-gray-400 mt-0.5 block">{AVAILABLE_COUPONS.length} discount codes available</span>
             </div>
           </div>
           <ChevronRight size={16} className="text-gray-400" />
@@ -287,7 +505,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigateToTab, o
             </div>
             <div>
               <span className="font-semibold text-brand-text text-sm block">Help & Support</span>
-              <span className="text-[10px] text-gray-400 mt-0.5 block">Paging waiter, cutlery request</span>
+              <span className="text-[10px] text-gray-400 mt-0.5 block">Helpline, FAQs & table service</span>
             </div>
           </div>
           <ChevronRight size={16} className="text-gray-400" />
