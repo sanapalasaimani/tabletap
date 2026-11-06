@@ -150,7 +150,8 @@ export const DishDetailModal: React.FC<DishDetailModalProps> = ({ item, onClose 
   const handleAddToCart = () => {
     if (isSoldOut) return;
     const combinedInstructions = [...selectedInstructions, ...extraToppings];
-    addToCart(item, quantity, combinedInstructions, notes);
+    // Pass item with unitPrice including pairings and add-ons so cart & total price match
+    addToCart({ ...item, price: unitPrice }, quantity, combinedInstructions, notes);
     onClose();
   };
 

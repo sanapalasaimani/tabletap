@@ -21,7 +21,8 @@ export const CartScreen: React.FC<CartScreenProps> = ({ onOrderPlaced, onNavigat
     placeOrder, 
     profile,
     addToCart,
-    tableId
+    tableId,
+    phone
   } = useApp();
 
   const [couponCode, setCouponCode] = useState('');
@@ -29,14 +30,19 @@ export const CartScreen: React.FC<CartScreenProps> = ({ onOrderPlaced, onNavigat
   const [couponError, setCouponError] = useState('');
   const [couponSuccess, setCouponSuccess] = useState('');
   const [promotions, setPromotions] = useState<any[]>([]);
+  const [usedCoupons, setUsedCoupons] = useState<string[]>([]);
   const [tip, setTip] = useState(0);
   const [customTip, setCustomTip] = useState('');
+  const [isCustomTipMode, setIsCustomTipMode] = useState(false);
   const [isPlacing, setIsPlacing] = useState(false);
 
-  // Load real promotions from Supabase/db
+  // Load real promotions and used coupons from database
   useEffect(() => {
     db.getPromotions().then(promos => setPromotions(promos || []));
-  }, []);
+    if (phone) {
+      db.getUsedCoupons(phone).then(used => setUsedCoupons(used || []));
+    }
+  }, [phone]);
 
   const getInstructionsKey = (instructions: string[], notes: string) => {
     return [...instructions.sort(), notes].join('|');
@@ -74,20 +80,26 @@ export const CartScreen: React.FC<CartScreenProps> = ({ onOrderPlaced, onNavigat
 
   const total = Math.max(0, subtotal + gst + tip - discount);
 
-  // Note 13: Coupons apply optimized, clears input, increases based on conditions
-  const handleApplyCoupon = () => {
+  // Apply coupon with single-use per customer check
+  const handleApplyCoupon = (overrideCode?: string) => {
     setCouponError('');
     setCouponSuccess('');
 
-    const code = couponCode.trim().toUpperCase();
+    const code = (overrideCode || couponCode).trim().toUpperCase();
     if (!code) return;
+
+    // Single-use validation: prevent using already redeemed coupons
+    if (usedCoupons.includes(code)) {
+      setCouponError(`Coupon ${code} has already been used by your account. Single-use only.`);
+      return;
+    }
 
     // Check dynamic promotions from database
     const foundPromo = promotions.find(p => p.code.toUpperCase() === code && p.active);
     if (foundPromo) {
       const minBill = Number(foundPromo.min_bill || foundPromo.minBill || 0);
       if (subtotal < minBill) {
-        setCouponError(`Min order of ₹${minBill} required for this coupon (Cart: ₹${subtotal})`);
+        setCouponError(`Min order of ₹${minBill} required for ${code} (Cart: ₹${subtotal})`);
         return;
       }
       setActiveCoupon(code);
@@ -118,6 +130,10 @@ export const CartScreen: React.FC<CartScreenProps> = ({ onOrderPlaced, onNavigat
         setCouponError('Insufficient loyalty points (need 100 points)');
       }
     } else if (code === 'SAVE20' || code === 'FESTIVE20') {
+      if (subtotal < 300) {
+        setCouponError(`${code} requires a minimum order of ₹300`);
+        return;
+      }
       setActiveCoupon(code);
       setCouponSuccess(`${code} applied! 20% Discount`);
       setCouponCode('');
@@ -134,6 +150,7 @@ export const CartScreen: React.FC<CartScreenProps> = ({ onOrderPlaced, onNavigat
   const selectTip = (val: number) => {
     setTip(val);
     setCustomTip('');
+    setIsCustomTipMode(false);
   };
 
   // Automatically re-validate active coupon whenever cart/subtotal changes
@@ -368,7 +385,7 @@ export const CartScreen: React.FC<CartScreenProps> = ({ onOrderPlaced, onNavigat
                 className="flex-1 bg-gray-50 border border-gray-200 rounded-2xl px-4 py-2.5 text-xs uppercase font-extrabold focus:outline-none focus:border-orange-500"
               />
               <button
-                onClick={handleApplyCoupon}
+                onClick={() => handleApplyCoupon()}
                 className="px-5 py-2.5 bg-slate-900 hover:bg-black text-white font-extrabold rounded-2xl text-xs transition-colors cursor-pointer"
               >
                 Apply
@@ -376,6 +393,34 @@ export const CartScreen: React.FC<CartScreenProps> = ({ onOrderPlaced, onNavigat
             </div>
             {couponError && <p className="text-[11px] text-red-500 font-semibold">{couponError}</p>}
             {couponSuccess && <p className="text-[11px] text-emerald-600 font-semibold">{couponSuccess}</p>}
+
+            {/* Available Synchronized Offer Chips */}
+            {promotions.length > 0 && (
+              <div className="pt-2">
+                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-1.5">
+                  Available Offers
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {promotions.filter(p => p.active !== false).map(p => {
+                    const isUsed = usedCoupons.includes(p.code.toUpperCase());
+                    return (
+                      <button
+                        key={p.code}
+                        disabled={isUsed}
+                        onClick={() => handleApplyCoupon(p.code)}
+                        className={`text-[10px] px-2.5 py-1 rounded-xl font-bold border transition-all ${
+                          isUsed 
+                            ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed line-through'
+                            : 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100 cursor-pointer'
+                        }`}
+                      >
+                        {p.code} {isUsed ? '(Used)' : `(₹${p.discount}${p.type === 'Percentage' ? '%' : ''} OFF)`}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -392,7 +437,7 @@ export const CartScreen: React.FC<CartScreenProps> = ({ onOrderPlaced, onNavigat
               key={amount}
               onClick={() => selectTip(amount)}
               className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                tip === amount
+                tip === amount && !isCustomTipMode
                   ? 'bg-orange-500 border-orange-500 text-white shadow-xs'
                   : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
               }`}
@@ -400,7 +445,48 @@ export const CartScreen: React.FC<CartScreenProps> = ({ onOrderPlaced, onNavigat
               ₹{amount}
             </button>
           ))}
+          <button
+            onClick={() => {
+              setIsCustomTipMode(true);
+              setTip(customTip ? parseInt(customTip) : 0);
+            }}
+            className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+              isCustomTipMode
+                ? 'bg-orange-500 border-orange-500 text-white shadow-xs'
+                : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            Custom
+          </button>
         </div>
+
+        {/* Custom Tip Amount Input */}
+        {isCustomTipMode && (
+          <div className="flex items-center gap-2 mt-2 bg-gray-50 p-2 rounded-xl border border-orange-200">
+            <span className="text-xs font-black text-slate-700 pl-2">₹</span>
+            <input
+              type="number"
+              min="0"
+              placeholder="Enter custom tip amount"
+              value={customTip}
+              onChange={handleCustomTipChange}
+              className="flex-1 bg-transparent text-xs font-bold text-slate-800 outline-none"
+              autoFocus
+            />
+            {tip > 0 && (
+              <button
+                onClick={() => {
+                  setTip(0);
+                  setCustomTip('');
+                  setIsCustomTipMode(false);
+                }}
+                className="text-[10px] font-bold text-gray-400 hover:text-red-500 px-2 py-1 cursor-pointer"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Bill Breakdown */}

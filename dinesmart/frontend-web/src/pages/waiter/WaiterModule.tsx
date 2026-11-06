@@ -450,6 +450,55 @@ export const WaiterModule: React.FC = () => {
     setTimeout(() => setFeedbackMessage(null), 3000);
   };
 
+  // Waiter clicks "Received Money" when collecting cash from customer at table
+  const handleReceiveCashPayment = async (tblId: string, orderId?: string, reqId?: string) => {
+    try {
+      const tableOrders = orders.filter(
+        o => String(o.tableId) === String(tblId) && o.paymentStatus !== 'Paid' && o.status !== 'Cancelled'
+      );
+      const ordersToPay = orderId ? tableOrders.filter(o => o.id === orderId) : tableOrders;
+      const targetList = ordersToPay.length > 0 ? ordersToPay : tableOrders;
+
+      for (const ord of targetList) {
+        await db.payOrder(ord.id, 'Cash');
+      }
+
+      // Complete any pending Bill request for this table
+      const billReqs = waiterRequests.filter(
+        r => String(r.tableId) === String(tblId) && r.requestType === 'Request Bill' && r.status === 'Pending'
+      );
+      for (const req of billReqs) {
+        await db.updateWaiterRequestStatus(req.id, 'Completed');
+      }
+      if (reqId) {
+        await db.updateWaiterRequestStatus(reqId, 'Completed');
+      }
+
+      // Remove from accepted tasks
+      const idsToRemove = [
+        ...(orderId ? [orderId, `cash_${orderId}`] : []),
+        ...(reqId ? [reqId] : []),
+        ...billReqs.map(r => r.id)
+      ];
+      setAcceptedTaskIds(prev => prev.filter(id => !idsToRemove.includes(id)));
+
+      // Update local state
+      setOrders(prev => prev.map(o => String(o.tableId) === String(tblId) ? { ...o, paymentStatus: 'Paid', paymentMethod: 'Cash' } : o));
+      setWaiterRequests(prev => prev.map(r => String(r.tableId) === String(tblId) && r.requestType === 'Request Bill' ? { ...r, status: 'Completed' } : r));
+
+      // Broadcast event so customer view immediately transitions to Payment Success
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('dinesmart_order_paid', { detail: { tableId: tblId, orderId } }));
+      }
+
+      const collectedAmount = targetList.reduce((sum, o) => sum + o.total, 0);
+      setFeedbackMessage(`✓ Received ₹${collectedAmount} cash from Table #${tblId}. Payment confirmed!`);
+      setTimeout(() => setFeedbackMessage(null), 3500);
+    } catch (err) {
+      console.warn('Failed to process cash collection:', err);
+    }
+  };
+
   // ORDER ROUTING BASED ON ASSIGNED TABLES
   // If assignedTables is empty or contains all, waiter sees ALL tables.
   // If assignedTables has specific numbers (e.g. [1, 2, 4]), waiter ONLY sees those tables.
@@ -465,15 +514,22 @@ export const WaiterModule: React.FC = () => {
   // Filter Tasks by table assignment routing
   const readyOrders = orders.filter(o => o.status === 'Ready to Serve' && isTableAssigned(o.tableId));
   const pendingRequests = waiterRequests.filter(r => r.status === 'Pending' && isTableAssigned(r.tableId));
+  const pendingCashOrders = orders.filter(
+    o => o.paymentStatus !== 'Paid' && 
+         o.paymentMethod === 'Cash' && 
+         o.status !== 'Cancelled' && 
+         isTableAssigned(o.tableId)
+  );
 
   interface UnifiedTask {
     id: string;
-    type: 'food_ready' | 'service_call';
+    type: 'food_ready' | 'service_call' | 'cash_collection';
     tableId: string;
     title: string;
     subtitle: string;
     details: string[];
     tip?: number;
+    amount?: number;
     rawOrder?: Order;
     rawReq?: WaiterRequest;
     isAccepted: boolean;
@@ -491,16 +547,50 @@ export const WaiterModule: React.FC = () => {
       rawOrder: o,
       isAccepted: acceptedTaskIds.includes(o.id)
     })),
-    ...pendingRequests.map(r => ({
-      id: r.id,
-      type: 'service_call' as const,
-      tableId: r.tableId,
-      title: `Customer Service Request`,
-      subtitle: `Table ${r.tableId} requested ${r.requestType}`,
-      details: [`Request: ${r.requestType}`, `Table ${r.tableId} assistance required`],
-      rawReq: r,
-      isAccepted: acceptedTaskIds.includes(r.id)
-    }))
+    ...pendingRequests.map(r => {
+      const isBill = r.requestType === 'Request Bill';
+      const unpaidForTable = orders.filter(
+        o => String(o.tableId) === String(r.tableId) && o.paymentStatus !== 'Paid' && o.status !== 'Cancelled'
+      );
+      const totalDue = unpaidForTable.reduce((sum, o) => sum + o.total, 0);
+
+      return {
+        id: r.id,
+        type: (isBill ? 'cash_collection' : 'service_call') as any,
+        tableId: r.tableId,
+        title: isBill ? `💵 Bill & Cash Collection` : `Customer Service Request`,
+        subtitle: isBill 
+          ? `Table #${r.tableId} • Collect Bill: ₹${totalDue}` 
+          : `Table ${r.tableId} requested ${r.requestType}`,
+        details: isBill 
+          ? [
+              `Customer at Table #${r.tableId} requested bill payment`,
+              totalDue > 0 ? `Total Cash to Collect: ₹${totalDue}` : `Bill settlement required`,
+              `Collect physical cash, then tap Received Money below`
+            ]
+          : [`Request: ${r.requestType}`, `Table ${r.tableId} assistance required`],
+        amount: totalDue,
+        rawReq: r,
+        isAccepted: acceptedTaskIds.includes(r.id)
+      };
+    }),
+    ...pendingCashOrders
+      .filter(o => !pendingRequests.some(r => String(r.tableId) === String(o.tableId) && r.requestType === 'Request Bill'))
+      .map(o => ({
+        id: `cash_${o.id}`,
+        type: 'cash_collection' as const,
+        tableId: o.tableId,
+        title: `💵 Cash Payment Collection`,
+        subtitle: `Table #${o.tableId} • Collect ₹${o.total}`,
+        details: [
+          `Order #${o.id} requested Cash payment`,
+          `Amount to Collect: ₹${o.total}`,
+          `Collect physical cash and click Received Money`
+        ],
+        amount: o.total,
+        rawOrder: o,
+        isAccepted: acceptedTaskIds.includes(`cash_${o.id}`) || acceptedTaskIds.includes(o.id)
+      }))
   ];
 
   // Note 21: FIFO sorting in Waiter Dashboard - Oldest first, newest last
@@ -785,7 +875,7 @@ export const WaiterModule: React.FC = () => {
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
                 <div>
-                  <p className="text-[10px] text-slate-400 uppercase font-black">Order Routing</p>
+                  <p className="text-[10px] text-slate-400 uppercase font-black">Active Tasks</p>
                   <strong className="text-xs font-black text-slate-800">
                     {isAllTables 
                       ? '⚡ Serving: All Tables (Full Floor)' 
@@ -887,18 +977,30 @@ export const WaiterModule: React.FC = () => {
                           >
                             Accept Task
                           </button>
-                        ) : (
+                        ) : task.type === 'cash_collection' || (task.type === 'service_call' && task.rawReq?.requestType === 'Request Bill') ? (
+                          <button
+                            onClick={() => handleReceiveCashPayment(task.tableId, task.rawOrder?.id, task.rawReq?.id)}
+                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-2.5 rounded-xl text-xs transition-all shadow-sm cursor-pointer flex items-center justify-center gap-1.5 active:scale-98"
+                          >
+                            <span>💵 Received Money (Mark Paid)</span>
+                          </button>
+                        ) : task.type === 'food_ready' ? (
                           <button
                             onClick={() => {
-                              if (task.type === 'food_ready' && task.rawOrder) {
-                                handleServeOrder(task.rawOrder);
-                              } else if (task.type === 'service_call' && task.rawReq) {
-                                handleCompleteRequest(task.rawReq);
-                              }
+                              if (task.rawOrder) handleServeOrder(task.rawOrder);
                             }}
                             className="w-full bg-[#FF6B00] hover:bg-orange-600 text-white font-bold py-2.5 rounded-xl text-xs transition-all shadow-sm cursor-pointer"
                           >
                             Mark Completed & Delivered
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              if (task.rawReq) handleCompleteRequest(task.rawReq);
+                            }}
+                            className="w-full bg-[#FF6B00] hover:bg-orange-600 text-white font-bold py-2.5 rounded-xl text-xs transition-all shadow-sm cursor-pointer"
+                          >
+                            Mark Completed & Assisted
                           </button>
                         )}
                       </div>

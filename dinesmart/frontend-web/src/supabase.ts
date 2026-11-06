@@ -79,6 +79,7 @@ const mapMenuItemToSupabase = (item: MenuItem): any => ({
 export const mapSupabaseToOrder = (row: any): Order => ({
   id: String(row.id || ''),
   tableId: String(row.table_id || row.tableId || '05'),
+  customerPhone: row.customer_phone || row.customerPhone,
   items: Array.isArray(row.items) ? row.items : [],
   subtotal: Number(row.subtotal || 0),
   gst: Number(row.gst || 0),
@@ -89,7 +90,8 @@ export const mapSupabaseToOrder = (row: any): Order => ({
   createdAt: row.created_at || row.createdAt || new Date().toISOString(),
   paymentStatus: row.payment_status || row.paymentStatus || 'Pending',
   paymentMethod: row.payment_method || row.paymentMethod,
-  feedbackSubmitted: Boolean(row.feedback_submitted || row.feedbackSubmitted)
+  feedbackSubmitted: Boolean(row.feedback_submitted || row.feedbackSubmitted),
+  discountCoupon: row.discount_coupon || row.discountCoupon,
 });
 
 export const mapSupabaseToWaiterRequest = (row: any): WaiterRequest => ({
@@ -300,7 +302,8 @@ export const db = {
     tableId: string,
     cartItems: CartItem[],
     pricing: { subtotal: number; gst: number; discount: number; tip: number; total: number },
-    phone: string
+    phone: string,
+    discountCoupon?: string
   ): Promise<Order> => {
     const orderItems = cartItems.map(item => ({
       menuItemId: item.menuItem.id,
@@ -311,14 +314,18 @@ export const db = {
       customNotes: item.customNotes,
     }));
 
+    const cleanCoupon = discountCoupon ? discountCoupon.trim().toUpperCase() : undefined;
+
     const newOrder: Order = {
       id: `ord_${Math.floor(1000 + Math.random() * 9000)}`,
       tableId,
+      customerPhone: phone || undefined,
       items: orderItems,
       ...pricing,
       status: 'Confirmed',
       createdAt: new Date().toISOString(),
       paymentStatus: 'Pending',
+      discountCoupon: cleanCoupon,
     };
 
     if (isRealSupabase) {
@@ -340,7 +347,7 @@ export const db = {
         .select()
         .single();
       if (!error && data) {
-        const mapped = mapSupabaseToOrder(data);
+        const mapped = { ...mapSupabaseToOrder(data), discountCoupon: cleanCoupon };
         const orders = getMockData<Order[]>('orders', []);
         orders.unshift(mapped);
         saveMockData('orders', orders);
@@ -348,6 +355,9 @@ export const db = {
         if (phone) {
           const rules = await db.getLoyaltyRules();
           await db.addLoyaltyPoints(phone, Math.floor((pricing.total / 100) * rules.pointsPerHundred));
+          if (cleanCoupon) {
+            await db.markCouponUsed(phone, cleanCoupon);
+          }
         }
         return mapped;
       }
@@ -361,6 +371,9 @@ export const db = {
     if (phone) {
       const rules = await db.getLoyaltyRules();
       await db.addLoyaltyPoints(phone, Math.floor((pricing.total / 100) * rules.pointsPerHundred));
+      if (cleanCoupon) {
+        await db.markCouponUsed(phone, cleanCoupon);
+      }
     }
     return newOrder;
   },
@@ -907,14 +920,108 @@ export const db = {
 
   // 8. PROMOTIONS / COUPONS
   getPromotions: async (): Promise<any[]> => {
+    let promos: any[] = [];
     if (isRealSupabase) {
-      const { data, error } = await supabaseClient
-        .from('promotions')
-        .select('*')
-        .order('code');
-      if (!error && data) return data;
+      try {
+        const { data, error } = await supabaseClient
+          .from('promotions')
+          .select('*')
+          .order('code');
+        if (!error && data && data.length > 0) {
+          promos = data;
+        }
+      } catch (err) {
+        console.warn('Supabase getPromotions error:', err);
+      }
     }
-    return getMockData<any[]>('coupons', []);
+    if (promos.length === 0) {
+      const local = getMockData<any[]>('coupons', []);
+      if (local && local.length > 0) {
+        promos = local;
+      } else {
+        // Default synchronized restaurant offers
+        promos = [
+          {
+            id: 'cp_welcome50',
+            code: 'WELCOME50',
+            title: '₹50 OFF on first order',
+            description: 'Use code WELCOME50 at checkout. Min order ₹150.',
+            discount: 50,
+            type: 'Fixed',
+            min_bill: 150,
+            active: true
+          },
+          {
+            id: 'cp_save20',
+            code: 'SAVE20',
+            title: '20% OFF Dining Delight',
+            description: 'Use code SAVE20 at checkout. Min order ₹300, max discount ₹150.',
+            discount: 20,
+            type: 'Percentage',
+            maxDiscount: 150,
+            min_bill: 300,
+            active: true
+          },
+          {
+            id: 'cp_festive20',
+            code: 'FESTIVE20',
+            title: 'Festive Season 20% OFF',
+            description: 'Special festival 20% discount on min order ₹300.',
+            discount: 20,
+            type: 'Percentage',
+            maxDiscount: 150,
+            min_bill: 300,
+            active: true
+          },
+          {
+            id: 'cp_loya100',
+            code: 'LOYA100',
+            title: '₹100 Loyalty Cash',
+            description: 'Redeem 100 reward points for cash discount. Use code LOYA100. Min order ₹250.',
+            discount: 100,
+            type: 'Fixed',
+            min_bill: 250,
+            active: true
+          }
+        ];
+        saveMockData('coupons', promos);
+      }
+    }
+    return promos;
+  },
+
+  getUsedCoupons: async (phone: string): Promise<string[]> => {
+    if (!phone) return [];
+    try {
+      const stored = localStorage.getItem(`dinesmart_used_coupons_${phone}`);
+      const list: string[] = stored ? JSON.parse(stored) : [];
+      // Also inspect stored orders for historical coupon usages
+      const orders = getMockData<Order[]>('orders', []);
+      orders.forEach(o => {
+        if (o.customerPhone === phone && o.discountCoupon) {
+          const clean = o.discountCoupon.trim().toUpperCase();
+          if (!list.includes(clean)) list.push(clean);
+        }
+      });
+      return list;
+    } catch {
+      return [];
+    }
+  },
+
+  markCouponUsed: async (phone: string, couponCode: string): Promise<void> => {
+    if (!phone || !couponCode) return;
+    try {
+      const clean = couponCode.trim().toUpperCase();
+      const stored = localStorage.getItem(`dinesmart_used_coupons_${phone}`);
+      const list: string[] = stored ? JSON.parse(stored) : [];
+      if (!list.includes(clean)) {
+        list.push(clean);
+        localStorage.setItem(`dinesmart_used_coupons_${phone}`, JSON.stringify(list));
+      }
+    } catch (e) {
+      console.warn('Failed to mark coupon used', e);
+    }
   },
 
   savePromotion: async (promo: any): Promise<any> => {

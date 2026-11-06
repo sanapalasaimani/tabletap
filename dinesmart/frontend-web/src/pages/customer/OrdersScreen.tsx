@@ -45,10 +45,23 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onAddMoreItems, onPa
     return true;
   });
 
-  // Calculate total across orders placed in this session
-  const hasPlacedOrders = !!activeOrder || sessionOrders.length > 0;
-  const currentTableTotal = (activeOrder ? activeOrder.total : 0) + 
-    sessionOrders.filter(o => o.id !== activeOrder?.id).reduce((sum, o) => sum + o.total, 0);
+  // Deduplicate and isolate orders for current table
+  const allTableOrdersMap = new Map<string, Order>();
+  if (activeOrder && String(activeOrder.tableId) === String(tableId)) {
+    allTableOrdersMap.set(activeOrder.id, activeOrder);
+  }
+  sessionOrders.forEach(o => {
+    allTableOrdersMap.set(o.id, o);
+  });
+  const allTableOrders = Array.from(allTableOrdersMap.values());
+
+  // Strictly calculate total across UNPAID active orders for this table (exclude already paid or cancelled)
+  const unpaidOrders = allTableOrders.filter(
+    o => o.paymentStatus !== 'Paid' && o.status !== 'Cancelled'
+  );
+  const currentTableTotal = unpaidOrders.reduce((sum, o) => sum + o.total, 0);
+  const hasUnpaidOrders = unpaidOrders.length > 0;
+  const hasPlacedOrders = allTableOrders.length > 0;
 
   const isOrderRated = (order: Order) => {
     return order.feedbackSubmitted || localStorage.getItem(`dinesmart_rated_${order.id}`) === 'true';
@@ -295,7 +308,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onAddMoreItems, onPa
 
       {/* Note 19 & Note 7: Single Prominent ("Pedda") Button at the Bottom */}
       <div className="sticky bottom-0 left-0 right-0 p-4 bg-white/95 backdrop-blur-md border-t border-gray-100 z-20 shadow-lg">
-        {hasPlacedOrders ? (
+        {hasUnpaidOrders ? (
           <button
             onClick={onPayBill}
             className="w-full py-4 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black text-sm rounded-2xl shadow-xl shadow-orange-500/25 flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-98"
@@ -303,6 +316,11 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onAddMoreItems, onPa
             <CreditCard size={18} />
             <span>Request Table Bill • ₹{currentTableTotal}</span>
           </button>
+        ) : hasPlacedOrders ? (
+          <div className="w-full py-3.5 bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold text-xs rounded-2xl flex items-center justify-center gap-2">
+            <CheckCircle2 size={16} className="text-emerald-600" />
+            <span>Bill Settled • All Orders for Table #{tableId} are Paid</span>
+          </div>
         ) : (
           <button
             onClick={onAddMoreItems}

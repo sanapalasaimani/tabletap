@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { MenuItem } from '../../types';
+import { db } from '../../supabase';
 import { 
   User, Award, Gift, Clock, Heart, Settings, 
   HelpCircle, LogOut, ChevronRight, ArrowLeft,
@@ -55,6 +56,17 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigateToTab, o
   const [ticketSubmitted, setTicketSubmitted] = useState(false);
   const [submittedTicketId, setSubmittedTicketId] = useState('');
   const [copiedCoupon, setCopiedCoupon] = useState<string | null>(null);
+
+  // Synchronized promotions and customer used coupons
+  const [promotions, setPromotions] = useState<any[]>([]);
+  const [usedCoupons, setUsedCoupons] = useState<string[]>([]);
+
+  useEffect(() => {
+    db.getPromotions().then(promos => setPromotions(promos || []));
+    if (profile?.phone) {
+      db.getUsedCoupons(profile.phone).then(used => setUsedCoupons(used || []));
+    }
+  }, [profile?.phone]);
 
   const handleHelpRequest = async (type: 'Water' | 'Cutlery' | 'Tissue' | 'Call Waiter' | 'Request Bill') => {
     setWaiterRequestType(type);
@@ -348,6 +360,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigateToTab, o
   }
 
   if (subView === 'coupons') {
+    const activeCoupons = promotions.filter(p => p.active !== false);
+
     return (
       <div className="flex-1 pb-24 overflow-y-auto no-scrollbar">
         {/* Header */}
@@ -357,55 +371,81 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigateToTab, o
           </button>
           <div>
             <h2 className="text-lg font-bold text-brand-text">Available Coupons</h2>
-            <p className="text-[11px] text-gray-400">{AVAILABLE_COUPONS.length} active restaurant offers</p>
+            <p className="text-[11px] text-gray-400">
+              {activeCoupons.length} active restaurant offers ({activeCoupons.filter(c => !usedCoupons.includes(c.code.toUpperCase())).length} available to you)
+            </p>
           </div>
         </div>
 
         {/* Coupons list */}
         <div className="p-5 space-y-4">
-          {AVAILABLE_COUPONS.map((coupon) => (
-            <div 
-              key={coupon.code}
-              className="bg-white rounded-3xl border-2 border-dashed border-primary/20 p-5 shadow-sm relative overflow-hidden"
-            >
-              <div className="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-brand-bg rounded-full"></div>
-              <div className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-brand-bg rounded-full"></div>
-              
-              <div className="flex items-center justify-between">
-                <span className="bg-primary/10 text-primary font-extrabold text-[10px] tracking-widest uppercase px-3 py-1 rounded-full">
-                  {coupon.badge}
-                </span>
-                <span className="text-xs font-black text-primary">
-                  {coupon.discountLabel}
-                </span>
-              </div>
+          {activeCoupons.map((coupon) => {
+            const isUsed = usedCoupons.includes(coupon.code.toUpperCase());
+            const discountLabel = coupon.type === 'Percentage' ? `${coupon.discount}% OFF` : `₹${coupon.discount} OFF`;
+            const minBill = Number(coupon.min_bill || coupon.minBill || 0);
 
-              <h3 className="text-lg font-black text-brand-text mt-3">{coupon.title}</h3>
-              <p className="text-xs text-gray-400 mt-1">{coupon.description}</p>
-
-              <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
-                <div className="inline-block bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-xl font-mono text-xs font-black text-brand-text tracking-wider">
-                  {coupon.code}
-                </div>
-                <button
-                  onClick={() => handleCopyCoupon(coupon.code)}
-                  className="flex items-center gap-1.5 text-xs font-bold text-primary hover:text-orange-600 px-3 py-1.5 rounded-xl bg-primary/10 hover:bg-primary/15 transition-all cursor-pointer"
-                >
-                  {copiedCoupon === coupon.code ? (
-                    <>
-                      <Check size={14} className="text-emerald-600" />
-                      <span className="text-emerald-600 font-bold">Copied!</span>
-                    </>
+            return (
+              <div 
+                key={coupon.code}
+                className={`bg-white rounded-3xl border-2 border-dashed p-5 shadow-sm relative overflow-hidden transition-all ${
+                  isUsed ? 'border-gray-200 opacity-60 bg-gray-50/50' : 'border-primary/20'
+                }`}
+              >
+                <div className="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-brand-bg rounded-full"></div>
+                <div className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-brand-bg rounded-full"></div>
+                
+                <div className="flex items-center justify-between">
+                  {isUsed ? (
+                    <span className="bg-gray-100 text-gray-500 font-extrabold text-[10px] tracking-widest uppercase px-3 py-1 rounded-full">
+                      ✓ Redeemed
+                    </span>
                   ) : (
-                    <>
-                      <Copy size={14} />
-                      <span>Copy Code</span>
-                    </>
+                    <span className="bg-primary/10 text-primary font-extrabold text-[10px] tracking-widest uppercase px-3 py-1 rounded-full">
+                      {coupon.type === 'Percentage' ? 'Special Discount' : 'Flat Savings'}
+                    </span>
                   )}
-                </button>
+                  <span className={`text-xs font-black ${isUsed ? 'text-gray-400' : 'text-primary'}`}>
+                    {discountLabel}
+                  </span>
+                </div>
+
+                <h3 className="text-lg font-black text-brand-text mt-3">{coupon.title || `${coupon.code} Promotion`}</h3>
+                <p className="text-xs text-gray-400 mt-1">
+                  {coupon.description || `Get ${discountLabel} on minimum order of ₹${minBill}.`}
+                </p>
+
+                <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
+                  <div className={`inline-block border px-3 py-1.5 rounded-xl font-mono text-xs font-black tracking-wider ${
+                    isUsed ? 'bg-gray-100 border-gray-200 text-gray-400 line-through' : 'bg-gray-50 border-gray-200 text-brand-text'
+                  }`}>
+                    {coupon.code}
+                  </div>
+                  {isUsed ? (
+                    <span className="text-xs font-bold text-gray-400 px-3 py-1.5">
+                      Already Used
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => handleCopyCoupon(coupon.code)}
+                      className="flex items-center gap-1.5 text-xs font-bold text-primary hover:text-orange-600 px-3 py-1.5 rounded-xl bg-primary/10 hover:bg-primary/15 transition-all cursor-pointer"
+                    >
+                      {copiedCoupon === coupon.code ? (
+                        <>
+                          <Check size={14} className="text-emerald-600" />
+                          <span className="text-emerald-600 font-bold">Copied!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy size={14} />
+                          <span>Copy Code</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     );
@@ -454,7 +494,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigateToTab, o
             </div>
             <div>
               <span className="font-semibold text-brand-text text-sm block">Coupons</span>
-              <span className="text-[10px] text-gray-400 mt-0.5 block">{AVAILABLE_COUPONS.length} discount codes available</span>
+              <span className="text-[10px] text-gray-400 mt-0.5 block">
+                {promotions.filter(p => p.active !== false && !usedCoupons.includes(p.code.toUpperCase())).length} active offers available
+              </span>
             </div>
           </div>
           <ChevronRight size={16} className="text-gray-400" />

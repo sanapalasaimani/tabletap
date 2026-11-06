@@ -51,6 +51,7 @@ export interface Order {
   paymentStatus: 'Pending' | 'Paid';
   paymentMethod?: string;
   feedbackSubmitted?: boolean;
+  discountCoupon?: string;
 }
 
 export interface UserProfile {

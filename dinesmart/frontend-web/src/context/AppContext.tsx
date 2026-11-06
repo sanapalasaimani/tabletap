@@ -211,38 +211,54 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const subtotal = getCartTotal();
     const gst = Math.round(subtotal * 0.05); // 5% GST
     let discount = 0;
+    let validatedCoupon: string | undefined = undefined;
     
-    // Strict checkout validation of coupon conditions
+    // Strict checkout validation of coupon conditions & single-use per customer
     if (discountCoupon) {
       const code = discountCoupon.toUpperCase();
-      if (code === 'WELCOME50' && subtotal >= 150) {
-        discount = 50;
-        if (subtotal >= 600) discount += 25;
-      } else if ((code === 'SAVE20' || code === 'FESTIVE20') && subtotal >= 300) {
-        discount = Math.min(150, Math.round(subtotal * 0.20));
-        if (subtotal >= 800) discount += 20;
-      } else if (code === 'LOYA100' && subtotal >= 250 && profile && profile.points >= 100) {
-        discount = 100;
-        // Deduct loyalty points
-        await db.addLoyaltyPoints(phone, -100);
-      } else {
-        // Dynamic promotion check
-        try {
-          const promos = await db.getPromotions();
-          const matched = promos?.find((p: any) => p.code?.toUpperCase() === code && p.active);
-          if (matched) {
-            const minBill = Number(matched.min_bill || matched.minBill || 0);
-            if (subtotal >= minBill) {
-              if (matched.type === 'Percentage') {
-                discount = Math.round((subtotal * Number(matched.discount)) / 100);
-                if (matched.maxDiscount) discount = Math.min(discount, matched.maxDiscount);
-              } else {
-                discount = Number(matched.discount);
+      let alreadyUsed = false;
+      if (phone) {
+        const usedList = await db.getUsedCoupons(phone);
+        if (usedList.includes(code)) {
+          alreadyUsed = true;
+          console.warn(`Customer ${phone} already used coupon ${code}`);
+        }
+      }
+
+      if (!alreadyUsed) {
+        if (code === 'WELCOME50' && subtotal >= 150) {
+          discount = 50;
+          if (subtotal >= 600) discount += 25;
+          validatedCoupon = code;
+        } else if ((code === 'SAVE20' || code === 'FESTIVE20') && subtotal >= 300) {
+          discount = Math.min(150, Math.round(subtotal * 0.20));
+          if (subtotal >= 800) discount += 20;
+          validatedCoupon = code;
+        } else if (code === 'LOYA100' && subtotal >= 250 && profile && profile.points >= 100) {
+          discount = 100;
+          // Deduct loyalty points
+          await db.addLoyaltyPoints(phone, -100);
+          validatedCoupon = code;
+        } else {
+          // Dynamic promotion check
+          try {
+            const promos = await db.getPromotions();
+            const matched = promos?.find((p: any) => p.code?.toUpperCase() === code && p.active);
+            if (matched) {
+              const minBill = Number(matched.min_bill || matched.minBill || 0);
+              if (subtotal >= minBill) {
+                if (matched.type === 'Percentage') {
+                  discount = Math.round((subtotal * Number(matched.discount)) / 100);
+                  if (matched.maxDiscount) discount = Math.min(discount, matched.maxDiscount);
+                } else {
+                  discount = Number(matched.discount);
+                }
+                validatedCoupon = code;
               }
             }
+          } catch (e) {
+            console.warn('Checkout promo check error', e);
           }
-        } catch (e) {
-          console.warn('Checkout promo check error', e);
         }
       }
     }
@@ -254,7 +270,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       tableId,
       cart,
       { subtotal, gst, discount, tip, total },
-      phone
+      phone,
+      validatedCoupon
     );
 
     setActiveOrder(order);
