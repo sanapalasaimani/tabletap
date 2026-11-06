@@ -5,7 +5,7 @@ import {
   ArrowLeft, User, Lock, Eye, EyeOff, 
   CheckCircle, Wallet, Sparkles, AlertTriangle, AlertCircle,
   Clock, ShieldCheck, Upload, Edit3, X, Check,
-  Smartphone, Download, LogOut
+  Smartphone, Download, LogOut, Unlock, RefreshCw, LayoutGrid
 } from 'lucide-react';
 import { formatPhotoUrl, getInitials, compressImageFile } from '../../utils/photoHelper';
 
@@ -15,7 +15,7 @@ export const ClocheIcon = ({ size = 20, className = '' }: { size?: number; class
   </svg>
 );
 
-type WaiterView = 'login' | 'tasks' | 'profile' | 'employee_details' | 'tip_earnings';
+type WaiterView = 'login' | 'tasks' | 'tables' | 'profile' | 'employee_details' | 'tip_earnings';
 type TaskTab = 'all' | 'pending' | 'accepted';
 
 export interface TipRecord {
@@ -83,6 +83,33 @@ export const WaiterModule: React.FC = () => {
   });
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const [remainingMinutes, setRemainingMinutes] = useState<number>(30);
+
+  // Tables Floor & Session State
+  const [tablesList, setTablesList] = useState<any[]>([]);
+  const [isLoadingTables, setIsLoadingTables] = useState(false);
+
+  const loadTables = useCallback(async () => {
+    setIsLoadingTables(true);
+    try {
+      const allTables = await db.getTables();
+      setTablesList(allTables || []);
+    } catch (e) {
+      console.warn('Failed to load tables in waiter module:', e);
+    } finally {
+      setIsLoadingTables(false);
+    }
+  }, []);
+
+  const handleRemoveSessionBlock = async (tblId: number) => {
+    try {
+      await db.releaseTableSession(tblId);
+      await loadTables();
+      setFeedbackMessage(`✓ Table #${tblId} session block removed! Open for new customers.`);
+      setTimeout(() => setFeedbackMessage(null), 3500);
+    } catch (err) {
+      console.warn('Failed to release table session:', err);
+    }
+  };
 
   // Profile Edit State
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -267,7 +294,13 @@ export const WaiterModule: React.FC = () => {
 
   useEffect(() => {
     fetchTasks();
-    const interval = setInterval(fetchTasks, 3000);
+    loadTables();
+    const interval = setInterval(() => {
+      fetchTasks();
+      if (activeView === 'tables') {
+        loadTables();
+      }
+    }, 3000);
 
     // Instant local event listener when admin updates staff in Waiter Management
     const handleStaffUpdated = (e: any) => {
@@ -870,8 +903,29 @@ export const WaiterModule: React.FC = () => {
               </div>
             </div>
 
+            {/* View Switcher: Tasks vs Tables Floor */}
+            <div className="flex bg-slate-100 p-1 rounded-2xl gap-1 mt-4">
+              <button
+                onClick={() => setActiveView('tasks')}
+                className="flex-1 py-2 text-xs font-black rounded-xl text-center transition-all cursor-pointer flex items-center justify-center gap-1.5 bg-white text-slate-900 shadow-sm"
+              >
+                <Clock size={13} />
+                <span>Tasks ({allTasksList.length})</span>
+              </button>
+              <button
+                onClick={() => {
+                  setActiveView('tables');
+                  loadTables();
+                }}
+                className="flex-1 py-2 text-xs font-black rounded-xl text-center transition-all cursor-pointer flex items-center justify-center gap-1.5 text-slate-500 hover:text-slate-900"
+              >
+                <Unlock size={13} />
+                <span>Tables & Unlock</span>
+              </button>
+            </div>
+
             {/* Table Routing Indicator Banner */}
-            <div className="mt-4 p-3 bg-white rounded-2xl border border-orange-100 flex items-center justify-between shadow-xs">
+            <div className="mt-3 p-3 bg-white rounded-2xl border border-orange-100 flex items-center justify-between shadow-xs">
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
                 <div>
@@ -978,12 +1032,21 @@ export const WaiterModule: React.FC = () => {
                             Accept Task
                           </button>
                         ) : task.type === 'cash_collection' || (task.type === 'service_call' && task.rawReq?.requestType === 'Request Bill') ? (
-                          <button
-                            onClick={() => handleReceiveCashPayment(task.tableId, task.rawOrder?.id, task.rawReq?.id)}
-                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-2.5 rounded-xl text-xs transition-all shadow-sm cursor-pointer flex items-center justify-center gap-1.5 active:scale-98"
-                          >
-                            <span>💵 Received Money (Mark Paid)</span>
-                          </button>
+                          <div className="space-y-1.5 w-full">
+                            <button
+                              onClick={() => handleReceiveCashPayment(task.tableId, task.rawOrder?.id, task.rawReq?.id)}
+                              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-2.5 rounded-xl text-xs transition-all shadow-sm cursor-pointer flex items-center justify-center gap-1.5 active:scale-98"
+                            >
+                              <span>💵 Received Money (Mark Paid)</span>
+                            </button>
+                            <button
+                              onClick={() => handleRemoveSessionBlock(Number(task.tableId))}
+                              className="w-full bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 font-extrabold py-2 rounded-xl text-[11px] transition-all cursor-pointer flex items-center justify-center gap-1 active:scale-98"
+                            >
+                              <Unlock size={12} />
+                              <span>Unlock Table #{task.tableId} (Remove Block)</span>
+                            </button>
+                          </div>
                         ) : task.type === 'food_ready' ? (
                           <button
                             onClick={() => {
@@ -1007,6 +1070,165 @@ export const WaiterModule: React.FC = () => {
                     </div>
                   ))}
                 </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ====================================================
+            VIEW: TABLES FLOOR & INSTANT SESSION UNLOCK
+            ==================================================== */}
+        {activeView === 'tables' && (
+          <div className="flex-1 p-5 flex flex-col animate-fade-in">
+            {/* Top Navigation Bar */}
+            <div className="flex justify-between items-center pt-2">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-2xl bg-[#FF6B00] text-white flex items-center justify-center shadow-md shadow-orange-500/20 shrink-0">
+                  <LayoutGrid size={18} />
+                </div>
+                <div>
+                  <h2 className="text-sm font-black text-slate-900 leading-tight">
+                    Floor Tables & Sessions
+                  </h2>
+                  <span className="text-[10px] font-semibold text-slate-400 font-mono block mt-0.5">
+                    {staffInfo.name || 'Floor Staff'} • Instant Unlock
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleLogout()}
+                  title="Logout"
+                  className="px-3 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5"
+                >
+                  <LogOut size={13} />
+                  <span>Logout</span>
+                </button>
+              </div>
+            </div>
+
+            {/* View Switcher: Tasks vs Tables Floor */}
+            <div className="flex bg-slate-100 p-1 rounded-2xl gap-1 mt-4">
+              <button
+                onClick={() => setActiveView('tasks')}
+                className="flex-1 py-2 text-xs font-black rounded-xl text-center transition-all cursor-pointer flex items-center justify-center gap-1.5 text-slate-500 hover:text-slate-900"
+              >
+                <Clock size={13} />
+                <span>Tasks ({allTasksList.length})</span>
+              </button>
+              <button
+                onClick={() => {
+                  setActiveView('tables');
+                  loadTables();
+                }}
+                className="flex-1 py-2 text-xs font-black rounded-xl text-center transition-all cursor-pointer flex items-center justify-center gap-1.5 bg-white text-orange-600 shadow-sm"
+              >
+                <Unlock size={13} />
+                <span>Tables & Unlock</span>
+              </button>
+            </div>
+
+            {/* Header info & Refresh */}
+            <div className="flex justify-between items-center mt-4 mb-3">
+              <div>
+                <p className="text-xs font-black text-slate-800">
+                  {tablesList.filter(t => t.status === 'Occupied').length} Occupied • {tablesList.filter(t => t.status !== 'Occupied').length} Available
+                </p>
+                <p className="text-[10px] text-slate-400">Tap Unlock to release table block for next diner</p>
+              </div>
+              <button
+                onClick={loadTables}
+                disabled={isLoadingTables}
+                className="px-3 py-1.5 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-600 font-bold text-xs flex items-center gap-1 transition-all cursor-pointer"
+              >
+                <RefreshCw size={12} className={isLoadingTables ? 'animate-spin' : ''} />
+                <span>Refresh</span>
+              </button>
+            </div>
+
+            {/* Tables Cards Grid */}
+            <div className="space-y-3 flex-1 overflow-y-auto no-scrollbar pb-6">
+              {tablesList.length === 0 ? (
+                <div className="p-8 text-center bg-white rounded-2xl border border-slate-100">
+                  <p className="text-xs text-slate-400 font-semibold">No tables found.</p>
+                </div>
+              ) : (
+                tablesList.map(table => {
+                  let session: any = null;
+                  if (table.customer_name) {
+                    try {
+                      session = typeof table.customer_name === 'string' && table.customer_name.startsWith('{')
+                        ? JSON.parse(table.customer_name)
+                        : { name: table.customer_name };
+                    } catch {
+                      session = { name: table.customer_name };
+                    }
+                  }
+                  const isOccupied = table.status === 'Occupied';
+                  const lastActiveMins = session?.lastActivityAt 
+                    ? Math.floor((Date.now() - Number(session.lastActivityAt)) / 60000) 
+                    : null;
+                  const isAssigned = isTableAssigned(table.id);
+
+                  return (
+                    <div 
+                      key={table.id}
+                      className={`p-4 rounded-2xl border transition-all shadow-xs ${
+                        isOccupied 
+                          ? 'bg-white border-orange-200/80 ring-1 ring-orange-500/10' 
+                          : 'bg-white border-slate-100'
+                      }`}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-black text-slate-900 text-sm">Table #{table.id}</h4>
+                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                              isOccupied 
+                                ? 'bg-orange-50 text-orange-600 border border-orange-200' 
+                                : 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+                            }`}>
+                              {isOccupied ? 'Occupied / Blocked' : 'Available'}
+                            </span>
+                            {isAssigned && !isAllTables && (
+                              <span className="text-[9px] font-bold bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">
+                                Assigned
+                              </span>
+                            )}
+                          </div>
+
+                          {isOccupied ? (
+                            <div className="mt-1.5 space-y-0.5 text-xs text-slate-600">
+                              <p className="font-semibold text-slate-800">
+                                Guest: {session?.name || 'Diner'} {session?.phone ? `• 📞 ${session.phone}` : ''}
+                              </p>
+                              {lastActiveMins !== null && (
+                                <p className={`text-[10px] font-bold ${lastActiveMins >= 5 ? 'text-red-500' : 'text-slate-400'}`}>
+                                  ⏱️ {lastActiveMins === 0 ? 'Active right now' : `Inactive for ${lastActiveMins} min`}{lastActiveMins >= 5 ? ' (Auto-Expired)' : ''}
+                                </p>
+                              )}
+                            </div>
+                          ) : (
+                            <p className="text-[11px] text-emerald-600 font-medium mt-1">
+                              ✓ Open for new customer QR scan
+                            </p>
+                          )}
+                        </div>
+
+                        {isOccupied && (
+                          <button
+                            onClick={() => handleRemoveSessionBlock(table.id)}
+                            className="px-3.5 py-2 bg-red-500 hover:bg-red-600 text-white font-black text-xs rounded-xl shadow-xs active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+                          >
+                            <Unlock size={13} />
+                            <span>Unlock Table</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
               )}
             </div>
           </div>

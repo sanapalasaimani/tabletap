@@ -3,9 +3,8 @@ import { useApp } from '../../context/AppContext';
 import { db } from '../../supabase';
 import { Order } from '../../types';
 import { 
-  X, Check, Smartphone, ShieldCheck, CheckCircle2, 
-  ArrowRight, Sparkles, QrCode, Banknote, Clock, 
-  ExternalLink, Copy, CheckCheck
+  X, ShieldCheck, CheckCircle2, 
+  Banknote, Clock
 } from 'lucide-react';
 
 interface CheckoutOverlayProps {
@@ -14,14 +13,12 @@ interface CheckoutOverlayProps {
   specificOrder?: Order | null;
 }
 
-type CheckoutStep = 'summary' | 'payment' | 'awaiting_cash' | 'success';
+type CheckoutStep = 'summary' | 'awaiting_cash' | 'success';
 
 export const CheckoutOverlay: React.FC<CheckoutOverlayProps> = ({ onClose, onPaymentSuccess, specificOrder }) => {
   const { activeOrder, setActiveOrder, orderHistory, refreshOrderHistory, profile, tableId } = useApp();
   const [step, setStep] = useState<CheckoutStep>('summary');
-  const [paymentMethod, setPaymentMethod] = useState<'UPI' | 'Cash'>('UPI');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [copiedUpi, setCopiedUpi] = useState(false);
 
   // Compute unpaid table orders to prevent mismatch (e.g., only unpaid orders are billed)
   const unpaidOrders = useMemo(() => {
@@ -48,14 +45,9 @@ export const CheckoutOverlay: React.FC<CheckoutOverlayProps> = ({ onClose, onPay
   const allItems = targetOrders.flatMap(o => o.items);
   const pointsEarned = Math.floor(totalAmount * 0.1);
 
-  const upiId = 'babaihotel@icici';
-  const billNote = specificOrder ? `Order+${specificOrder.id}+Bill` : `Table+${tableId}+Bill`;
-  const upiUri = `upi://pay?pa=${upiId}&pn=Babai+Hotel&am=${totalAmount}&cu=INR&tn=${billNote}`;
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(upiUri)}`;
-
   // Polling for waiter cash payment receipt confirmation
   useEffect(() => {
-    if (step !== 'awaiting_cash' && (step as any) !== 'payment') return;
+    if (step !== 'awaiting_cash') return;
 
     const checkPaymentSettled = async () => {
       if (targetOrders.length === 0) return;
@@ -119,26 +111,7 @@ export const CheckoutOverlay: React.FC<CheckoutOverlayProps> = ({ onClose, onPay
     );
   }
 
-  // 1. UPI Payment Confirmation (Client completes UPI and marks done)
-  const handleCompleteUpiPayment = async () => {
-    setIsProcessing(true);
-    try {
-      for (const ord of targetOrders) {
-        await db.payOrder(ord.id, 'UPI');
-      }
-      if (activeOrder) {
-        setActiveOrder({ ...activeOrder, paymentStatus: 'Paid', paymentMethod: 'UPI' });
-      }
-      await refreshOrderHistory();
-      setStep('success');
-    } catch (err) {
-      console.warn('Error completing UPI payment:', err);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  // 2. Cash Payment Request (Alerts waiter; waiter must click "Received Money")
+  // Cash Payment Request (Alerts waiter; waiter must click "Received Money")
   const handleRequestCashPayment = async () => {
     setIsProcessing(true);
     try {
@@ -163,12 +136,6 @@ export const CheckoutOverlay: React.FC<CheckoutOverlayProps> = ({ onClose, onPay
     }
   };
 
-  const handleCopyUpiId = () => {
-    navigator.clipboard?.writeText(upiId);
-    setCopiedUpi(true);
-    setTimeout(() => setCopiedUpi(false), 2000);
-  };
-
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 animate-fade-in font-sans">
       <div className="absolute inset-0" onClick={step === 'success' ? undefined : onClose}></div>
@@ -180,11 +147,10 @@ export const CheckoutOverlay: React.FC<CheckoutOverlayProps> = ({ onClose, onPay
           <div>
             <h3 className="font-black text-brand-text text-base">
               {step === 'summary' && (specificOrder ? `Order #${specificOrder.id} Bill` : 'Table Bill Summary')}
-              {step === 'payment' && (paymentMethod === 'UPI' ? 'Scan & Pay via UPI' : 'Pay with Cash')}
               {step === 'awaiting_cash' && 'Awaiting Waiter Confirmation'}
               {step === 'success' && 'Payment Successful'}
             </h3>
-            <span className="text-[11px] text-gray-400 font-semibold">Table #{tableId}</span>
+            <span className="text-[11px] text-gray-400 font-semibold">Table #{tableId} • Pay with Cash</span>
           </div>
 
           {step !== 'success' && (
@@ -264,9 +230,22 @@ export const CheckoutOverlay: React.FC<CheckoutOverlayProps> = ({ onClose, onPay
                     <span>-₹{totalDiscount}</span>
                   </div>
                 )}
-                <div className="flex justify-between text-sm font-black text-brand-text border-t border-gray-100 pt-3">
-                  <span>Total Amount Payable</span>
-                  <span className="text-primary text-xl font-black">₹{totalAmount}</span>
+                <div className="flex justify-between text-sm font-black text-slate-900 border-t border-dashed border-gray-200 pt-3">
+                  <span>Final Total to Pay</span>
+                  <span className="text-primary text-base">₹{totalAmount}</span>
+                </div>
+              </div>
+
+              {/* Cash Payment Highlight Banner */}
+              <div className="bg-emerald-50/70 rounded-2xl p-4 border border-emerald-200/80 flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 mt-0.5">
+                  <Banknote size={22} />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-xs text-emerald-950">Payment Method: Pay with Cash</h4>
+                  <p className="text-[11px] text-emerald-800 mt-0.5 leading-relaxed">
+                    Please pay <strong>₹{totalAmount}</strong> in physical cash to your waiter or at the billing counter. Your waiter will confirm payment upon receiving the money.
+                  </p>
                 </div>
               </div>
 
@@ -277,144 +256,15 @@ export const CheckoutOverlay: React.FC<CheckoutOverlayProps> = ({ onClose, onPay
                   Paying this bill will earn you <strong className="font-bold">{pointsEarned} DineSmart reward points</strong>!
                 </p>
               </div>
-            </div>
-          )}
-
-          {/* STEP 2: PAYMENT METHOD SELECTOR (ONLY UPI & CASH) */}
-          {step === 'payment' && (
-            <div className="space-y-5">
-              <div className="text-center py-2">
-                <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Total Amount to Pay</p>
-                <strong className="text-3xl font-black text-primary mt-0.5 block">₹{totalAmount}</strong>
-              </div>
-
-              {/* Payment Methods (Strictly UPI & Cash only) */}
-              <div className="grid grid-cols-2 gap-3">
-                {/* 1. UPI Option */}
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod('UPI')}
-                  className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                    paymentMethod === 'UPI' 
-                      ? 'border-primary bg-primary/[0.04] ring-2 ring-primary/20 shadow-xs' 
-                      : 'border-gray-200 bg-white hover:bg-gray-50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between w-full mb-3">
-                    <div className="w-10 h-10 rounded-xl bg-orange-100 text-primary flex items-center justify-center">
-                      <QrCode size={22} />
-                    </div>
-                    <span className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                      paymentMethod === 'UPI' ? 'border-primary bg-primary' : 'border-gray-300'
-                    }`}>
-                      {paymentMethod === 'UPI' && <Check size={10} className="text-white stroke-[3px]" />}
-                    </span>
-                  </div>
-                  <div>
-                    <h4 className="font-black text-sm text-brand-text">UPI & QR Code</h4>
-                    <p className="text-[10px] text-gray-400 font-medium mt-0.5">GPay, PhonePe, Paytm</p>
-                  </div>
-                </button>
-
-                {/* 2. Cash Option */}
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod('Cash')}
-                  className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                    paymentMethod === 'Cash' 
-                      ? 'border-primary bg-primary/[0.04] ring-2 ring-primary/20 shadow-xs' 
-                      : 'border-gray-200 bg-white hover:bg-gray-50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between w-full mb-3">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
-                      <Banknote size={22} />
-                    </div>
-                    <span className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                      paymentMethod === 'Cash' ? 'border-primary bg-primary' : 'border-gray-300'
-                    }`}>
-                      {paymentMethod === 'Cash' && <Check size={10} className="text-white stroke-[3px]" />}
-                    </span>
-                  </div>
-                  <div>
-                    <h4 className="font-black text-sm text-brand-text">Pay with Cash</h4>
-                    <p className="text-[10px] text-gray-400 font-medium mt-0.5">Pay to Waiter at Table</p>
-                  </div>
-                </button>
-              </div>
-
-              {/* UPI QR & DIRECT APP LAUNCHER */}
-              {paymentMethod === 'UPI' && (
-                <div className="bg-gray-50/80 rounded-3xl p-5 border border-gray-200/70 text-center space-y-4 animate-fade-in">
-                  <div className="bg-white p-3.5 rounded-2xl inline-block shadow-md border border-gray-100 mx-auto">
-                    <img 
-                      src={qrUrl} 
-                      alt="UPI QR Code" 
-                      className="w-48 h-48 mx-auto rounded-lg object-contain"
-                    />
-                  </div>
-
-                  <div>
-                    <p className="text-xs font-black text-slate-800">Scan QR Code using any UPI App</p>
-                    <p className="text-[11px] text-gray-500 mt-0.5">Google Pay, PhonePe, Paytm, BHIM, CRED</p>
-                  </div>
-
-                  {/* Copy UPI ID */}
-                  <div className="flex items-center justify-center gap-2">
-                    <div className="bg-white border border-gray-200 px-3 py-1.5 rounded-xl text-xs font-mono font-bold text-gray-700">
-                      {upiId}
-                    </div>
-                    <button
-                      onClick={handleCopyUpiId}
-                      className="flex items-center gap-1 text-[11px] font-bold text-primary bg-primary/10 hover:bg-primary/15 px-2.5 py-1.5 rounded-xl transition-colors cursor-pointer"
-                    >
-                      {copiedUpi ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
-                      <span>{copiedUpi ? 'Copied' : 'Copy UPI'}</span>
-                    </button>
-                  </div>
-
-                  {/* Direct Launch in UPI Apps Button */}
-                  <div className="pt-1">
-                    <a
-                      href={upiUri}
-                      className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-extrabold text-xs py-3 rounded-2xl shadow-md shadow-orange-500/20 transition-all cursor-pointer"
-                    >
-                      <Smartphone size={16} />
-                      <span>Open in UPI App (GPay / PhonePe / Paytm)</span>
-                      <ExternalLink size={13} />
-                    </a>
-                  </div>
-                </div>
-              )}
-
-              {/* CASH PAYMENT EXPLANATION */}
-              {paymentMethod === 'Cash' && (
-                <div className="bg-emerald-50/50 rounded-3xl p-5 border border-emerald-100 space-y-3 animate-fade-in">
-                  <div className="flex items-start gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <Banknote size={20} />
-                    </div>
-                    <div>
-                      <h4 className="font-black text-sm text-emerald-950">Pay Cash to Waiter</h4>
-                      <p className="text-xs text-emerald-800 mt-1 leading-relaxed">
-                        When you tap below, your assigned waiter will be alerted to collect <strong>₹{totalAmount}</strong> cash at Table #{tableId}.
-                      </p>
-                      <p className="text-[11px] text-emerald-700 font-semibold mt-2 bg-emerald-100/70 px-2.5 py-1.5 rounded-xl inline-block">
-                        ✓ Payment completes when waiter confirms received cash
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               <div className="flex justify-center items-center gap-1.5 text-[10px] text-gray-400 font-semibold py-1">
                 <ShieldCheck size={14} className="text-gray-400" />
-                <span>100% Verified Table Bill Settlement</span>
+                <span>100% Verified Table Bill Settlement (Cash)</span>
               </div>
             </div>
           )}
 
-          {/* STEP 2.5: AWAITING WAITER CASH CONFIRMATION */}
+          {/* STEP 2: AWAITING WAITER CASH CONFIRMATION */}
           {step === 'awaiting_cash' && (
             <div className="text-center py-6 space-y-5 animate-fade-in">
               <div className="relative w-20 h-20 mx-auto">
@@ -429,7 +279,7 @@ export const CheckoutOverlay: React.FC<CheckoutOverlayProps> = ({ onClose, onPay
               <div className="space-y-1.5">
                 <h3 className="text-xl font-black text-brand-text">Awaiting Waiter Confirmation</h3>
                 <p className="text-gray-500 text-xs leading-relaxed max-w-[280px] mx-auto">
-                  A waiter has been notified to collect <strong className="text-slate-900 font-black">₹{totalAmount}</strong> at <strong>Table #{tableId}</strong>.
+                  A waiter has been notified to collect <strong className="text-slate-900 font-black">₹{totalAmount}</strong> in cash at <strong>Table #{tableId}</strong>.
                 </p>
               </div>
 
@@ -459,7 +309,7 @@ export const CheckoutOverlay: React.FC<CheckoutOverlayProps> = ({ onClose, onPay
               <div className="space-y-1.5">
                 <h2 className="text-2xl font-black text-brand-text">Payment Successful</h2>
                 <p className="text-gray-500 text-xs leading-relaxed max-w-[260px] mx-auto">
-                  Your payment of <strong className="text-emerald-600 font-bold text-sm">₹{totalAmount}</strong> has been received successfully.
+                  Your cash payment of <strong className="text-emerald-600 font-bold text-sm">₹{totalAmount}</strong> has been received and confirmed by your waiter.
                 </p>
               </div>
 
@@ -472,7 +322,7 @@ export const CheckoutOverlay: React.FC<CheckoutOverlayProps> = ({ onClose, onPay
                 <div className="flex justify-between">
                   <span className="text-gray-400 font-medium">Payment Method</span>
                   <span className="font-bold text-brand-text">
-                    {paymentMethod === 'UPI' ? 'UPI (QR Code)' : 'Cash (Received by Waiter)'}
+                    Cash (Received by Waiter)
                   </span>
                 </div>
                 <div className="flex justify-between border-t border-gray-200/50 pt-2 text-emerald-700 font-bold">
@@ -499,33 +349,12 @@ export const CheckoutOverlay: React.FC<CheckoutOverlayProps> = ({ onClose, onPay
         <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-4 z-20">
           {step === 'summary' && (
             <button
-              onClick={() => setStep('payment')}
-              className="w-full bg-primary hover:bg-orange-600 text-white font-extrabold py-3.5 px-6 rounded-2xl shadow-lg shadow-primary/25 transition-all flex items-center justify-center gap-2 group cursor-pointer"
-            >
-              <span>Choose Payment Method • ₹{totalAmount}</span>
-              <ArrowRight size={16} className="transition-transform group-hover:translate-x-0.5" />
-            </button>
-          )}
-
-          {step === 'payment' && paymentMethod === 'UPI' && (
-            <button
-              onClick={handleCompleteUpiPayment}
-              disabled={isProcessing}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-3.5 px-6 rounded-2xl shadow-lg shadow-emerald-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:bg-gray-300"
-            >
-              <CheckCheck size={18} />
-              <span>{isProcessing ? 'Verifying UPI...' : '✓ I Have Completed UPI Payment'}</span>
-            </button>
-          )}
-
-          {step === 'payment' && paymentMethod === 'Cash' && (
-            <button
               onClick={handleRequestCashPayment}
               disabled={isProcessing}
-              className="w-full bg-primary hover:bg-orange-600 text-white font-extrabold py-3.5 px-6 rounded-2xl shadow-lg shadow-primary/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:bg-gray-300"
+              className="w-full bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-extrabold py-3.5 px-6 rounded-2xl shadow-lg shadow-emerald-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:bg-gray-300 active:scale-98"
             >
               <Banknote size={18} />
-              <span>{isProcessing ? 'Alerting Waiter...' : `Request Cash Payment • ₹${totalAmount}`}</span>
+              <span>{isProcessing ? 'Alerting Waiter...' : `Pay with Cash • ₹${totalAmount}`}</span>
             </button>
           )}
 
@@ -534,7 +363,7 @@ export const CheckoutOverlay: React.FC<CheckoutOverlayProps> = ({ onClose, onPay
               onClick={onClose}
               className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3.5 px-6 rounded-2xl transition-all text-center text-xs cursor-pointer"
             >
-              Keep Dining (We'll update once paid)
+              Keep Dining (We'll update once waiter confirms)
             </button>
           )}
 

@@ -117,12 +117,12 @@ export const MainContainer: React.FC = () => {
     verifyTableSession();
   }, [routeTableId, token, setTableId, phone, customerName]);
 
-  // 2-HOUR INACTIVITY AUTO LOGOUT & SESSION EXPIRATION
+  // 5-MINUTE INACTIVITY AUTO LOGOUT & SESSION EXPIRATION
   useEffect(() => {
     if (verificationStatus !== 'valid' || !routeTableId) return;
 
     const tableNum = parseInt(routeTableId, 10);
-    const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+    const FIVE_MINUTES_MS = 5 * 60 * 1000;
     let timer: any = null;
 
     const resetInactivityTimer = () => {
@@ -131,14 +131,14 @@ export const MainContainer: React.FC = () => {
       db.touchTableActivity(tableNum, devId);
 
       timer = setTimeout(async () => {
-        console.log('2 hours of user inactivity reached: automatically releasing QR session.');
+        console.log('5 minutes of user inactivity reached: automatically releasing QR session.');
         await db.releaseTableSession(tableNum);
         localStorage.removeItem('dinesmart_active_table');
         localStorage.removeItem('dinesmart_active_order');
         localStorage.removeItem('dinesmart_session_id');
-        alert('Your 2-hour dining table session has expired due to inactivity. Please scan the QR code to begin a fresh session.');
+        alert('Your dining table session has expired due to 5 minutes of inactivity. Please scan the QR code to begin a fresh session.');
         window.location.href = '/';
-      }, TWO_HOURS_MS);
+      }, FIVE_MINUTES_MS);
     };
 
     const activityEvents = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'];

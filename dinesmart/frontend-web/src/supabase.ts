@@ -827,8 +827,9 @@ export const db = {
     }
 
     const now = Date.now();
-    const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
-    const isExpired = sessionData?.lastActivityAt && (now - Number(sessionData.lastActivityAt) > TWO_HOURS_MS);
+    // 5-minute inactivity timeout: Table becomes available to other customers if inactive for 5 minutes
+    const FIVE_MINUTES_MS = 5 * 60 * 1000;
+    const isExpired = sessionData?.lastActivityAt && (now - Number(sessionData.lastActivityAt) > FIVE_MINUTES_MS);
 
     // If table is occupied, not expired, and device does not match
     if (table.status === 'Occupied' && !isExpired && sessionData?.deviceId && sessionData.deviceId !== deviceId) {
@@ -882,6 +883,9 @@ export const db = {
       customer_name: null
     };
     await db.saveTable(updated);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('dinesmart_table_released', { detail: { tableId } }));
+    }
     return true;
   },
 

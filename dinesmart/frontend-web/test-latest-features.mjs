@@ -63,14 +63,13 @@ assert(
 );
 console.log('✅ PASS: Coupons synchronized with admin and restricted to single-use per customer');
 
-// 5. Check Payment Methods: UPI & Cash Only + Waiter Received Money
+// 5. Check Order Payments: ONLY Pay with Cash Available + Waiter Received Money Confirmation
 const checkoutOverlay = fs.readFileSync(path.join(__dirname, 'src/components/customer/CheckoutOverlay.tsx'), 'utf-8');
 assert(!checkoutOverlay.includes('RazorpayModal'), 'CheckoutOverlay must NOT include RazorpayModal');
 assert(!checkoutOverlay.includes('Credit / Debit Cards'), 'CheckoutOverlay must NOT include Credit / Debit Cards');
-assert(checkoutOverlay.includes("paymentMethod === 'UPI'"), 'CheckoutOverlay must support UPI');
-assert(checkoutOverlay.includes("paymentMethod === 'Cash'"), 'CheckoutOverlay must support Cash');
-assert(checkoutOverlay.includes('upi://pay?pa='), 'CheckoutOverlay must generate UPI URI');
-assert(checkoutOverlay.includes('create-qr-code'), 'CheckoutOverlay must generate UPI QR Code');
+assert(!checkoutOverlay.includes('upi://pay?pa='), 'CheckoutOverlay must NOT include UPI payment links');
+assert(!checkoutOverlay.includes('create-qr-code'), 'CheckoutOverlay must NOT include UPI QR Code');
+assert(checkoutOverlay.includes('Pay with Cash'), 'CheckoutOverlay must support Pay with Cash');
 assert(checkoutOverlay.includes('awaiting_cash'), 'CheckoutOverlay must have awaiting_cash state for waiter collection');
 
 const waiterModule = fs.readFileSync(path.join(__dirname, 'src/pages/waiter/WaiterModule.tsx'), 'utf-8');
@@ -82,7 +81,27 @@ assert(
   waiterModule.includes('Received Money (Mark Paid)'),
   'WaiterModule must have "Received Money (Mark Paid)" button'
 );
-console.log('✅ PASS: Payment methods restricted to UPI & Cash only; Waiter "Received Money" confirmation implemented');
+console.log('✅ PASS: Order Payments restricted strictly to Pay with Cash only (UPI removed); Waiter "Received Money" implemented');
+
+// 6. Check 5-Minute Inactivity Session Expiration & Waiter APK Session Unlock
+const mainContainer = fs.readFileSync(path.join(__dirname, 'src/pages/customer/MainContainer.tsx'), 'utf-8');
+assert(
+  supabaseFile.includes('5 * 60 * 1000') && supabaseFile.includes('FIVE_MINUTES_MS'),
+  'supabase.ts must implement 5-minute table session inactivity expiration'
+);
+assert(
+  mainContainer.includes('5 * 60 * 1000') && mainContainer.includes('FIVE_MINUTES_MS'),
+  'MainContainer.tsx must implement 5-minute table session auto-logout'
+);
+assert(
+  waiterModule.includes('handleRemoveSessionBlock') && waiterModule.includes('releaseTableSession'),
+  'WaiterModule must implement handleRemoveSessionBlock using releaseTableSession'
+);
+assert(
+  waiterModule.includes('Unlock Table'),
+  'WaiterModule must render Unlock Table button'
+);
+console.log('✅ PASS: Table is released after 5 minutes inactivity or unlocked by waiter via APK so new customers are not blocked');
 
 console.log('\n====================================================');
 console.log('🎉 ALL 5 USER FEATURE CHECKS PASSED SUCCESSFULLY!');
