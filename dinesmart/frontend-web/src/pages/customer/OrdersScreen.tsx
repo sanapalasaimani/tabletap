@@ -6,7 +6,7 @@ import { FeedbackModal } from '../../components/customer/FeedbackModal';
 
 interface OrdersScreenProps {
   onAddMoreItems: () => void;
-  onPayBill: () => void;
+  onPayBill: (order?: Order) => void;
 }
 
 export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onAddMoreItems, onPayBill }) => {
@@ -30,10 +30,11 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onAddMoreItems, onPa
 
   const currentStepIdx = activeOrder ? getStatusIndex(activeOrder.status) : -1;
 
-  // Session-isolated history: Prioritize orders belonging to current table and session
+  // Session-isolated history: Prioritize orders belonging to current table and session (within last 12 hours)
   const sessionOrders = orderHistory.filter(order => {
-    // Only show orders for this table during active dining
-    return String(order.tableId) === String(tableId);
+    const isSameTable = String(order.tableId) === String(tableId);
+    const orderAgeHours = (Date.now() - new Date(order.createdAt).getTime()) / (1000 * 60 * 60);
+    return isSameTable && (isNaN(orderAgeHours) || orderAgeHours < 12);
   });
 
   const displayHistory = (sessionOrders.length > 0 ? sessionOrders : orderHistory).filter(order => {
@@ -273,24 +274,40 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onAddMoreItems, onPa
                     <div className="flex justify-between items-center border-t border-gray-50 pt-2.5">
                       <span className="text-xs font-black text-brand-text">Total: ₹{order.total}</span>
                       
-                      {/* Note 4: Single time rating only */}
-                      {order.status === 'Delivered' && !rated ? (
-                        <button
-                          onClick={() => setSelectedFeedbackOrderId(order.id)}
-                          className="flex items-center gap-1 text-[11px] bg-orange-500 text-white font-bold px-3 py-1.5 rounded-xl hover:bg-orange-600 transition-all shadow-sm active:scale-95 cursor-pointer"
-                        >
-                          <MessageSquare size={12} />
-                          <span>Rate Experience</span>
-                        </button>
-                      ) : rated ? (
-                        <span className="text-[11px] text-emerald-600 font-extrabold flex items-center gap-1 bg-emerald-50 px-2.5 py-1 rounded-xl">
-                          ✓ Rated (Thank You)
-                        </span>
-                      ) : (
-                        <span className="text-[10px] text-gray-400 font-medium italic">
-                          {order.paymentStatus === 'Paid' ? 'Paid' : 'Unpaid'}
-                        </span>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {/* Note 4: Single time rating only */}
+                        {order.status === 'Delivered' && !rated ? (
+                          <button
+                            onClick={() => setSelectedFeedbackOrderId(order.id)}
+                            className="flex items-center gap-1 text-[11px] bg-orange-500 text-white font-bold px-3 py-1.5 rounded-xl hover:bg-orange-600 transition-all shadow-sm active:scale-95 cursor-pointer"
+                          >
+                            <MessageSquare size={12} />
+                            <span>Rate</span>
+                          </button>
+                        ) : rated ? (
+                          <span className="text-[11px] text-emerald-600 font-extrabold flex items-center gap-1 bg-emerald-50 px-2.5 py-1 rounded-xl">
+                            ✓ Rated
+                          </span>
+                        ) : null}
+
+                        {order.paymentStatus === 'Paid' ? (
+                          <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-md">
+                            Paid
+                          </span>
+                        ) : order.status !== 'Cancelled' ? (
+                          <button
+                            onClick={() => onPayBill(order)}
+                            className="flex items-center gap-1 text-[11px] bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-3 py-1 rounded-xl transition-all shadow-xs active:scale-95 cursor-pointer"
+                          >
+                            <CreditCard size={11} />
+                            <span>Pay ₹{order.total}</span>
+                          </button>
+                        ) : (
+                          <span className="text-[10px] text-gray-400 font-medium italic">
+                            Cancelled
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
@@ -309,13 +326,30 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onAddMoreItems, onPa
       {/* Note 19 & Note 7: Single Prominent ("Pedda") Button at the Bottom */}
       <div className="sticky bottom-0 left-0 right-0 p-4 bg-white/95 backdrop-blur-md border-t border-gray-100 z-20 shadow-lg">
         {hasUnpaidOrders ? (
-          <button
-            onClick={onPayBill}
-            className="w-full py-4 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black text-sm rounded-2xl shadow-xl shadow-orange-500/25 flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-98"
-          >
-            <CreditCard size={18} />
-            <span>Request Table Bill • ₹{currentTableTotal}</span>
-          </button>
+          <div>
+            {unpaidOrders.length > 1 && (
+              <div className="mb-2.5 px-3 py-2 bg-orange-50 border border-orange-200/80 rounded-xl flex items-center justify-between text-xs text-orange-950">
+                <div className="flex items-center gap-1.5 font-bold">
+                  <AlertCircle size={14} className="text-orange-500 shrink-0" />
+                  <span>Table #{tableId} has {unpaidOrders.length} unpaid orders:</span>
+                </div>
+                <div className="text-[11px] font-semibold text-orange-800">
+                  {unpaidOrders.map(o => `#${o.id.replace('ord_', '')} (₹${o.total})`).join(' + ')}
+                </div>
+              </div>
+            )}
+            <button
+              onClick={() => onPayBill()}
+              className="w-full py-4 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black text-sm rounded-2xl shadow-xl shadow-orange-500/25 flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-98"
+            >
+              <CreditCard size={18} />
+              <span>
+                {unpaidOrders.length > 1
+                  ? `Request Table Bill (${unpaidOrders.length} Orders) • ₹${currentTableTotal}`
+                  : `Request Table Bill • ₹${currentTableTotal}`}
+              </span>
+            </button>
+          </div>
         ) : hasPlacedOrders ? (
           <div className="w-full py-3.5 bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold text-xs rounded-2xl flex items-center justify-center gap-2">
             <CheckCircle2 size={16} className="text-emerald-600" />

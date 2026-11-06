@@ -87,3 +87,4 @@ console.log('✅ PASS: Payment methods restricted to UPI & Cash only; Waiter "Re
 console.log('\n====================================================');
 console.log('🎉 ALL 5 USER FEATURE CHECKS PASSED SUCCESSFULLY!');
 console.log('====================================================\n');
+

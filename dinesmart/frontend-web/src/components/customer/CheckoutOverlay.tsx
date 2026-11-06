@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { db } from '../../supabase';
+import { Order } from '../../types';
 import { 
   X, Check, Smartphone, ShieldCheck, CheckCircle2, 
   ArrowRight, Sparkles, QrCode, Banknote, Clock, 
@@ -10,11 +11,12 @@ import {
 interface CheckoutOverlayProps {
   onClose: () => void;
   onPaymentSuccess: () => void;
+  specificOrder?: Order | null;
 }
 
 type CheckoutStep = 'summary' | 'payment' | 'awaiting_cash' | 'success';
 
-export const CheckoutOverlay: React.FC<CheckoutOverlayProps> = ({ onClose, onPaymentSuccess }) => {
+export const CheckoutOverlay: React.FC<CheckoutOverlayProps> = ({ onClose, onPaymentSuccess, specificOrder }) => {
   const { activeOrder, setActiveOrder, orderHistory, refreshOrderHistory, profile, tableId } = useApp();
   const [step, setStep] = useState<CheckoutStep>('summary');
   const [paymentMethod, setPaymentMethod] = useState<'UPI' | 'Cash'>('UPI');
@@ -23,16 +25,21 @@ export const CheckoutOverlay: React.FC<CheckoutOverlayProps> = ({ onClose, onPay
 
   // Compute unpaid table orders to prevent mismatch (e.g., only unpaid orders are billed)
   const unpaidOrders = useMemo(() => {
+    if (specificOrder) return [specificOrder];
     const list = (orderHistory || []).filter(
-      o => String(o.tableId) === String(tableId) && o.paymentStatus !== 'Paid' && o.status !== 'Cancelled'
+      o => {
+        const isSameTable = String(o.tableId) === String(tableId);
+        const orderAgeHours = (Date.now() - new Date(o.createdAt).getTime()) / (1000 * 60 * 60);
+        return isSameTable && o.paymentStatus !== 'Paid' && o.status !== 'Cancelled' && (isNaN(orderAgeHours) || orderAgeHours < 12);
+      }
     );
     if (activeOrder && activeOrder.paymentStatus !== 'Paid' && !list.some(o => o.id === activeOrder.id)) {
       list.unshift(activeOrder);
     }
     return list;
-  }, [orderHistory, activeOrder, tableId]);
+  }, [orderHistory, activeOrder, tableId, specificOrder]);
 
-  const targetOrders = unpaidOrders.length > 0 ? unpaidOrders : (activeOrder ? [activeOrder] : []);
+  const targetOrders = specificOrder ? [specificOrder] : (unpaidOrders.length > 0 ? unpaidOrders : (activeOrder ? [activeOrder] : []));
   const totalAmount = targetOrders.reduce((sum, o) => sum + o.total, 0);
   const totalSubtotal = targetOrders.reduce((sum, o) => sum + o.subtotal, 0);
   const totalGst = targetOrders.reduce((sum, o) => sum + o.gst, 0);
@@ -42,7 +49,8 @@ export const CheckoutOverlay: React.FC<CheckoutOverlayProps> = ({ onClose, onPay
   const pointsEarned = Math.floor(totalAmount * 0.1);
 
   const upiId = 'babaihotel@icici';
-  const upiUri = `upi://pay?pa=${upiId}&pn=Babai+Hotel&am=${totalAmount}&cu=INR&tn=Table+${tableId}+Bill`;
+  const billNote = specificOrder ? `Order+${specificOrder.id}+Bill` : `Table+${tableId}+Bill`;
+  const upiUri = `upi://pay?pa=${upiId}&pn=Babai+Hotel&am=${totalAmount}&cu=INR&tn=${billNote}`;
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(upiUri)}`;
 
   // Polling for waiter cash payment receipt confirmation
@@ -171,7 +179,7 @@ export const CheckoutOverlay: React.FC<CheckoutOverlayProps> = ({ onClose, onPay
         <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-white sticky top-0 z-20">
           <div>
             <h3 className="font-black text-brand-text text-base">
-              {step === 'summary' && 'Table Bill Summary'}
+              {step === 'summary' && (specificOrder ? `Order #${specificOrder.id} Bill` : 'Table Bill Summary')}
               {step === 'payment' && (paymentMethod === 'UPI' ? 'Scan & Pay via UPI' : 'Pay with Cash')}
               {step === 'awaiting_cash' && 'Awaiting Waiter Confirmation'}
               {step === 'success' && 'Payment Successful'}
@@ -198,10 +206,17 @@ export const CheckoutOverlay: React.FC<CheckoutOverlayProps> = ({ onClose, onPay
               {/* Table details */}
               <div className="bg-orange-50/70 rounded-2xl p-4 border border-orange-100/70 flex justify-between items-center">
                 <div>
-                  <span className="text-[10px] text-orange-600 font-extrabold uppercase tracking-wider">Table Bill</span>
+                  <span className="text-[10px] text-orange-600 font-extrabold uppercase tracking-wider">
+                    {specificOrder ? 'Single Order Bill' : 'Table Bill'}
+                  </span>
                   <p className="font-extrabold text-brand-text text-sm mt-0.5">
                     {targetOrders.length === 1 ? `Order #${targetOrders[0].id}` : `${targetOrders.length} Unpaid Orders`}
                   </p>
+                  {targetOrders.length > 1 && (
+                    <p className="text-[11px] text-orange-800 font-medium mt-0.5">
+                      {targetOrders.map(o => `#${o.id.replace('ord_', '')} (₹${o.total})`).join(' + ')} = ₹{totalAmount}
+                    </p>
+                  )}
                 </div>
                 <span className="bg-white text-orange-600 text-xs font-black px-3 py-1 rounded-full border border-orange-200 shadow-xs">
                   Table #{tableId}

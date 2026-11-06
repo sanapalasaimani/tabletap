@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
-import { MenuItem } from '../../types';
+import { MenuItem, Order } from '../../types';
 import { db } from '../../supabase';
 import { WelcomeScreen } from './WelcomeScreen';
 import { HomeScreen } from './HomeScreen';
@@ -40,6 +40,7 @@ export const MainContainer: React.FC = () => {
   const [selectedDish, setSelectedDish] = useState<MenuItem | null>(null);
   const [showWaiterModal, setShowWaiterModal] = useState(false);
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+  const [checkoutTargetOrder, setCheckoutTargetOrder] = useState<Order | null>(null);
   const [showExitModal, setShowExitModal] = useState(false);
 
   // Refs for tracking in popstate event listener
@@ -424,7 +425,10 @@ export const MainContainer: React.FC = () => {
         {activeTab === 'orders' && (
           <OrdersScreen 
             onAddMoreItems={() => handleNavigateToTab('search')} 
-            onPayBill={() => setShowCheckoutModal(true)} 
+            onPayBill={(order?: Order) => {
+              setCheckoutTargetOrder(order || null);
+              setShowCheckoutModal(true);
+            }} 
           />
         )}
 
@@ -526,9 +530,14 @@ export const MainContainer: React.FC = () => {
       {/* Checkout Modal */}
       {showCheckoutModal && (
         <CheckoutOverlay 
-          onClose={() => setShowCheckoutModal(false)}
+          specificOrder={checkoutTargetOrder}
+          onClose={() => {
+            setShowCheckoutModal(false);
+            setCheckoutTargetOrder(null);
+          }}
           onPaymentSuccess={() => {
             setShowCheckoutModal(false);
+            setCheckoutTargetOrder(null);
             handleNavigateToTab('orders');
           }}
         />
