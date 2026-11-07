@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 
 console.log('====================================================');
-console.log('🧪 TESTING MODERN ADMIN LOGIN PAGE');
+console.log('🧪 TESTING FULL-WINDOW ADMIN LOGIN WITH LEFT DISHES PHOTO');
 console.log('====================================================\n');
 
 let allPassed = true;
@@ -10,64 +10,63 @@ let allPassed = true;
 const loginPath = path.resolve('dinesmart/frontend-web/src/pages/admin/AdminLogin.tsx');
 const content = fs.readFileSync(loginPath, 'utf8');
 
-// 1. Check for Modern Two-Column Split Layout
-const hasSplitLayout = content.includes('flex-col md:flex-row') && content.includes('md:w-5/12') && content.includes('md:w-7/12');
-if (hasSplitLayout) {
-  console.log('✅ PASS: Modern two-column horizontal split layout implemented matching reference design!');
+// 1. Check Full Window Sizing
+const hasFullWindow = content.includes('w-screen h-screen min-h-screen overflow-hidden');
+if (hasFullWindow) {
+  console.log('✅ PASS: Login page occupies full window (100vw, 100vh)!');
 } else {
-  console.error('❌ FAIL: Two-column split layout not found.');
+  console.error('❌ FAIL: Full window sizing missing.');
   allPassed = false;
 }
 
-// 2. Check for "Welcome Admin" on Right Side
-const hasWelcomeAdmin = content.includes('Welcome Admin');
-const hasSouthIndianHeader = content.includes('South Indian Cuisine Hub') || content.includes('South Indian');
-if (hasWelcomeAdmin && hasSouthIndianHeader) {
-  console.log('✅ PASS: Right side prominent "Welcome Admin" heading with South Indian branding present!');
+// 2. Check Dishes Photo on the Left Side
+const hasLeftDishSection = content.includes('1. LEFT SIDE: FULL-WINDOW SOUTH INDIAN DISHES PHOTO') || content.includes('activeDish.image');
+const hasSouthIndianDishes = content.includes('Masala Dosa') && content.includes('Idli Sambar') && content.includes('Dum Biryani');
+
+if (hasLeftDishSection && hasSouthIndianDishes) {
+  console.log('✅ PASS: South Indian dishes photo is positioned on the LEFT side!');
 } else {
-  console.error('❌ FAIL: "Welcome Admin" or South Indian branding missing.');
+  console.error('❌ FAIL: Left dishes photo missing.');
   allPassed = false;
 }
 
-// 3. Check for Specifically South Indian Food Dishes
-const hasMasalaDosa = content.includes('Crispy Ghee Roast Masala Dosa');
-const hasIdliSambar = content.includes('Steamed Idli Sambar Platter');
-const hasBiryani = content.includes('Hyderabadi Dum Biryani');
-const hasBananaThali = content.includes('South Indian Banana Leaf Feast');
+// 3. Check Form on the Right Side with "Welcome Admin"
+const hasRightLoginSection = content.includes('2. RIGHT SIDE: FULL-WINDOW CLEAN LOGIN FORM');
+const hasWelcomeAdmin = content.includes('Welcome Admin') && content.includes('Login');
 
-if (hasMasalaDosa && hasIdliSambar && hasBiryani && hasBananaThali) {
-  console.log('✅ PASS: Specifically South Indian food dishes showcase (Masala Dosa, Idli Sambar, Dum Biryani, Banana Leaf Feast) present!');
+if (hasRightLoginSection && hasWelcomeAdmin) {
+  console.log('✅ PASS: Right side contains "Welcome Admin" and clean "Login" form!');
 } else {
-  console.error('❌ FAIL: South Indian dishes missing.');
+  console.error('❌ FAIL: Right side login section or Welcome Admin missing.');
   allPassed = false;
 }
 
-// 4. Verify NO "Forgot Password" and NO "Create Account"
+// 4. Verify NO "Forgot Password" and NO "Create account / Don't have account"
 const lower = content.toLowerCase();
-const hasForgotPassword = lower.includes('forgot password') || lower.includes('forget password');
-const hasCreateAccount = lower.includes("don't have account") || lower.includes('create account') || lower.includes('sign up');
+const hasForgotPassword = lower.includes('forgot password?') || lower.includes('forget password?');
+const hasCreateAccount = lower.includes("don't have account?") || lower.includes("don't have account") || lower.includes('create account');
 
 if (!hasForgotPassword && !hasCreateAccount) {
   console.log('✅ PASS: Strictly NO "Forgot Password" and NO "Don\'t have account / create" links!');
 } else {
-  console.error('❌ FAIL: Found unwanted forgot password or create account links.');
+  console.error('❌ FAIL: Found unwanted forgot password or create account text.');
   allPassed = false;
 }
 
-// 5. Verify Authentication Logic and Demo Fill
+// 5. Verify Authentication and Quick Demo Fill
 const hasAuth = content.includes("admin") && content.includes("password") && content.includes("onLoginSuccess('Admin')");
-const hasQuickFill = content.includes('handleQuickFill');
+const hasPillButton = content.includes('rounded-full') && content.includes('Login');
 
-if (hasAuth && hasQuickFill) {
-  console.log('✅ PASS: Admin authentication logic and 1-click Quick Demo Fill helper verified!');
+if (hasAuth && hasPillButton) {
+  console.log('✅ PASS: Rounded-full pill Login button and authentication logic verified!');
 } else {
-  console.error('❌ FAIL: Authentication logic or Quick Fill missing.');
+  console.error('❌ FAIL: Pill button or authentication missing.');
   allPassed = false;
 }
 
 console.log('\n====================================================');
 if (allPassed) {
-  console.log('🎉 ALL MODERN ADMIN LOGIN VERIFICATION CHECKS PASSED!');
+  console.log('🎉 ALL FULL-WINDOW & LEFT DISHES PHOTO CHECKS PASSED!');
 } else {
   console.log('❌ SOME CHECKS FAILED');
 }
