@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChefHat, User, Eye, EyeOff, ArrowRight, Sparkles, Star, CheckCircle2 } from 'lucide-react';
+import { ChefHat, User, Eye, EyeOff, ArrowRight, Star, CheckCircle2 } from 'lucide-react';
 
 interface AdminLoginProps {
   onLoginSuccess: (role: string) => void;
@@ -12,7 +12,6 @@ interface SouthIndianDish {
   category: string;
   rating: number;
   image: string;
-  tag: string;
   description: string;
   highlights: string[];
 }
@@ -24,7 +23,6 @@ const SOUTH_INDIAN_DISHES: SouthIndianDish[] = [
     category: 'Breakfast & All-Day Classic',
     rating: 4.9,
     image: 'https://images.unsplash.com/photo-1668236543090-82eba5ee5976?auto=format&fit=crop&w=1400&q=85',
-    tag: '⭐ Signature Delicacy',
     description: 'Golden, paper-thin fermented rice crepe roasted with pure desi ghee, served with coconut chutney & piping hot vegetable sambar.',
     highlights: ['Pure Desi Ghee', 'Fresh Chutneys', 'Golden Roast']
   },
@@ -34,7 +32,6 @@ const SOUTH_INDIAN_DISHES: SouthIndianDish[] = [
     category: 'Breakfast Specialty',
     rating: 4.8,
     image: 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=1400&q=85',
-    tag: '🌿 Pillow-Soft & Fresh',
     description: 'Pillow-soft fermented rice cakes freshly steamed, accompanied by hot lentil vegetable sambar and freshly ground chutneys.',
     highlights: ['100% Steamed', 'Low Calorie', 'Podi Ghee Toss']
   },
@@ -44,7 +41,6 @@ const SOUTH_INDIAN_DISHES: SouthIndianDish[] = [
     category: 'Chef Special Main Course',
     rating: 4.9,
     image: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=1400&q=85',
-    tag: '👑 Royal Nizam Legacy',
     description: 'Long-grain basmati layered with rich spices, slow-cooked in a sealed handi with saffron and caramelized onions.',
     highlights: ['Slow Dum Cooked', 'Saffron Fragrance', 'Mirchi Ka Salan']
   },
@@ -54,15 +50,14 @@ const SOUTH_INDIAN_DISHES: SouthIndianDish[] = [
     category: 'Traditional Grand Thali',
     rating: 4.9,
     image: 'https://images.unsplash.com/photo-1610057099443-fde8c4d50f91?auto=format&fit=crop&w=1400&q=85',
-    tag: '🍃 Authentic Grand Feast',
     description: 'A lavish multi-course meal on green banana leaf with steamed rice, drumstick sambar, rasam, avial, poriyal & payasam.',
     highlights: ['Banana Leaf Serve', '12+ Authentic Items', 'Traditional Flavors']
   }
 ];
 
 export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, sessionExpiredNotice }) => {
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('password');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -94,22 +89,19 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, sessionE
     setLoading(true);
 
     setTimeout(() => {
-      if (username.trim().toLowerCase() === 'admin' && password === 'password') {
+      const isUsernameMatch = username.trim().toLowerCase() === 'admin@got11'.toLowerCase();
+      const isPasswordMatch = password === 'TableTap@GOT11';
+
+      if (isUsernameMatch && isPasswordMatch) {
         localStorage.setItem('dinesmart_admin_token', 'session_admin1');
         localStorage.setItem('dinesmart_admin_role', 'Admin');
         localStorage.setItem('dinesmart_admin_last_active', String(Date.now()));
         onLoginSuccess('Admin');
       } else {
-        setError('Invalid credentials. (Demo: admin / password)');
+        setError('Invalid username or password. Please try again.');
       }
       setLoading(false);
     }, 600);
-  };
-
-  const handleQuickFill = () => {
-    setUsername('admin');
-    setPassword('password');
-    setError('');
   };
 
   return (
@@ -132,21 +124,6 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, sessionE
 
         {/* Ambient Dark Gradient Overlays for Readability */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-black/60 pointer-events-none"></div>
-
-        {/* Top Badges & Branding */}
-        <div className="absolute top-6 left-6 right-6 flex items-center justify-between z-10">
-          <div className="flex items-center gap-2.5 bg-black/50 backdrop-blur-md border border-white/15 px-3.5 py-1.5 rounded-full">
-            <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-[#FF6B00] to-amber-500 flex items-center justify-center text-white shadow-xs">
-              <ChefHat size={14} />
-            </div>
-            <span className="text-xs font-black tracking-wider uppercase text-white">TableTap • South Indian Kitchen</span>
-          </div>
-
-          <div className="hidden sm:flex items-center gap-1.5 bg-orange-500/80 backdrop-blur-md px-3 py-1 rounded-full text-[11px] font-black text-white shadow-sm">
-            <Sparkles size={12} />
-            <span>{activeDish.tag}</span>
-          </div>
-        </div>
 
         {/* Bottom Dish Details & Selector */}
         <div className="absolute bottom-6 left-6 right-6 z-10 space-y-3">
@@ -244,7 +221,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, sessionE
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="admin"
+                placeholder="Username"
                 autoComplete="username"
                 className="w-full bg-[#f1f5f9] hover:bg-slate-100 focus:bg-white border border-transparent focus:border-[#FF6B00] rounded-2xl py-3.5 pl-5 pr-12 text-sm font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-orange-500/15 transition-all shadow-2xs"
               />
@@ -259,7 +236,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, sessionE
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
+                placeholder="Password"
                 autoComplete="current-password"
                 className="w-full bg-[#f1f5f9] hover:bg-slate-100 focus:bg-white border border-transparent focus:border-[#FF6B00] rounded-2xl py-3.5 pl-5 pr-12 text-sm font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-orange-500/15 transition-all shadow-2xs"
               />
@@ -295,19 +272,6 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, sessionE
 
           </form>
 
-          {/* Quick Demo Fill Helper */}
-          <div className="mt-6 flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-100 text-xs">
-            <span className="text-slate-500 text-[11px]">
-              Demo: <strong className="text-slate-800">admin</strong> / <strong className="text-slate-800">password</strong>
-            </span>
-            <button
-              type="button"
-              onClick={handleQuickFill}
-              className="text-[11px] font-bold text-orange-600 hover:text-orange-700 bg-orange-100/70 hover:bg-orange-100 px-2.5 py-1 rounded-xl transition-colors cursor-pointer"
-            >
-              Fill Demo
-            </button>
-          </div>
         </div>
 
         {/* Minimal Footer */}
