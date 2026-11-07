@@ -12,7 +12,8 @@ import {
   CornerDownRight, UserPlus, Heart, TrendingUp, DollarSign, Calendar, CalendarDays,
   TrendingDown, ArrowUpRight, ArrowDownRight, Clock, Star, Eye, EyeOff, Phone, Copy, FileSpreadsheet, ChevronDown, ExternalLink,
   Upload, Smartphone, Share2, CheckCircle2, AlertCircle, Receipt,
-  Bell, LogOut, Activity, BookOpen, Smile, Meh, Frown, PanelLeftClose, PanelLeftOpen
+  Bell, LogOut, Activity, BookOpen, Smile, Meh, Frown, PanelLeftClose, PanelLeftOpen,
+  Table, List, LayoutGrid
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, CartesianGrid, AreaChart, Area } from 'recharts';
 import {
@@ -172,6 +173,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
   const [chartTimeframe, setChartTimeframe] = useState<'hourly' | 'daily'>('hourly');
   const [revenueTimeframe, setRevenueTimeframe] = useState<'today' | 'week' | 'month'>('today');
   const [searchGlobalQuery, setSearchGlobalQuery] = useState('');
+  const [menuViewMode, setMenuViewMode] = useState<'table' | 'grid'>('table');
+  const [qrViewMode, setQrViewMode] = useState<'table' | 'grid'>('table');
+  const [copiedTokenId, setCopiedTokenId] = useState<number | null>(null);
   const [reviewFilter, setReviewFilter] = useState<'all' | 'positive' | 'neutral' | 'critical' | 'unreplied'>('all');
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
 
@@ -1653,95 +1657,85 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                   </div>
                 </div>
 
-                {/* 2. TOP KPI CARDS */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-                  {/* Card 1: Today's Revenue */}
-                  <div
-                    onClick={() => setActiveTab('reports')}
-                    className="p-5 rounded-2xl border bg-white border-slate-200/90 shadow-2xs hover:shadow-md hover:border-[#FF6B00]/60 hover:scale-[1.01] active:scale-[0.99] transition-all flex flex-col justify-between cursor-pointer group"
-                    title="Click to view detailed Hotel Reports & Revenue Analytics"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-[#FF6B00] group-hover:bg-[#FF6B00] group-hover:text-white transition-colors">
-                        <CreditCard size={18} />
-                      </div>
-                      <span className="text-xs font-bold text-slate-400 group-hover:text-[#FF6B00] flex items-center gap-0.5 transition-colors">
-                        <span>Reports</span>
-                        <ArrowUpRight size={14} />
-                      </span>
-                    </div>
-                    <div className="mt-4">
-                      <span className="text-xs font-semibold text-slate-400 block">
-                        {isAllDatesMode ? 'All-Time Revenue' : `${formatFriendlyDate(selectedOrderDate)} Revenue`}
-                      </span>
-                      <strong className="text-2xl font-black text-slate-900 tracking-tight mt-1 block">
-                        ₹{displayRevenue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </strong>
-                      <div className="mt-2 flex items-center justify-between text-xs font-bold text-slate-500">
-                        <span>{activeDateOrders.length} {activeDateOrders.length === 1 ? 'order' : 'orders'} {isAllDatesMode ? 'recorded' : 'on date'}</span>
-                        <span 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowDateOrdersModal(true);
-                          }}
-                          className="text-[#FF6B00] hover:underline flex items-center gap-0.5 text-[11px]"
-                        >
-                          <span>Explore</span>
-                          <ArrowUpRight size={12} />
+                {/* 2. UNIFIED ENTERPRISE METRICS BAR */}
+                <div className="bg-white border border-slate-200/80 rounded-2xl shadow-2xs overflow-hidden">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
+                    {/* Metric 1: Revenue */}
+                    <div
+                      onClick={() => setActiveTab('reports')}
+                      className="p-5 hover:bg-slate-50/60 transition-colors cursor-pointer group flex flex-col justify-between"
+                      title="Click to view detailed Hotel Reports & Revenue Analytics"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                          {isAllDatesMode ? 'All-Time Revenue' : `${formatFriendlyDate(selectedOrderDate)} Revenue`}
                         </span>
+                        <ArrowUpRight size={14} className="text-slate-300 group-hover:text-orange-500 transition-colors" />
+                      </div>
+                      <div className="mt-2.5">
+                        <strong className="text-2xl font-black text-slate-900 tracking-tight block">
+                          ₹{displayRevenue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </strong>
+                        <div className="mt-1.5 flex items-center justify-between text-xs text-slate-500 font-medium">
+                          <span>{activeDateOrders.length} {activeDateOrders.length === 1 ? 'order' : 'orders'} {isAllDatesMode ? 'recorded' : 'on date'}</span>
+                          <span 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowDateOrdersModal(true);
+                            }}
+                            className="text-orange-600 hover:text-orange-700 font-semibold flex items-center gap-0.5 text-[11px]"
+                          >
+                            <span>Explore</span>
+                            <ArrowUpRight size={12} />
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Card 2: Tables Occupied */}
-                  <div
-                    onClick={() => setActiveTab('qrcodes')}
-                    className="p-5 rounded-2xl border bg-white border-slate-200/90 shadow-2xs hover:shadow-md hover:border-indigo-400 hover:scale-[1.01] active:scale-[0.99] transition-all flex flex-col justify-between cursor-pointer group"
-                    title="Click to manage Floor Tables & QR Codes"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-500 group-hover:bg-indigo-500 group-hover:text-white transition-colors">
-                        <Layers size={18} />
+                    {/* Metric 2: Floor Occupancy */}
+                    <div
+                      onClick={() => setActiveTab('qrcodes')}
+                      className="p-5 hover:bg-slate-50/60 transition-colors cursor-pointer group flex flex-col justify-between"
+                      title="Click to manage Floor Tables & QR Codes"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                          Floor Occupancy
+                        </span>
+                        <ArrowUpRight size={14} className="text-slate-300 group-hover:text-indigo-500 transition-colors" />
                       </div>
-                      <span className="text-xs font-bold text-slate-400 group-hover:text-indigo-500 flex items-center gap-0.5 transition-colors">
-                        <span>Floor Plan</span>
-                        <ArrowUpRight size={14} />
-                      </span>
-                    </div>
-                    <div className="mt-4">
-                      <span className="text-xs font-semibold text-slate-400 block">Tables Occupied</span>
-                      <strong className="text-2xl font-black text-slate-900 tracking-tight mt-1 block">
-                        {floorDisplay}
-                      </strong>
-                      <div className="mt-2 flex items-center gap-1 text-xs font-bold text-emerald-500">
-                        <ArrowUpRight size={13} />
-                        <span>{occupancyPct}% occupancy rate</span>
+                      <div className="mt-2.5">
+                        <div className="text-2xl font-black text-slate-900 tracking-tight flex items-baseline gap-1.5">
+                          <span>{floorDisplay}</span>
+                          <span className="text-xs text-slate-400 font-normal">tables active</span>
+                        </div>
+                        <div className="mt-1.5 flex items-center gap-1.5 text-xs font-semibold text-emerald-600">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                          <span>{occupancyPct}% dining floor utilized</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Card 3: Staff on Duty */}
-                  <div
-                    onClick={() => setActiveTab('staff')}
-                    className="p-5 rounded-2xl border bg-white border-slate-200/90 shadow-2xs hover:shadow-md hover:border-emerald-400 hover:scale-[1.01] active:scale-[0.99] transition-all flex flex-col justify-between cursor-pointer group"
-                    title="Click to view Staff Roster & Waiters"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-500 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
-                        <Users size={18} />
+                    {/* Metric 3: Staff on Duty */}
+                    <div
+                      onClick={() => setActiveTab('staff')}
+                      className="p-5 hover:bg-slate-50/60 transition-colors cursor-pointer group flex flex-col justify-between"
+                      title="Click to view Staff Roster & Waiters"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                          Staff on Duty
+                        </span>
+                        <ArrowUpRight size={14} className="text-slate-300 group-hover:text-emerald-500 transition-colors" />
                       </div>
-                      <span className="text-xs font-bold text-slate-400 group-hover:text-emerald-500 flex items-center gap-0.5 transition-colors">
-                        <span>Staff</span>
-                        <ArrowUpRight size={14} />
-                      </span>
-                    </div>
-                    <div className="mt-4">
-                      <span className="text-xs font-semibold text-slate-400 block">Staff on Duty</span>
-                      <strong className="text-2xl font-black text-slate-900 tracking-tight mt-1 block">
-                        {staff.length}
-                      </strong>
-                      <div className="mt-2 flex items-center gap-1 text-xs font-semibold text-slate-500">
-                        <span>{staff.filter(s => s.shift === 'Morning').length} Morning • {staff.filter(s => s.shift === 'Evening').length} Evening</span>
+                      <div className="mt-2.5">
+                        <div className="text-2xl font-black text-slate-900 tracking-tight flex items-baseline gap-1.5">
+                          <span>{staff.length}</span>
+                          <span className="text-xs text-slate-400 font-normal">team members</span>
+                        </div>
+                        <div className="mt-1.5 text-xs text-slate-500 font-medium">
+                          <span>{staff.filter(s => s.shift === 'Morning').length} Morning • {staff.filter(s => s.shift === 'Evening').length} Evening</span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -2078,40 +2072,42 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                   </div>
                 </div>
 
-                {/* 6. SMART AI RECOMMENDATIONS & BEST IN HOTEL DISH INTELLIGENCE */}
+                {/* 6. OPERATIONAL DISPATCH & DISH PERFORMANCE */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-2">
-                  {/* Top Performing Dishes Leaderboard */}
-                  <div className="p-6 rounded-2xl border bg-white border-slate-200/90 shadow-2xs">
-                    <div className="flex justify-between items-start mb-4">
+                  {/* Top Performing Dishes Data List */}
+                  <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-2xs">
+                    <div className="flex items-center justify-between pb-3.5 border-b border-slate-100">
                       <div>
-                        <h3 className="font-extrabold text-base text-slate-900">Top Performing Dishes</h3>
-                        <p className="text-xs text-slate-400 mt-0.5">Volume, revenue & gross profit margins</p>
+                        <h3 className="text-sm font-bold text-slate-900 tracking-tight">Top Performing Dishes</h3>
+                        <p className="text-[11px] text-slate-400 mt-0.5">Volume, revenue & contribution margins</p>
                       </div>
-                      <span className="text-[10px] font-bold text-[#FF6B00] bg-orange-50 px-2.5 py-1 rounded-full border border-orange-200/60">
+                      <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-md">
                         Live Leaderboard
                       </span>
                     </div>
 
-                    <div className="space-y-2.5">
-                      {topSellingDishes.map(item => (
+                    <div className="divide-y divide-slate-100">
+                      {topSellingDishes.map((item) => (
                         <div
                           key={item.rank}
-                          className="flex items-center justify-between p-3 rounded-xl bg-slate-50/80 border border-slate-100 hover:bg-slate-50 transition-colors"
+                          className="py-3 flex items-center justify-between gap-3 hover:bg-slate-50/70 px-1 rounded-lg transition-colors group"
                         >
-                          <div className="flex items-center gap-3">
-                            <span className="text-base font-black w-6 text-center">
-                              {item.rank === 1 ? '🥇' : item.rank === 2 ? '🥈' : item.rank === 3 ? '🥉' : `#${item.rank}`}
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className="text-xs font-mono font-bold text-slate-400 w-5 text-center">
+                              {String(item.rank).padStart(2, '0')}
                             </span>
-                            <div>
-                              <h4 className="font-extrabold text-xs text-slate-900">{item.name}</h4>
-                              <span className="text-[10px] text-slate-400 font-semibold">{item.category}</span>
+                            <div className="min-w-0">
+                              <h4 className="font-semibold text-xs text-slate-900 truncate">{item.name}</h4>
+                              <span className="text-[11px] text-slate-400 block truncate">{item.category}</span>
                             </div>
                           </div>
-                          <div className="flex items-center gap-3">
-                            <span className="text-xs font-semibold text-slate-500">{item.sold} sold</span>
-                            <span className="text-xs font-black text-slate-900 w-16 text-right">₹{item.rev.toLocaleString()}</span>
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/60">
-                              {item.margin}% Margin
+                          <div className="flex items-center gap-3.5 flex-shrink-0">
+                            <span className="text-xs text-slate-500 font-medium">{item.sold} sold</span>
+                            <span className="text-xs font-bold text-slate-900 w-16 text-right tabular-nums">
+                              ₹{item.rev.toLocaleString()}
+                            </span>
+                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-700">
+                              {item.margin}% margin
                             </span>
                           </div>
                         </div>
@@ -2119,70 +2115,114 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                     </div>
                   </div>
 
-                  {/* Smart AI Recommendations & Alerts */}
-                  <div className="p-6 rounded-2xl border bg-white border-slate-200/90 shadow-2xs flex flex-col justify-between">
+                  {/* Smart Dispatch & Operational Insights Feed */}
+                  <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-2xs flex flex-col justify-between">
                     <div>
-                      <div className="flex justify-between items-start mb-4">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-xl bg-orange-50 text-[#FF6B00] flex items-center justify-center font-bold">
-                            <Sparkles size={16} />
-                          </div>
-                          <div>
-                            <h3 className="font-extrabold text-base text-slate-900">Smart AI Recommendations</h3>
-                            <p className="text-xs text-slate-400 mt-0.5">Real-time floor suggestions & demand balancing</p>
-                          </div>
+                      <div className="flex items-center justify-between pb-3.5 border-b border-slate-100">
+                        <div>
+                          <h3 className="text-sm font-bold text-slate-900 tracking-tight">Smart Dispatch & Insights</h3>
+                          <p className="text-[11px] text-slate-400 mt-0.5">Live floor suggestions & demand balancing</p>
                         </div>
-                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200/60">
-                          Active Advisor
+                        <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-md border border-emerald-200/60">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                          <span>Active Advisor</span>
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div className="p-3.5 rounded-xl border bg-amber-50/60 border-amber-200/70 text-slate-800">
-                          <div className="flex items-center justify-between mb-1.5">
-                            <strong className="text-xs font-black text-amber-950">📦 Stock Prep</strong>
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-200/80 text-amber-900">High</span>
+                      <div className="divide-y divide-slate-100">
+                        {/* Insight 1: Stock Prep */}
+                        <div className="py-3 flex items-start justify-between gap-4 group">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-semibold text-slate-800">Stock Prep</span>
+                              <span className="text-[9px] uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200/60 px-1.5 py-0.2 rounded font-semibold">
+                                High Priority
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-500 leading-relaxed">
+                              Prep 15kg Chicken & Biryani spices before 7 PM rush.
+                            </p>
                           </div>
-                          <p className="text-xs text-slate-700 font-medium leading-relaxed">
-                            Prep 15kg Chicken & Biryani spices before 7 PM rush.
-                          </p>
+                          <button
+                            type="button"
+                            onClick={() => alert('Stock Prep alert dispatched to kitchen inventory queue.')}
+                            className="text-xs font-semibold text-orange-600 hover:text-orange-700 hover:bg-orange-50 px-2.5 py-1 rounded-lg transition-colors whitespace-nowrap self-center cursor-pointer"
+                          >
+                            Resolve
+                          </button>
                         </div>
 
-                        <div className="p-3.5 rounded-xl border bg-blue-50/60 border-blue-200/70 text-slate-800">
-                          <div className="flex items-center justify-between mb-1.5">
-                            <strong className="text-xs font-black text-blue-950">⚡ Station 1 Load</strong>
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-200/80 text-blue-900">85% Cap</span>
+                        {/* Insight 2: Station 1 Load */}
+                        <div className="py-3 flex items-start justify-between gap-4 group">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-semibold text-slate-800">Station 1 Load</span>
+                              <span className="text-[9px] uppercase tracking-wider bg-blue-50 text-blue-700 border border-blue-200/60 px-1.5 py-0.2 rounded font-semibold">
+                                85% Capacity
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-500 leading-relaxed">
+                              Station 1 at 85% capacity — auto-rebalance starters to Station 2.
+                            </p>
                           </div>
-                          <p className="text-xs text-slate-700 font-medium leading-relaxed">
-                            Station 1 at 85% capacity — auto-rebalance starters to Station 2.
-                          </p>
+                          <button
+                            type="button"
+                            onClick={() => alert('Starter orders automatically rebalanced to Station 2.')}
+                            className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 px-2.5 py-1 rounded-lg transition-colors whitespace-nowrap self-center cursor-pointer"
+                          >
+                            Rebalance
+                          </button>
                         </div>
 
-                        <div className="p-3.5 rounded-xl border bg-purple-50/60 border-purple-200/70 text-slate-800">
-                          <div className="flex items-center justify-between mb-1.5">
-                            <strong className="text-xs font-black text-purple-950">🥤 Beverage Upsell</strong>
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-200/80 text-purple-900">+₹65 AOV</span>
+                        {/* Insight 3: Beverage Upsell */}
+                        <div className="py-3 flex items-start justify-between gap-4 group">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-semibold text-slate-800">Beverage Upsell</span>
+                              <span className="text-[9px] uppercase tracking-wider bg-purple-50 text-purple-700 border border-purple-200/60 px-1.5 py-0.2 rounded font-semibold">
+                                +₹65 AOV Lift
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-500 leading-relaxed">
+                              Bundle Mango Lassi with Spicy Biryani to lift AOV by ₹65.
+                            </p>
                           </div>
-                          <p className="text-xs text-slate-700 font-medium leading-relaxed">
-                            Bundle Mango Lassi with Spicy Biryani to lift AOV by ₹65.
-                          </p>
+                          <button
+                            type="button"
+                            onClick={() => alert('Mango Lassi bundle suggestion active on customer cart.')}
+                            className="text-xs font-semibold text-purple-600 hover:text-purple-700 hover:bg-purple-50 px-2.5 py-1 rounded-lg transition-colors whitespace-nowrap self-center cursor-pointer"
+                          >
+                            Apply Bundle
+                          </button>
                         </div>
 
-                        <div className="p-3.5 rounded-xl border bg-emerald-50/60 border-emerald-200/70 text-slate-800">
-                          <div className="flex items-center justify-between mb-1.5">
-                            <strong className="text-xs font-black text-emerald-950">⏱️ SLA Balancing</strong>
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-200/80 text-emerald-900">&lt;18m SLA</span>
+                        {/* Insight 4: SLA Expediting */}
+                        <div className="py-3 flex items-start justify-between gap-4 group">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-semibold text-slate-800">SLA Expediting</span>
+                              <span className="text-[9px] uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200/60 px-1.5 py-0.2 rounded font-semibold">
+                                14.2m Target
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-500 leading-relaxed">
+                              Prep time SLA at 14.2m. Shift 1 expediter to Station 3.
+                            </p>
                           </div>
-                          <p className="text-xs text-slate-700 font-medium leading-relaxed">
-                            Prep time SLA at 14.2m. Shift 1 expediter to Station 3.
-                          </p>
+                          <button
+                            type="button"
+                            onClick={() => alert('Station 3 floor expediter re-assigned.')}
+                            className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 px-2.5 py-1 rounded-lg transition-colors whitespace-nowrap self-center cursor-pointer"
+                          >
+                            Acknowledge
+                          </button>
                         </div>
                       </div>
                     </div>
 
                     <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
-                      <span>Predicted Tomorrow Revenue: <strong className="text-slate-800">₹53,600</strong></span>
-                      <span className="text-emerald-600 font-bold">94% forecast accuracy</span>
+                      <span>Forecasted Tomorrow: <strong className="text-slate-800 font-bold">₹53,600</strong></span>
+                      <span className="text-emerald-600 font-semibold">94% forecast accuracy</span>
                     </div>
                   </div>
                 </div>
@@ -2212,21 +2252,86 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
 
             return (
               <div className="space-y-6 animate-fade-in">
-                {/* Header */}
-                <div className="border-b pb-4">
-                  <h3 className="font-extrabold text-base">Dishes</h3>
+                {/* Enterprise Header Bar */}
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-1">
+                  <div>
+                    <div className="flex items-center gap-2.5">
+                      <h3 className="font-bold text-base text-slate-900 tracking-tight">Menu Catalog</h3>
+                      <span className="text-[11px] font-semibold text-slate-600 bg-slate-100 border border-slate-200/80 px-2 py-0.5 rounded-full">
+                        {filteredDishes.length} {filteredDishes.length === 1 ? 'Dish' : 'Dishes'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">Live kitchen pricing, dish specifications, and dietary tags.</p>
+                  </div>
+
+                  <div className="flex items-center gap-2.5 self-stretch sm:self-auto justify-end">
+                    {/* View Switcher: Dense Table vs Compact Grid */}
+                    <div className="flex items-center bg-slate-100/80 p-0.5 rounded-xl border border-slate-200/60">
+                      <button
+                        type="button"
+                        onClick={() => setMenuViewMode('table')}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                          menuViewMode === 'table'
+                            ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                            : 'text-slate-500 hover:text-slate-900'
+                        }`}
+                        title="Dense Table View"
+                      >
+                        <Table size={13} />
+                        <span>Table</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setMenuViewMode('grid')}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                          menuViewMode === 'grid'
+                            ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                            : 'text-slate-500 hover:text-slate-900'
+                        }`}
+                        title="Card Grid View"
+                      >
+                        <LayoutGrid size={13} />
+                        <span>Grid</span>
+                      </button>
+                    </div>
+
+                    {/* Add Dish Action */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingMenuItem(null);
+                        setMenuFormState({
+                          name: '',
+                          price: 150,
+                          category: 'Main Course',
+                          image: '',
+                          description: '',
+                          calories: 350,
+                          prepTime: '15 mins',
+                          isVeg: true,
+                          isSpecial: false
+                        });
+                        setNewMenuItemForm(true);
+                      }}
+                      className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#FF6B00] hover:bg-[#e05e00] text-white rounded-xl text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
+                    >
+                      <Plus size={14} />
+                      <span>Add Dish</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Filter and Search Bar */}
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+                <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-3 bg-white p-3 rounded-2xl border border-slate-200/80 shadow-2xs">
                   <div className="flex flex-wrap items-center gap-1.5">
                     {['All', 'Breakfast', 'Soups', 'Starters', 'Main Course', 'Combos', 'Breads', 'Desserts', 'Beverages', 'Veg', 'Non-Veg'].map(cat => (
                       <button
                         key={cat}
+                        type="button"
                         onClick={() => setMenuFilterCategory(cat)}
-                        className={`text-xs px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${menuFilterCategory === cat
-                          ? 'bg-primary text-white shadow-sm'
-                          : 'bg-gray-100  text-gray-500 hover:text-black dark:hover:text-white'
+                        className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all cursor-pointer ${menuFilterCategory === cat
+                          ? 'bg-slate-900 text-white shadow-2xs font-semibold'
+                          : 'bg-slate-50 text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200/60'
                           }`}
                       >
                         {cat}
@@ -2234,19 +2339,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                     ))}
                   </div>
 
-                  <div className="relative w-full md:w-64">
-                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <div className="relative w-full md:w-64 shrink-0">
+                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
                       type="text"
-                      placeholder="Search dish name..."
+                      placeholder="Filter by dish name..."
                       value={menuSearchQuery}
                       onChange={(e) => setMenuSearchQuery(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2 text-xs border rounded-xl bg-transparent focus:outline-primary"
+                      className="w-full pl-9 pr-8 py-1.5 text-xs border border-slate-200 rounded-xl bg-slate-50/50 text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#FF6B00] focus:bg-white transition-all"
                     />
                     {menuSearchQuery && (
                       <button
+                        type="button"
                         onClick={() => setMenuSearchQuery('')}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs cursor-pointer"
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs cursor-pointer"
                       >
                         ✕
                       </button>
@@ -2447,136 +2553,236 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                   document.body
                 )}
 
-                {/* Menu Grid with Direct Openable Image Links */}
+                {/* Menu Catalog: Dense Enterprise Data Table vs Grid */}
                 {filteredDishes.length === 0 ? (
-                  <div className="text-center py-16 border rounded-3xl bg-gray-50/50 /30">
-                    <p className="text-sm font-bold text-gray-400">No dishes found matching your search filter.</p>
+                  <div className="text-center py-16 border border-slate-200/80 rounded-2xl bg-white shadow-2xs">
+                    <p className="text-sm font-semibold text-slate-500">No dishes found matching your search filter.</p>
                     <button
                       onClick={() => { setMenuFilterCategory('All'); setMenuSearchQuery(''); }}
-                      className="mt-2 text-xs font-bold text-primary underline cursor-pointer"
+                      className="mt-2 text-xs font-semibold text-[#FF6B00] hover:underline cursor-pointer"
                     >
-                      Clear filters
+                      Clear all filters
                     </button>
                   </div>
+                ) : menuViewMode === 'table' ? (
+                  /* ENTERPRISE DATA TABLE */
+                  <div className="bg-white border border-slate-200/80 rounded-2xl shadow-2xs overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead>
+                          <tr className="border-b border-slate-100 bg-slate-50/75 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                            <th className="py-3.5 pl-6 pr-4">Dish Details</th>
+                            <th className="py-3.5 px-4">Type</th>
+                            <th className="py-3.5 px-4">Category</th>
+                            <th className="py-3.5 px-4">Prep / Calories</th>
+                            <th className="py-3.5 px-4 text-right">Price</th>
+                            <th className="py-3.5 pl-4 pr-6 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {filteredDishes.map((item) => (
+                            <tr key={item.id} className="hover:bg-slate-50/60 transition-colors group">
+                              {/* Dish Details & Thumbnail */}
+                              <td className="py-3 pl-6 pr-4">
+                                <div className="flex items-center gap-3">
+                                  <div className="relative w-12 h-12 rounded-xl overflow-hidden bg-slate-100 shrink-0 border border-slate-200/60 group-hover:border-slate-300 transition-colors">
+                                    <img
+                                      src={item.image || COMING_SOON_IMAGE}
+                                      alt={item.name}
+                                      className="w-full h-full object-cover"
+                                      onError={(e) => {
+                                        (e.target as HTMLImageElement).src = COMING_SOON_IMAGE;
+                                      }}
+                                    />
+                                    {item.isSpecial && (
+                                      <span className="absolute bottom-0 inset-x-0 bg-amber-500 text-white text-[8px] font-bold text-center py-0.5 leading-none">
+                                        SPEC
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <div className="font-semibold text-slate-900 group-hover:text-[#FF6B00] transition-colors flex items-center gap-2">
+                                      <span className="truncate">{item.name}</span>
+                                      <span className="text-[10px] text-slate-400 font-mono shrink-0">#{item.id}</span>
+                                    </div>
+                                    {item.description && (
+                                      <p className="text-[11px] text-slate-500 line-clamp-1 max-w-sm mt-0.5">
+                                        {item.description}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+
+                              {/* Dietary Type */}
+                              <td className="py-3 px-4 whitespace-nowrap">
+                                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium ${
+                                  item.isVeg ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60' : 'bg-rose-50 text-rose-700 border border-rose-200/60'
+                                }`}>
+                                  <span className={`w-1.5 h-1.5 rounded-full ${item.isVeg ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                                  {item.isVeg ? 'Veg' : 'Non-Veg'}
+                                </span>
+                              </td>
+
+                              {/* Category */}
+                              <td className="py-3 px-4 whitespace-nowrap">
+                                <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[11px] font-medium border border-slate-200/60">
+                                  {item.category}
+                                </span>
+                              </td>
+
+                              {/* Prep & Calories */}
+                              <td className="py-3 px-4 whitespace-nowrap">
+                                <div className="flex items-center gap-2 text-[11px] text-slate-600">
+                                  {item.prepTime && <span className="font-mono text-slate-600">⏳ {item.prepTime}</span>}
+                                  {item.calories && <span className="text-slate-400">· {item.calories} kcal</span>}
+                                  {!item.prepTime && !item.calories && <span className="text-slate-400">—</span>}
+                                </div>
+                              </td>
+
+                              {/* Price */}
+                              <td className="py-3 px-4 whitespace-nowrap text-right">
+                                <span className="font-bold text-slate-900 font-mono text-xs">{formatPrice(item.price)}</span>
+                              </td>
+
+                              {/* Actions */}
+                              <td className="py-3 pl-4 pr-6 text-right whitespace-nowrap">
+                                <div className="flex items-center justify-end gap-1">
+                                  {item.image && !item.image.startsWith('data:') && (
+                                    <a
+                                      href={item.image}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+                                      title="Open full image"
+                                    >
+                                      <ExternalLink size={13} />
+                                    </a>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditingMenuItem(item);
+                                      setMenuFormState({
+                                        name: item.name,
+                                        price: item.price,
+                                        category: item.category,
+                                        image: item.image || '',
+                                        description: item.description || '',
+                                        calories: item.calories || 300,
+                                        prepTime: item.prepTime || '15 mins',
+                                        isVeg: item.isVeg,
+                                        isSpecial: !!item.isSpecial
+                                      });
+                                      setNewMenuItemForm(true);
+                                    }}
+                                    className="p-1.5 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                                    title="Edit dish"
+                                  >
+                                    <Edit3 size={13} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteMenuItem(item.id, item.name)}
+                                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                    title="Delete dish"
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+                  /* REFINED COMPACT CARD GRID */
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                     {filteredDishes.map(item => (
                       <div
                         key={item.id}
-                        className={`p-4 rounded-3xl border shadow-sm flex flex-col justify-between transition-all hover:shadow-md ${'bg-white border-gray-100'
-                          }`}
+                        className="p-3.5 rounded-2xl border border-slate-200/80 bg-white shadow-2xs flex flex-col justify-between hover:border-slate-300 transition-all group"
                       >
                         <div>
-                          {/* Image Container with Direct Link Overlay and Badge */}
-                          <div className="relative group overflow-hidden rounded-2xl mb-3 bg-gray-100 h-36">
+                          <div className="relative group/img overflow-hidden rounded-xl mb-3 bg-slate-100 h-36 border border-slate-200/60">
                             <img
                               src={item.image || COMING_SOON_IMAGE}
                               alt={item.name}
-                              className="w-full h-full object-cover rounded-2xl transition-transform duration-300 group-hover:scale-105"
+                              className="w-full h-full object-cover transition-transform duration-300 group-hover/img:scale-105"
                               onError={(e) => {
                                 (e.target as HTMLImageElement).src = COMING_SOON_IMAGE;
                               }}
                             />
-
-                            {/* Direct Link Hover Overlay - Clicking opens image link directly or prompts photo upload */}
-                            {item.image && !item.image.startsWith('data:') ? (
-                              <>
-                                <a
-                                  href={item.image}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col items-center justify-center gap-1 text-white font-bold text-xs backdrop-blur-[2px]"
-                                  title="Click to open image directly in new tab"
-                                >
-                                  <ExternalLink size={20} className="drop-shadow" />
-                                  <span className="drop-shadow text-[11px]">Open Full Image</span>
-                                </a>
-
-                                <a
-                                  href={item.image}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="absolute top-2 right-2 bg-black/60 hover:bg-primary text-white px-2 py-1 rounded-lg backdrop-blur-md transition-colors shadow-sm flex items-center gap-1 text-[10px] font-bold"
-                                  title="Open image directly in new tab"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <ExternalLink size={11} />
-                                  <span>Open</span>
-                                </a>
-                              </>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setEditingMenuItem(item);
-                                  setMenuFormState({
-                                    name: item.name,
-                                    price: item.price,
-                                    category: item.category,
-                                    image: item.image || '',
-                                    description: item.description,
-                                    calories: item.calories,
-                                    prepTime: item.prepTime,
-                                    isVeg: item.isVeg,
-                                    isSpecial: !!item.isSpecial
-                                  });
-                                  setNewMenuItemForm(true);
-                                }}
-                                className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col items-center justify-center gap-1 text-white font-bold text-xs backdrop-blur-[2px] cursor-pointer"
+                            {item.image && !item.image.startsWith('data:') && (
+                              <a
+                                href={item.image}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="absolute top-2 right-2 bg-slate-900/70 hover:bg-[#FF6B00] text-white px-2 py-1 rounded-md backdrop-blur-xs transition-colors shadow-2xs flex items-center gap-1 text-[10px] font-semibold"
+                                title="Open image in new tab"
                               >
-                                <Upload size={18} />
-                                <span>Upload Dish Photo</span>
-                              </button>
+                                <ExternalLink size={10} />
+                                <span>Open</span>
+                              </a>
                             )}
-
-                            {/* Veg / Non-Veg Tag */}
-                            <span className={`absolute top-2 left-2 px-2 py-0.5 rounded-md text-[9px] font-extrabold uppercase shadow-sm ${item.isVeg ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
-                              }`}>
+                            <span className={`absolute top-2 left-2 px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider shadow-2xs ${
+                              item.isVeg ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'
+                            }`}>
                               {item.isVeg ? 'Veg' : 'Non-Veg'}
                             </span>
-
-                            {/* Chef Special Tag */}
                             {item.isSpecial && (
-                              <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded-md text-[9px] font-extrabold uppercase bg-amber-500 text-white shadow-sm">
+                              <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded-md text-[9px] font-bold uppercase bg-amber-500 text-white shadow-2xs">
                                 Special
                               </span>
                             )}
                           </div>
 
-                          {/* Item Details */}
                           <div className="flex justify-between items-start mb-1">
-                            <h4 className="font-extrabold text-xs text-gray-900 line-clamp-1">{item.name}</h4>
-                            <span className="font-extrabold text-primary text-xs whitespace-nowrap ml-2">{formatPrice(item.price)}</span>
+                            <h4 className="font-semibold text-xs text-slate-900 line-clamp-1 group-hover:text-[#FF6B00] transition-colors">{item.name}</h4>
+                            <span className="font-bold text-slate-900 text-xs font-mono ml-2 shrink-0">{formatPrice(item.price)}</span>
                           </div>
 
-                          <div className="flex items-center gap-2 mb-2 text-[10px] text-gray-400 font-semibold">
-                            <span className="bg-gray-100 px-2 py-0.5 rounded-md">{item.category}</span>
+                          <div className="flex items-center gap-2 mb-2 text-[10px] text-slate-500">
+                            <span className="bg-slate-100 px-2 py-0.5 rounded-md font-medium text-slate-700">{item.category}</span>
                             {item.prepTime && <span>⏳ {item.prepTime}</span>}
                             {item.calories && <span>🔥 {item.calories} kcal</span>}
                           </div>
 
                           {item.description && (
-                            <p className="text-[10px] text-gray-500 dark:text-gray-400 line-clamp-2 leading-relaxed mb-3">
+                            <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed mb-3">
                               {item.description}
                             </p>
                           )}
                         </div>
 
-                        {/* Card Footer with Direct Open Link and Edit/Delete */}
-                        <div className="border-t pt-3 mt-1 flex justify-between items-center text-[10px] font-bold">
-                          {/* Direct clickable URL link or Photo Upload button */}
+                        <div className="border-t border-slate-100 pt-2.5 mt-1 flex justify-between items-center text-[11px]">
                           {item.image && !item.image.startsWith('data:') ? (
                             <a
                               href={item.image}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-primary hover:underline flex items-center gap-1 truncate max-w-[130px] font-semibold"
-                              title={`Open ${item.image}`}
+                              className="text-slate-500 hover:text-[#FF6B00] flex items-center gap-1 font-medium truncate max-w-[120px]"
                             >
-                              <ExternalLink size={10} className="shrink-0" />
-                              <span className="truncate">Open Image</span>
+                              <ExternalLink size={11} className="shrink-0" />
+                              <span className="truncate">View Image</span>
                             </a>
                           ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingMenuItem(item);
+                                setNewMenuItemForm(true);
+                              }}
+                              className="text-slate-500 hover:text-[#FF6B00] flex items-center gap-1 font-medium cursor-pointer"
+                            >
+                              <Upload size={11} />
+                              <span>Set Photo</span>
+                            </button>
+                          )}
+
+                          <div className="flex gap-1">
                             <button
                               type="button"
                               onClick={() => {
@@ -2586,49 +2792,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                                   price: item.price,
                                   category: item.category,
                                   image: item.image || '',
-                                  description: item.description,
-                                  calories: item.calories,
-                                  prepTime: item.prepTime,
+                                  description: item.description || '',
+                                  calories: item.calories || 300,
+                                  prepTime: item.prepTime || '15 mins',
                                   isVeg: item.isVeg,
                                   isSpecial: !!item.isSpecial
                                 });
                                 setNewMenuItemForm(true);
                               }}
-                              className="text-primary hover:underline flex items-center gap-1 font-semibold cursor-pointer"
-                            >
-                              <Upload size={10} />
-                              <span>Set Photo</span>
-                            </button>
-                          )}
-
-                          <div className="flex gap-1.5">
-                            <button
-                              onClick={() => {
-                                setEditingMenuItem(item);
-                                setMenuFormState({
-                                  name: item.name,
-                                  price: item.price,
-                                  category: item.category,
-                                  image: item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500',
-                                  description: item.description || '',
-                                  calories: item.calories || 300,
-                                  prepTime: item.prepTime || '15 mins',
-                                  isVeg: item.isVeg,
-                                  isSpecial: item.isSpecial || false
-                                });
-                                setNewMenuItemForm(true);
-                              }}
-                              className="p-1.5 border rounded-lg text-gray-400 hover:text-black dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+                              className="p-1.5 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
                               title="Edit Item"
                             >
-                              <Edit3 size={11} />
+                              <Edit3 size={12} />
                             </button>
                             <button
+                              type="button"
                               onClick={() => handleDeleteMenuItem(item.id, item.name)}
-                              className="p-1.5 border rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                               title="Delete Item"
                             >
-                              <Trash2 size={11} />
+                              <Trash2 size={12} />
                             </button>
                           </div>
                         </div>
@@ -3564,77 +3747,325 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
               ---------------------------------------------------- */}
           {activeTab === 'qrcodes' && (
             <div className="space-y-6 animate-fade-in">
-              <div className="flex justify-between items-center border-b pb-3">
+              {/* Enterprise Header Bar */}
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-1">
                 <div>
-                  <h3 className="font-extrabold text-sm">Table QR Code Generator & Manager</h3>
-                  <p className="text-[10px] text-gray-400">Generate secure URL sessions, manage floor tables, and replace QR codes.</p>
+                  <div className="flex items-center gap-2.5">
+                    <h3 className="font-bold text-base text-slate-900 tracking-tight">Table QR Sessions</h3>
+                    <span className="text-[11px] font-semibold text-slate-600 bg-slate-100 border border-slate-200/80 px-2 py-0.5 rounded-full">
+                      {tables.length} {tables.length === 1 ? 'Table' : 'Tables'} Active
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">High-security table sessions, encrypted token rotation, and physical QR downloads.</p>
                 </div>
-                <div className="flex gap-2">
+
+                <div className="flex items-center gap-2.5 self-stretch sm:self-auto justify-end">
+                  {/* View Mode Toggle: Table vs Grid */}
+                  <div className="flex items-center bg-slate-100/80 p-0.5 rounded-xl border border-slate-200/60">
+                    <button
+                      type="button"
+                      onClick={() => setQrViewMode('table')}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                        qrViewMode === 'table'
+                          ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                          : 'text-slate-500 hover:text-slate-900'
+                      }`}
+                      title="Dense Table Matrix"
+                    >
+                      <Table size={13} />
+                      <span>Table</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setQrViewMode('grid')}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                        qrViewMode === 'grid'
+                          ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                          : 'text-slate-500 hover:text-slate-900'
+                      }`}
+                      title="Card Grid"
+                    >
+                      <LayoutGrid size={13} />
+                      <span>Grid</span>
+                    </button>
+                  </div>
+
                   {tables.length === 0 && (
                     <button
+                      type="button"
                       onClick={handleInitializeTables}
                       disabled={loading}
-                      className="bg-primary text-white font-bold py-2 px-3.5 rounded-xl cursor-pointer text-xs"
+                      className="bg-slate-900 hover:bg-slate-800 text-white font-semibold py-1.5 px-3.5 rounded-xl cursor-pointer text-xs transition-colors shadow-2xs"
                     >
                       Initialize Tables 1-12
                     </button>
                   )}
+
                   <button
+                    type="button"
                     onClick={handleAddTable}
                     disabled={loading}
-                    className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2 px-3.5 rounded-xl cursor-pointer text-xs flex items-center gap-1.5"
+                    className="bg-[#FF6B00] hover:bg-[#e05e00] text-white font-semibold py-1.5 px-3.5 rounded-xl cursor-pointer text-xs flex items-center gap-1.5 transition-colors shadow-2xs"
                   >
-                    <Plus size={14} /> Add Table
+                    <Plus size={14} />
+                    <span>Add Table</span>
                   </button>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 text-xs font-semibold">
-                {tables.map(num => {
-                  const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-                  const secureUrl = num.qr_token
-                    ? `${baseUrl}/table/${num.id}?token=${num.qr_token}`
-                    : `No Token Session Configured`;
-                  return (
-                    <div key={num.id} className={`p-4 rounded-3xl border text-center shadow-sm bg-white border-gray-50`}>
-                      <h4 className="font-extrabold">Table #{num.id} QR</h4>
-                      <div className="w-24 h-24 bg-gray-50 rounded-2xl mx-auto my-3 flex items-center justify-center border">
-                        {num.qr_token ? (
-                          <img
-                            src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(secureUrl)}`}
-                            alt="Table QR"
-                            className="w-20 h-20"
-                          />
-                        ) : (
-                          <QrCode size={40} className="text-gray-400" />
-                        )}
+              {/* QR Management Content */}
+              {tables.length === 0 ? (
+                <div className="text-center py-16 border border-slate-200/80 rounded-2xl bg-white shadow-2xs">
+                  <QrCode size={36} className="mx-auto text-slate-400 mb-2" />
+                  <p className="text-sm font-semibold text-slate-700">No active tables found on the floor.</p>
+                  <p className="text-xs text-slate-500 mt-1">Initialize default restaurant tables or add your first table to generate QR tokens.</p>
+                  <button
+                    type="button"
+                    onClick={handleInitializeTables}
+                    className="mt-4 px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-semibold hover:bg-slate-800 cursor-pointer shadow-2xs transition-colors"
+                  >
+                    Initialize Tables 1-12
+                  </button>
+                </div>
+              ) : qrViewMode === 'table' ? (
+                /* ENTERPRISE DENSE QR DATA TABLE */
+                <div className="bg-white border border-slate-200/80 rounded-2xl shadow-2xs overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-100 bg-slate-50/75 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                          <th className="py-3.5 pl-6 pr-4">Table</th>
+                          <th className="py-3.5 px-4">QR Code</th>
+                          <th className="py-3.5 px-4">Session Token</th>
+                          <th className="py-3.5 px-4">Direct Order URL</th>
+                          <th className="py-3.5 px-4">Floor Status</th>
+                          <th className="py-3.5 pl-4 pr-6 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {tables.map(num => {
+                          const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+                          const secureUrl = num.qr_token
+                            ? `${baseUrl}/table/${num.id}?token=${num.qr_token}`
+                            : `${baseUrl}/table/${num.id}`;
+                          const qrImgSrc = num.qr_token
+                            ? `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(secureUrl)}`
+                            : null;
+
+                          return (
+                            <tr key={num.id} className="hover:bg-slate-50/60 transition-colors group">
+                              {/* Table ID */}
+                              <td className="py-3.5 pl-6 pr-4 whitespace-nowrap">
+                                <div className="flex items-center gap-2">
+                                  <span className="w-8 h-8 rounded-lg bg-slate-100 border border-slate-200/80 text-slate-900 font-mono font-bold flex items-center justify-center text-xs group-hover:bg-[#FF6B00]/10 group-hover:text-[#FF6B00] group-hover:border-[#FF6B00]/30 transition-colors">
+                                    {num.id < 10 ? `0${num.id}` : num.id}
+                                  </span>
+                                  <div>
+                                    <div className="font-semibold text-slate-900">Table #{num.id}</div>
+                                    <div className="text-[10px] text-slate-400">Indoor Dining</div>
+                                  </div>
+                                </div>
+                              </td>
+
+                              {/* QR Thumbnail with Hover Preview */}
+                              <td className="py-3.5 px-4 whitespace-nowrap">
+                                <div className="relative group/qr inline-block">
+                                  <div className="w-10 h-10 rounded-lg border border-slate-200/80 bg-white p-1 flex items-center justify-center shadow-2xs cursor-pointer hover:border-[#FF6B00] transition-colors">
+                                    {qrImgSrc ? (
+                                      <img src={qrImgSrc} alt={`Table ${num.id} QR`} className="w-full h-full object-contain" />
+                                    ) : (
+                                      <QrCode size={18} className="text-slate-300" />
+                                    )}
+                                  </div>
+                                  {/* Hover Large Preview */}
+                                  {qrImgSrc && (
+                                    <div className="absolute left-12 top-1/2 -translate-y-1/2 z-50 hidden group-hover/qr:flex flex-col items-center p-3 bg-white border border-slate-200 rounded-2xl shadow-xl w-44 pointer-events-none animate-fade-in">
+                                      <img src={qrImgSrc} alt={`Table ${num.id} QR Large`} className="w-36 h-36" />
+                                      <span className="text-[10px] font-bold text-slate-700 mt-1.5 font-mono">Table #{num.id} QR</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+
+                              {/* Session Token */}
+                              <td className="py-3.5 px-4 whitespace-nowrap">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-mono text-[11px] bg-slate-50 border border-slate-200/80 text-slate-700 px-2.5 py-1 rounded-md select-all max-w-[140px] truncate">
+                                    {num.qr_token || 'unconfigured'}
+                                  </span>
+                                  {num.qr_token && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        navigator.clipboard.writeText(num.qr_token || '');
+                                        setCopiedTokenId(num.id);
+                                        setTimeout(() => setCopiedTokenId(null), 1800);
+                                      }}
+                                      className="p-1.5 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors cursor-pointer"
+                                      title="Copy Session Token"
+                                    >
+                                      {copiedTokenId === num.id ? (
+                                        <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-0.5">
+                                          <Check size={11} />
+                                          <span>Copied</span>
+                                        </span>
+                                      ) : (
+                                        <Copy size={12} />
+                                      )}
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+
+                              {/* Direct Order URL */}
+                              <td className="py-3.5 px-4 whitespace-nowrap">
+                                <a
+                                  href={secureUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-600 hover:text-[#FF6B00] transition-colors group/link max-w-[180px]"
+                                  title={secureUrl}
+                                >
+                                  <span className="truncate font-mono">/table/{num.id}{num.qr_token ? `?token=${num.qr_token.slice(0, 6)}…` : ''}</span>
+                                  <ExternalLink size={10} className="shrink-0 text-slate-400 group-hover/link:text-[#FF6B00]" />
+                                </a>
+                              </td>
+
+                              {/* Floor Status */}
+                              <td className="py-3.5 px-4 whitespace-nowrap">
+                                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium ${
+                                  num.qr_token
+                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
+                                    : 'bg-slate-100 text-slate-500 border border-slate-200/60'
+                                }`}>
+                                  <span className={`w-1.5 h-1.5 rounded-full ${num.qr_token ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                                  {num.qr_token ? 'Session Active' : 'No Token'}
+                                </span>
+                              </td>
+
+                              {/* Actions */}
+                              <td className="py-3.5 pl-4 pr-6 text-right whitespace-nowrap">
+                                <div className="flex items-center justify-end gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDownloadQrImage(num.id, num.qr_token || '')}
+                                    className="p-1.5 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                                    title="Download printable QR"
+                                  >
+                                    <Download size={13} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleReplaceQrToken(num.id)}
+                                    className="p-1.5 text-slate-400 hover:text-[#FF6B00] hover:bg-orange-50 rounded-lg transition-colors cursor-pointer"
+                                    title="Rotate security token"
+                                  >
+                                    <RefreshCw size={13} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveTable(num.id)}
+                                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                    title="Delete table"
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : (
+                /* REFINED ENTERPRISE CARD GRID */
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 text-xs font-semibold">
+                  {tables.map(num => {
+                    const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+                    const secureUrl = num.qr_token
+                      ? `${baseUrl}/table/${num.id}?token=${num.qr_token}`
+                      : `${baseUrl}/table/${num.id}`;
+                    return (
+                      <div
+                        key={num.id}
+                        className="p-4 rounded-2xl border border-slate-200/80 bg-white text-center shadow-2xs hover:border-slate-300 transition-all flex flex-col justify-between"
+                      >
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-mono text-xs font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md">
+                              T-{num.id < 10 ? `0${num.id}` : num.id}
+                            </span>
+                            <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                              num.qr_token ? 'text-emerald-700 bg-emerald-50' : 'text-slate-400 bg-slate-50'
+                            }`}>
+                              <span className={`w-1 h-1 rounded-full ${num.qr_token ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                              {num.qr_token ? 'Active' : 'Unset'}
+                            </span>
+                          </div>
+
+                          <div className="w-24 h-24 bg-slate-50/80 rounded-xl mx-auto my-3 flex items-center justify-center border border-slate-200/60 p-1.5">
+                            {num.qr_token ? (
+                              <img
+                                src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(secureUrl)}`}
+                                alt={`Table ${num.id} QR`}
+                                className="w-20 h-20"
+                              />
+                            ) : (
+                              <QrCode size={36} className="text-slate-300" />
+                            )}
+                          </div>
+
+                          <div className="flex items-center justify-center gap-1 text-[10px] text-slate-400 font-mono mb-2">
+                            <span className="truncate max-w-[110px]">{num.qr_token || 'No Token'}</span>
+                            {num.qr_token && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(num.qr_token || '');
+                                  setCopiedTokenId(num.id);
+                                  setTimeout(() => setCopiedTokenId(null), 1800);
+                                }}
+                                className="text-slate-400 hover:text-slate-700"
+                                title="Copy"
+                              >
+                                {copiedTokenId === num.id ? <Check size={11} className="text-emerald-600" /> : <Copy size={11} />}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex gap-1.5 mt-2 border-t border-slate-100 pt-2.5">
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadQrImage(num.id, num.qr_token || '')}
+                            className="flex-grow bg-[#FF6B00] hover:bg-[#e05e00] text-white font-medium py-1.5 rounded-lg text-[10px] transition-colors cursor-pointer"
+                          >
+                            Download
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleReplaceQrToken(num.id)}
+                            className="border border-slate-200 hover:bg-slate-50 text-slate-700 font-medium px-2 py-1.5 rounded-lg text-[10px] transition-colors cursor-pointer"
+                            title="Rotate Token"
+                          >
+                            <RefreshCw size={11} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveTable(num.id)}
+                            className="text-slate-400 hover:text-rose-600 hover:bg-rose-50 px-2 py-1.5 rounded-lg text-[10px] transition-colors cursor-pointer"
+                            title="Remove Table"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
                       </div>
-                      <p className="text-[9px] text-gray-400 truncate px-1">Session Token: {num.qr_token || 'None'}</p>
-                      <div className="flex gap-1.5 mt-3 border-t pt-2.5">
-                        <button
-                          onClick={() => handleDownloadQrImage(num.id, num.qr_token || '')}
-                          className="flex-grow bg-primary text-white font-bold py-1.5 rounded-xl text-[9px] cursor-pointer"
-                        >
-                          Download
-                        </button>
-                        <button
-                          onClick={() => handleReplaceQrToken(num.id)}
-                          className="flex-grow border border-gray-200 text-gray-500 font-bold py-1.5 rounded-xl text-[9px] bg-white cursor-pointer"
-                        >
-                          Replace
-                        </button>
-                        <button
-                          onClick={() => handleRemoveTable(num.id)}
-                          className="bg-red-50 text-red-500 font-bold px-2 rounded-xl text-[9px] hover:bg-red-100 cursor-pointer"
-                          title="Remove Table"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
