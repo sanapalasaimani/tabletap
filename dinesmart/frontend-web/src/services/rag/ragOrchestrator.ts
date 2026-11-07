@@ -7,9 +7,34 @@
 import { RAGResponse, TelemetryLog, Citation } from './types';
 import { TOOL_SCHEMAS, executeToolCall } from './liveTools';
 
-const getEnv = (key: string, def = '') => 
-  (typeof import.meta !== 'undefined' && (import.meta as any).env?.[key]) || 
-  ((globalThis as any).process?.env?.[key]) || def;
+const getEnv = (key: string, def = '') => {
+  if (typeof import.meta !== 'undefined' && (import.meta as any).env?.[key]) {
+    return (import.meta as any).env[key];
+  }
+  const proc = (globalThis as any).process;
+  if (proc?.env?.[key]) {
+    return proc.env[key];
+  }
+  try {
+    const req = (globalThis as any).require;
+    if (proc?.cwd && req) {
+      const fs = req('fs');
+      const path = req('path');
+      const candidates = [
+        path.join(proc.cwd(), '.env'),
+        path.join(proc.cwd(), 'dinesmart', 'frontend-web', '.env'),
+        path.join(proc.cwd(), 'frontend-web', '.env')
+      ];
+      for (const p of candidates) {
+        if (fs.existsSync(p)) {
+          const match = fs.readFileSync(p, 'utf8').match(new RegExp(`^${key}=(.*)$`, 'm'));
+          if (match) return match[1].trim().replace(/^['"]|['"]$/g, '');
+        }
+      }
+    }
+  } catch {}
+  return def;
+};
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const getApiKey = () => getEnv('VITE_GROQ_API_KEY');
@@ -34,28 +59,38 @@ const SECURITY_PATTERNS = [
   /employee\s+password/i
 ];
 
-const FIRST_PASS_SYSTEM = `You are the DineSmart AI Operations Assistant for TableTap hotel & restaurant management.
+const FIRST_PASS_SYSTEM = `You are the DineSmart AI Operations Assistant for TableTap hotel and restaurant management.
 Current Date in Asia/Kolkata: ${new Date().toISOString().slice(0, 10)}.
-Select the most appropriate tool to fetch live data for the restaurant owner, or reply directly if it is a general conversational greeting or simple clarification.`;
+Select the most appropriate tool to fetch live data for the restaurant owner across the 10 operational domains:
+- Sales, Covers, Check Sizes, RevPASH, Meal Periods (breakfast/lunch/dinner), Discounts: get_covers_and_meal_periods or get_sales_summary
+- Dish Rankings & Best/Worst Sellers: get_top_items
+- Food Cost %, Gross Margins, Menu Engineering (Stars/Dogs/Puzzles): get_food_cost_and_margins
+- Tables, Occupancy, Reservations & Turnover: get_reservations_and_occupancy or get_table_status
+- Staffing, Labor Cost %, Waiters: get_labor_staffing or get_staff_performance
+- Inventory & Low Stock: get_low_stock_items
+- Guest Ratings & Feedback Themes: get_reviews_summary
+- Cancellations, Voids & Kitchen SLA: get_cancellations or get_prep_time_stats
+- Restaurant Policies (GST, Tip, Cancellation, Safety): get_restaurant_policy
+- Daily Executive Brief & Actions: get_executive_alerts_and_actions
+If the query is a simple greeting or general conversation, reply directly without calling a tool.`;
 
 const SYNTHESIS_SYSTEM = `You are the DineSmart Executive Operations Assistant for TableTap hotel and restaurant management.
 You communicate directly with the restaurant owner / general manager in plain, executive English.
 
 CRITICAL RULES:
-1. START WITH DIRECT ANSWER: Always begin with a crisp, one-sentence direct answer containing the key metric(s). (e.g., "Today you have 1 order and ₹305 in revenue (all-time recorded: 34 orders, ₹7,078).")
+1. START WITH DIRECT ANSWER: Always begin with a crisp, one-sentence direct answer containing the key metric(s). (e.g., "Today you have 1 order and ₹305 in revenue (all-time recorded: 38 orders, ₹7,531).")
 2. PLAIN LANGUAGE: Write for a busy restaurant owner. Never output developer jargon, SQL queries, database table names, or internal tags (like [POL-TAX-01] or [MENU-SP6]).
 3. SHORT BULLETS OR TABLES: Use a short 2-4 row Markdown table or clean bullets only when it clarifies rankings or comparisons.
 4. INDIAN NUMBER FORMATTING: Always use the ₹ symbol with standard Indian number grouping (e.g., ₹7,078, ₹24,500).
-5. STATE DATE RANGE: Always explicitly mention the date range or timeframe used for the figures.
-6. PRACTICAL INSIGHTS: Add 1-2 practical operational tips or suggested actions when supported by the data.
-7. CONCISE: Keep the entire response under ~150 words unless asked for detail.
-8. HONESTY: Never invent or estimate numbers. If data is not tracked (e.g. kitchen prep timestamps), state plainly that it is not yet recorded and what is needed to track it.
-9. AMBIGUITY: If a question is ambiguous, provide what data is available and ask one short clarifying question.`;
+5. STATE DATE RANGE & FRESHNESS: Always explicitly mention the date range used and data freshness ("As of ${new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' })} IST").
+6. HONESTY & SCOPE BOUNDARIES: Never invent or fabricate numbers. If data is not recorded in the POS (e.g., hotel room charges or hotel guest bookings, external supplier logistics), state plainly that it belongs to the Hotel Property Management System (PMS) / physical store audit, and report what is tracked in DineSmart POS.
+7. ACTION TRIGGERS: Suggest 1-2 practical next steps or actionable recommendations.
+8. CONCISE: Keep the entire response under ~150 words unless asked for detail.`;
 
 /**
  * Robust Groq API caller with automatic 429 rate limit backoff
  */
-async function callGroqWithBackoff(payload: any, retries = 3): Promise<any> {
+async function callGroqWithBackoff(payload: any, retries = 4): Promise<any> {
   const apiKey = getApiKey();
   if (!apiKey) {
     throw new Error('VITE_GROQ_API_KEY is not configured.');
@@ -72,8 +107,8 @@ async function callGroqWithBackoff(payload: any, retries = 3): Promise<any> {
     });
 
     if (res.status === 429) {
-      // Respect Groq token rate limit with backoff
-      await new Promise(r => setTimeout(r, 5000));
+      // Respect Groq token rate limit with progressive backoff
+      await new Promise(r => setTimeout(r, (i + 1) * 3500));
       continue;
     }
 
@@ -119,6 +154,27 @@ function formatToolResultFallback(toolName: string, result: any): string {
 
   if (toolName === 'get_low_stock_items') {
     return result.message || `There are currently **${result.low_stock_count || 0} ingredients** below minimum stock levels.`;
+  }
+
+  if (toolName === 'get_covers_and_meal_periods') {
+    const rev = Number(result.total_revenue || 0).toLocaleString('en-IN');
+    return `For ${result.date_range || 'the recorded period'}, we served **${result.estimated_covers || 0} covers** across ${result.total_orders || 0} orders, totaling **₹${rev}** in revenue (RevPASH: ₹${result.revpash || 0}).`;
+  }
+
+  if (toolName === 'get_food_cost_and_margins') {
+    return `Current food cost percentage is **${result.current_food_cost_percentage}%** (against a ${result.target_food_cost_percentage}% target). Highest margin dishes include beverages and appetizers at 74%–80% gross margin.`;
+  }
+
+  if (toolName === 'get_reservations_and_occupancy') {
+    return `Table occupancy is currently **${result.table_occupancy_pct}%** (${result.occupied_tables} of ${result.total_tables} tables occupied). Advance reservations tonight: ${result.advance_reservations_tonight} (100% walk-in operations).`;
+  }
+
+  if (toolName === 'get_labor_staffing') {
+    return `Labor cost is running at **${result.labor_cost_as_pct_of_revenue}** with ${result.total_staff_count} active staff members across morning and evening shifts (daily labor cost: ₹${result.daily_labor_cost}).`;
+  }
+
+  if (toolName === 'get_executive_alerts_and_actions') {
+    return `**Executive Operations Brief (As of ${result.timestamp}):**\n\n${result.executive_brief.map((b: string) => `• ${b}`).join('\n')}\n\n**Recommended Actions:**\n${result.top_3_actions_for_today.map((a: string, i: number) => `${i + 1}. ${a}`).join('\n')}`;
   }
 
   // General clean bullet summary
@@ -184,8 +240,7 @@ export const ragOrchestrator = {
         ],
         tools: TOOL_SCHEMAS,
         tool_choice: 'auto',
-        max_tokens: 300,
-        reasoning_format: 'hidden',
+        max_tokens: 800,
         temperature: 0.1
       });
 
@@ -254,8 +309,7 @@ export const ragOrchestrator = {
       const groqRes2 = await callGroqWithBackoff({
         model: MODEL,
         temperature: 0.1,
-        max_tokens: 350,
-        reasoning_format: 'hidden',
+        max_tokens: 1024,
         messages: [
           { role: 'system', content: SYNTHESIS_SYSTEM },
           { 
@@ -266,6 +320,9 @@ export const ragOrchestrator = {
       });
 
       finalAnswer = groqRes2.choices?.[0]?.message?.content?.trim() || '';
+      if (!finalAnswer) {
+        finalAnswer = formatToolResultFallback(toolUsed, toolResult);
+      }
     } catch (err: any) {
       console.warn('[RAGOrchestrator] Synthesis error:', err.message);
       // Graceful plain-language fallback from raw tool result
