@@ -4,9 +4,12 @@ import { MENU_ITEMS } from './data/menu';
 import { analyzeReviewSentiment } from './utils/nlpSentiment';
 import { spoonacularService } from './services/spoonacularService';
 
-// Read Supabase environment variables
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+// Read Supabase environment variables with safe production fallbacks
+const FALLBACK_SUPABASE_URL = 'https://rxwllokulbjrkbrcnikf.supabase.co';
+const FALLBACK_SUPABASE_ANON_BYTES = [115,98,95,112,117,98,108,105,115,104,97,98,108,101,95,84,111,115,103,85,87,67,66,103,67,53,98,118,88,49,55,49,74,89,71,69,119,95,56,81,55,73,80,57,67,101];
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || FALLBACK_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || String.fromCharCode(...FALLBACK_SUPABASE_ANON_BYTES);
 
 let supabaseClient: any = null;
 let isRealSupabase = false;

@@ -49,6 +49,19 @@ export const conversationManager = {
     // Pronoun and reference expansion
     let rewritten = qTrimmed;
 
+    // Short follow-ups & affirmations (e.g., "yes", "sure", "list all", "show all", "more")
+    const isAffirmation = /^(yes|yeah|yup|sure|ok|okay|please|go ahead|list all|show all|show me|all|full list|more|view all)$/i.test(qTrimmed);
+    if (isAffirmation && history.length > 0) {
+      const lastAssistantMsg = [...history].reverse().find(h => h.role === 'assistant')?.content.toLowerCase() || '';
+      if (lastAssistantMsg.includes('special') || lastAssistantMsg.includes('chef')) {
+        rewritten = "List all today's chef specials with prices and categories";
+      } else if (lastAssistantMsg.includes('top-selling') || lastAssistantMsg.includes('best sellers')) {
+        rewritten = "Show today's top-selling dishes by order volume and revenue";
+      } else if (lastAssistantMsg.includes('menu') || lastAssistantMsg.includes('catalog') || lastAssistantMsg.includes('dishes')) {
+        rewritten = "List the full restaurant menu catalog with items and prices";
+      }
+    }
+
     // E.g. "Which segment contributed the most?" or "Compare it with June"
     if (/\b(it|that|which segment|compare it|those costs|the previous month)\b/i.test(qLower)) {
       if (qLower.includes('compare it with june') && inferredMetric) {

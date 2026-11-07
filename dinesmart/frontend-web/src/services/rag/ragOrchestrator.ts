@@ -6,6 +6,7 @@
 
 import { RAGResponse, TelemetryLog, Citation } from './types';
 import { TOOL_SCHEMAS, executeToolCall } from './liveTools';
+import { conversationManager } from './conversationManager';
 
 const getEnv = (key: string, def = '') => {
   if (typeof import.meta !== 'undefined' && (import.meta as any).env?.[key]) {
@@ -67,7 +68,9 @@ const SECURITY_PATTERNS = [
 
 const FIRST_PASS_SYSTEM = `You are the DineSmart AI Operations Assistant for TableTap hotel and restaurant management.
 Current Date in Asia/Kolkata: ${new Date().toISOString().slice(0, 10)}.
-Select the most appropriate tool to fetch live data for the restaurant owner across the 10 operational domains:
+Select the most appropriate tool to fetch live data for the restaurant owner across the operational domains:
+- Chef's Specials, Today's Specials, Signature Dishes: get_menu_catalog (with is_special: true)
+- Full Restaurant Menu, Catalog, All Dishes & Prices, Dietary/Category Lists: get_menu_catalog or search_menu
 - Sales, Covers, Check Sizes, RevPASH, Meal Periods (breakfast/lunch/dinner), Discounts: get_covers_and_meal_periods or get_sales_summary
 - Dish Rankings & Best/Worst Sellers: get_top_items
 - Food Cost %, Gross Margins, Menu Engineering (Stars/Dogs/Puzzles): get_food_cost_and_margins
@@ -78,7 +81,7 @@ Select the most appropriate tool to fetch live data for the restaurant owner acr
 - Cancellations, Voids & Kitchen SLA: get_cancellations or get_prep_time_stats
 - Restaurant Policies (GST, Tip, Cancellation, Safety): get_restaurant_policy
 - Daily Executive Brief & Actions: get_executive_alerts_and_actions
-If the query is a simple greeting or general conversation, reply directly without calling a tool.`;
+If the query is a simple greeting or general conversation (e.g. "hi", "hello"), reply directly without calling a tool.`;
 
 const SYNTHESIS_SYSTEM = `You are the DineSmart Executive Operations Assistant for TableTap hotel and restaurant management.
 You communicate directly with the restaurant owner / general manager in plain, executive English.
@@ -131,6 +134,28 @@ async function callGroqWithBackoff(payload: any, retries = 4): Promise<any> {
 
 function formatToolResultFallback(toolName: string, result: any): string {
   if (!result || typeof result !== 'object') return 'I could not retrieve data for that request. Please try again.';
+
+  if (toolName === 'get_menu_catalog') {
+    if (result.is_chef_specials || result.specials) {
+      const list = (result.specials || []).map((s: any) => `• **${s.name}** (${s.category}) — **₹${s.price}** [Prep: ${s.prep_time || '15 mins'}]${s.description ? `\n  _${s.description}_` : ''}`).join('\n\n');
+      return `### Today's Chef Specials & Signature Dishes (${result.total_specials || 0} Dishes)\n\n${list}\n\n**Next Steps:**\n1. Ensure high-margin specials (Hyderabadi Biryani, Butter Chicken) are actively recommended by servers.\n2. Verify kitchen prep availability during peak meal hours.`;
+    }
+    if (result.categories) {
+      let catalog = `### DineSmart Restaurant Menu Catalog (${result.total_items || 0} Total Dishes)\n\n`;
+      for (const [cat, items] of Object.entries<any>(result.categories)) {
+        catalog += `#### ${cat}\n`;
+        catalog += items.map((it: any) => `• **${it.name}** — ₹${it.price}${it.is_special ? ' ⭐ _(Chef Special)_' : ''}`).join('\n') + '\n\n';
+      }
+      return catalog.trim();
+    }
+  }
+
+  if (toolName === 'search_menu') {
+    const items = result.items || [];
+    if (!items.length) return `No matching menu items found for your request.`;
+    const list = items.map((i: any) => `• **${i.name}** (${i.category}) — **₹${i.price}**${i.is_special ? ' ⭐ _(Chef Special)_' : ''}\n  ${i.description || ''}`).join('\n\n');
+    return `Found **${items.length} matching menu items**:\n\n${list}`;
+  }
 
   if (toolName === 'get_sales_summary') {
     const s = result.summary || result;
@@ -202,9 +227,13 @@ export const ragOrchestrator = {
     const requestId = generateRequestId();
     const cleanQuery = (query || '').trim();
 
+    // Context resolution for multi-turn conversations (resolves "yes", "list all", pronouns, etc.)
+    const resolvedContext = conversationManager.resolveContext(cleanQuery, history);
+    const effectiveQuery = resolvedContext.rewrittenQuery || cleanQuery;
+
     // 1. Security & Guardrails
     for (const pattern of SECURITY_PATTERNS) {
-      if (pattern.test(cleanQuery)) {
+      if (pattern.test(cleanQuery) || pattern.test(effectiveQuery)) {
         const totalLatency = Math.round(performance.now() - startTime);
         return {
           answer: `### Security Violation & Access Restricted\n\nThe system detected an unauthorized instruction override or adversarial request.\n\n- **Security Policy**: Database credentials, passwords, and system prompts are strictly protected.\n- **Audit Action**: Request ID \`${requestId}\` has been flagged.`,
@@ -242,7 +271,7 @@ export const ragOrchestrator = {
         messages: [
           { role: 'system', content: FIRST_PASS_SYSTEM },
           ...history.slice(-4).map(h => ({ role: h.role, content: h.content })),
-          { role: 'user', content: cleanQuery }
+          { role: 'user', content: effectiveQuery }
         ],
         tools: TOOL_SCHEMAS,
         tool_choice: 'auto',
@@ -255,8 +284,10 @@ export const ragOrchestrator = {
       console.warn('[RAGOrchestrator] First-pass tool selection error:', err.message);
     }
 
-    // 3. If direct conversational answer (e.g. Greeting or direct question)
-    if (choice1 && (!choice1.tool_calls || choice1.tool_calls.length === 0) && choice1.content) {
+    // 3. If direct conversational answer (only for pure greetings/pleasantries without data queries)
+    const isOperationalQuery = /special|chef|signature|dish|menu|price|catalog|item|food|revenue|sale|order|cover|period|staff|waiter|table|occupan|reserv|stock|inventory|review|feedback|policy|gst|tax|margin|cost|alert|action|brief|today|tonight|yesterday/i.test(effectiveQuery);
+
+    if (choice1 && (!choice1.tool_calls || choice1.tool_calls.length === 0) && choice1.content && !isOperationalQuery) {
       const totalLatency = Math.round(performance.now() - startTime);
       return {
         answer: choice1.content.trim(),
@@ -301,9 +332,43 @@ export const ragOrchestrator = {
         timestamp: new Date().toISOString()
       });
     } else {
-      // Fallback: Default to sales summary if no tool was picked
-      toolUsed = 'get_sales_summary';
-      toolResult = await executeToolCall('get_sales_summary', {});
+      // Intelligent Intent-Guided Fallback: Route according to actual operational keywords
+      const qLower = effectiveQuery.toLowerCase();
+      let fallbackArgs: any = {};
+
+      if (/special|chef|signature/.test(qLower)) {
+        toolUsed = 'get_menu_catalog';
+        fallbackArgs = { is_special: true };
+      } else if (/menu|dish|price|catalog|item|food|category|breakfast|soup|starter|main course|bread|dessert|beverage/.test(qLower)) {
+        toolUsed = 'get_menu_catalog';
+        fallbackArgs = {};
+      } else if (/review|rating|feedback|complaint/.test(qLower)) {
+        toolUsed = 'get_reviews_summary';
+      } else if (/table|occupan|reserv|turnover/.test(qLower)) {
+        toolUsed = 'get_table_status';
+      } else if (/staff|waiter|labor|overtime/.test(qLower)) {
+        toolUsed = 'get_labor_staffing';
+      } else if (/stock|inventory|spoil|waste|par/.test(qLower)) {
+        toolUsed = 'get_low_stock_items';
+      } else if (/cost|margin|shrinkage/.test(qLower)) {
+        toolUsed = 'get_food_cost_and_margins';
+      } else if (/alert|action|brief|yesterday/.test(qLower)) {
+        toolUsed = 'get_executive_alerts_and_actions';
+      } else if (/policy|gst|tax|refund|cancel/.test(qLower)) {
+        toolUsed = 'get_restaurant_policy';
+      } else {
+        toolUsed = 'get_sales_summary';
+      }
+
+      toolResult = await executeToolCall(toolUsed, fallbackArgs);
+      citations.push({
+        sourceId: `SUPABASE-${toolUsed.toUpperCase()}`,
+        sourceType: 'LIVE_DATABASE',
+        title: `Supabase Intent Fallback: ${toolUsed}`,
+        verifiedClaim: `Executed on live database tables with parameters: ${JSON.stringify(fallbackArgs)}`,
+        confidence: 0.98,
+        timestamp: new Date().toISOString()
+      });
     }
     const retrievalLatency = Math.round(performance.now() - toolStart);
 
@@ -320,7 +385,7 @@ export const ragOrchestrator = {
           { role: 'system', content: SYNTHESIS_SYSTEM },
           { 
             role: 'user', 
-            content: `User Question: "${cleanQuery}"\n\nLIVE DATABASE DATA / VERIFIED FACTS:\n${JSON.stringify(toolResult, null, 2)}\n\nAnswer the restaurant owner directly following the critical rules.` 
+            content: `User Question: "${effectiveQuery}"\n\nLIVE DATABASE DATA / VERIFIED FACTS:\n${JSON.stringify(toolResult, null, 2)}\n\nAnswer the restaurant owner directly following the critical rules.` 
           }
         ]
       });

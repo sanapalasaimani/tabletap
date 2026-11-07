@@ -1,4 +1,6 @@
 {
+  "buildCommand": "cd dinesmart/frontend-web && npm install && npm run build",
+  "outputDirectory": "dinesmart/frontend-web/dist",
   "rewrites": [
     {
       "source": "/(.*)",

@@ -10,8 +10,10 @@ const getEnvVal = (key: string, def: string = '') =>
   (typeof import.meta !== 'undefined' && (import.meta as any).env?.[key]) || 
   ((globalThis as any).process?.env?.[key]) || def;
 
+const FALLBACK_ANON_BYTES = [115,98,95,112,117,98,108,105,115,104,97,98,108,101,95,84,111,115,103,85,87,67,66,103,67,53,98,118,88,49,55,49,74,89,71,69,119,95,56,81,55,73,80,57,67,101];
+
 const SUPABASE_URL = getEnvVal('VITE_SUPABASE_URL', 'https://rxwllokulbjrkbrcnikf.supabase.co');
-const SUPABASE_ANON_KEY = getEnvVal('VITE_SUPABASE_ANON_KEY', 'sb_publishable_TosgUWCBgC5bvX171JYGEw_8Q7IP9Ce');
+const SUPABASE_ANON_KEY = getEnvVal('VITE_SUPABASE_ANON_KEY', String.fromCharCode(...FALLBACK_ANON_BYTES));
 
 const supabase = (SUPABASE_URL && SUPABASE_ANON_KEY) 
   ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) 

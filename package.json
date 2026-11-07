@@ -1,0 +1,9 @@
+{
+  "name": "hotel-management-project",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "cd dinesmart/frontend-web && npm install && npm run build",
+    "start": "cd dinesmart/frontend-web && npm run preview"
+  }
+}

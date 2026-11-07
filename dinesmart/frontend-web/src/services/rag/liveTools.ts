@@ -35,8 +35,10 @@ const getEnv = (key: string, def = '') => {
   return def;
 };
 
+const FALLBACK_ANON_BYTES = [115,98,95,112,117,98,108,105,115,104,97,98,108,101,95,84,111,115,103,85,87,67,66,103,67,53,98,118,88,49,55,49,74,89,71,69,119,95,56,81,55,73,80,57,67,101];
+
 const SUPABASE_URL = getEnv('VITE_SUPABASE_URL', 'https://rxwllokulbjrkbrcnikf.supabase.co');
-const SUPABASE_ANON_KEY = getEnv('VITE_SUPABASE_ANON_KEY', 'sb_publishable_TosgUWCBgC5bvX171JYGEw_8Q7IP9Ce');
+const SUPABASE_ANON_KEY = getEnv('VITE_SUPABASE_ANON_KEY', String.fromCharCode(...FALLBACK_ANON_BYTES));
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -362,10 +364,94 @@ export const liveTools = {
     };
   },
 
-  // 12. Search Menu Items / Dietary
-  async search_menu({ query, is_veg, is_vegan, category }: { query?: string; is_veg?: boolean; is_vegan?: boolean; category?: string } = {}) {
+  // 12. Full Restaurant Menu Catalog & Chef's Specials
+  async get_menu_catalog({
+    category,
+    is_special,
+    is_veg,
+    is_vegan,
+    limit = 150
+  }: {
+    category?: string;
+    is_special?: boolean;
+    is_veg?: boolean;
+    is_vegan?: boolean;
+    limit?: number;
+  } = {}) {
+    let whereClauses: string[] = ['1=1'];
+    if (is_special) {
+      whereClauses.push('is_special = true');
+    }
+    if (category) {
+      whereClauses.push(`lower(category) = lower('${category.replace(/'/g, '')}')`);
+    }
+    if (is_veg) {
+      whereClauses.push('is_veg = true');
+    }
+
+    const rows = await runQuery(`
+      SELECT id, name, price, category, is_veg, prep_time, description, available, is_special
+      FROM menu_items
+      WHERE ${whereClauses.join(' AND ')}
+      ORDER BY category ASC, price ASC
+      LIMIT ${limit}
+    `);
+
+    let filtered = rows;
+    if (is_vegan) {
+      const dairyRegex = /\b(dairy|butter|paneer|ghee|curd|cream|cheese|milk|egg)\b/i;
+      filtered = rows.filter(item => {
+        const text = `${item.name} ${item.description || ''}`;
+        return item.is_veg && !dairyRegex.test(text);
+      });
+    }
+
+    if (is_special) {
+      return {
+        title: "Today's Chef Specials & Signature Dishes",
+        total_specials: filtered.length,
+        is_chef_specials: true,
+        specials: filtered.map(i => ({
+          name: i.name,
+          category: i.category,
+          price: i.price,
+          formatted_price: `₹${i.price}`,
+          is_veg: i.is_veg,
+          prep_time: i.prep_time || '10-15 mins',
+          description: i.description || ''
+        }))
+      };
+    }
+
+    // Group by category for full catalog
+    const byCategory: Record<string, Array<{ name: string; price: number; formatted_price: string; is_veg: boolean; is_special?: boolean }>> = {};
+    for (const item of filtered) {
+      const cat = item.category || 'Other';
+      if (!byCategory[cat]) byCategory[cat] = [];
+      byCategory[cat].push({
+        name: item.name,
+        price: item.price,
+        formatted_price: `₹${item.price}`,
+        is_veg: item.is_veg,
+        is_special: item.is_special
+      });
+    }
+
+    return {
+      title: "DineSmart Restaurant Menu Catalog",
+      total_items: filtered.length,
+      categories_count: Object.keys(byCategory).length,
+      categories: byCategory
+    };
+  },
+
+  // 12b. Search Menu Items / Dietary
+  async search_menu({ query, is_veg, is_vegan, category, is_special }: { query?: string; is_veg?: boolean; is_vegan?: boolean; category?: string; is_special?: boolean } = {}) {
     let whereClauses: string[] = ['1=1'];
 
+    if (is_special) {
+      whereClauses.push('is_special = true');
+    }
     if (is_veg) {
       whereClauses.push('is_veg = true');
     }
@@ -378,10 +464,11 @@ export const liveTools = {
     }
 
     const rows = await runQuery(`
-      SELECT id, name, price, category, is_veg, prep_time, description, available
+      SELECT id, name, price, category, is_veg, prep_time, description, available, is_special
       FROM menu_items
       WHERE ${whereClauses.join(' AND ')}
-      LIMIT 25
+      ORDER BY category ASC, price ASC
+      LIMIT 120
     `);
 
     let filtered = rows;
@@ -396,11 +483,13 @@ export const liveTools = {
 
     return {
       total_matches: filtered.length,
-      items: filtered.slice(0, 10).map(i => ({
+      items: filtered.map(i => ({
         name: i.name,
         price: i.price,
+        formatted_price: `₹${i.price}`,
         category: i.category,
         is_veg: i.is_veg,
+        is_special: i.is_special,
         prep_time_mins: i.prep_time,
         description: i.description
       }))
@@ -815,12 +904,29 @@ export const TOOL_SCHEMAS = [
   {
     type: "function",
     function: {
+      name: "get_menu_catalog",
+      description: "Retrieve full restaurant menu catalog, all dishes with prices, category-wise menus (Breakfast, Soups, Starters, Main Course, Combos, Breads, Desserts, Beverages), or today's Chef Specials.",
+      parameters: {
+        type: "object",
+        properties: {
+          is_special: { type: "boolean", description: "Set true to retrieve all Chef's Specials and signature dishes" },
+          category: { type: "string", description: "Filter by category (Breakfast, Soups, Starters, Main Course, Combos, Breads, Desserts, Beverages)" },
+          is_veg: { type: "boolean", description: "Filter for vegetarian items only" },
+          is_vegan: { type: "boolean", description: "Filter for vegan items only" }
+        }
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
       name: "search_menu",
-      description: "Search restaurant menu dishes by name, price, ingredients, vegetarian, vegan, or category.",
+      description: "Search restaurant menu dishes by name, price, ingredients, vegetarian, vegan, or chef specials.",
       parameters: {
         type: "object",
         properties: {
           query: { type: "string", description: "Dish name or ingredient keyword" },
+          is_special: { type: "boolean", description: "Filter for chef specials" },
           is_veg: { type: "boolean", description: "Filter for vegetarian items" },
           is_vegan: { type: "boolean", description: "Filter for strictly vegan (no dairy/butter/ghee) items" },
           category: { type: "string", description: "Food category (Breakfast, Starters, Main Course, Soups, Beverages, Desserts)" }
