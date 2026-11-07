@@ -1112,219 +1112,221 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
   const formatPrice = (amount: number) => `₹${amount.toLocaleString('en-IN')}`;
 
   return (
-    <div className="flex h-screen overflow-hidden font-sans bg-slate-50 text-brand-text">
+    <div className="h-screen bg-slate-50/60 flex w-full overflow-hidden font-sans text-slate-800">
 
-      {/* 1. SIDEBAR NAVIGATION */}
+      {/* 1. SIDEBAR NAVIGATION (Cohesive Neutral Dark) */}
       <aside
         className={`${
-          isSidebarOpen ? 'w-64 translate-x-0 opacity-100' : 'w-0 -translate-x-full opacity-0 pointer-events-none border-r-0'
-        } transition-all duration-300 ease-in-out flex flex-col justify-between flex-shrink-0 z-20 border-r bg-[#11141D] text-white border-slate-800 overflow-hidden select-none`}
+          isSidebarOpen ? 'w-64 opacity-100' : 'w-0 opacity-0 pointer-events-none border-r-0'
+        } transition-all duration-300 ease-in-out flex flex-col justify-between shrink-0 z-20 border-r bg-slate-900 text-white border-slate-800/80 overflow-hidden select-none`}
       >
-        <div className="w-64">
-          {/* Logo Header from Figma */}
-          <div className="p-4 border-b flex items-center justify-between border-gray-800/80">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#FF6B00] to-amber-600 flex items-center justify-center text-white shadow-md shadow-orange-500/20 flex-shrink-0">
-                <div className="flex items-end gap-1 h-4">
-                  <span className="w-1 h-2 bg-white rounded-full"></span>
-                  <span className="w-1 h-4 bg-white rounded-full"></span>
-                  <span className="w-1 h-2.5 bg-white rounded-full"></span>
+        <div className="w-64 min-w-[16rem] flex flex-col h-full justify-between">
+          <div>
+            {/* Logo Header */}
+            <div className="p-4 border-b flex items-center justify-between border-slate-800/80">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#FF6B00] to-amber-600 flex items-center justify-center text-white shadow-md shadow-orange-500/20 shrink-0">
+                  <div className="flex items-end gap-1 h-3.5">
+                    <span className="w-1 h-2 bg-white rounded-full"></span>
+                    <span className="w-1 h-3.5 bg-white rounded-full"></span>
+                    <span className="w-1 h-2.5 bg-white rounded-full"></span>
+                  </div>
+                </div>
+                <div className="min-w-0">
+                  <h2 className="font-bold text-sm tracking-tight leading-none text-white truncate">DineSmart</h2>
+                  <span className="text-[9px] text-slate-400 font-semibold tracking-wider uppercase mt-1 block">Manager Panel</span>
                 </div>
               </div>
-              <div className="min-w-0">
-                <h2 className="font-extrabold text-sm tracking-tight leading-none text-white truncate">DineSmart</h2>
-                <span className="text-[9px] text-slate-400 font-bold tracking-widest uppercase mt-1 block">Manager Panel</span>
+              {/* Close sidebar button */}
+              <button
+                type="button"
+                onClick={toggleSidebar}
+                title="Close sidebar to expand screen"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors cursor-pointer shrink-0"
+              >
+                <PanelLeftClose size={16} />
+              </button>
+            </div>
+
+            {/* Navigation links */}
+            <div className="p-3 space-y-3 overflow-y-auto no-scrollbar max-h-[calc(100vh-145px)]">
+              <div>
+                <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mb-1.5 px-3">Operations</p>
+                <nav className="space-y-1">
+                  <button
+                    onClick={() => setActiveTab('overview')}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs transition-all cursor-pointer ${activeTab === 'overview'
+                      ? 'bg-slate-800/90 text-white font-semibold border border-slate-700/80 shadow-2xs'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 font-medium'
+                      }`}
+                  >
+                    <LayoutDashboard size={15} className={activeTab === 'overview' ? 'text-[#FF6B00]' : 'text-slate-400'} />
+                    <span>Overview & Home</span>
+                    {activeTab === 'overview' && <ChevronRight size={13} className="ml-auto text-slate-400" />}
+                  </button>
+                </nav>
+              </div>
+
+              <div>
+                <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mb-1.5 px-3">Menu & QR Codes</p>
+                <nav className="space-y-1">
+                  <button
+                    onClick={() => setActiveTab('menu')}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs transition-all cursor-pointer ${activeTab === 'menu'
+                      ? 'bg-slate-800/90 text-white font-semibold border border-slate-700/80 shadow-2xs'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 font-medium'
+                      }`}
+                  >
+                    <BookOpen size={15} className={activeTab === 'menu' ? 'text-[#FF6B00]' : 'text-slate-400'} />
+                    <span>Menu Management</span>
+                    {activeTab === 'menu' && <ChevronRight size={13} className="ml-auto text-slate-400" />}
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('qrcodes')}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs transition-all cursor-pointer ${activeTab === 'qrcodes'
+                      ? 'bg-slate-800/90 text-white font-semibold border border-slate-700/80 shadow-2xs'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 font-medium'
+                      }`}
+                  >
+                    <QrCode size={15} className={activeTab === 'qrcodes' ? 'text-[#FF6B00]' : 'text-slate-400'} />
+                    <span>QR Code Manager</span>
+                    {activeTab === 'qrcodes' && <ChevronRight size={13} className="ml-auto text-slate-400" />}
+                  </button>
+                </nav>
+              </div>
+
+              <div>
+                <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mb-1.5 px-3">Logistics & Staff</p>
+                <nav className="space-y-1">
+                  <button
+                    onClick={() => setActiveTab('staff')}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs transition-all cursor-pointer ${activeTab === 'staff'
+                      ? 'bg-slate-800/90 text-white font-semibold border border-slate-700/80 shadow-2xs'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 font-medium'
+                      }`}
+                  >
+                    <UserCheck size={15} className={activeTab === 'staff' ? 'text-[#FF6B00]' : 'text-slate-400'} />
+                    <span>Waiter Management</span>
+                    {activeTab === 'staff' && <ChevronRight size={13} className="ml-auto text-slate-400" />}
+                  </button>
+                </nav>
+              </div>
+
+              <div>
+                <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mb-1.5 px-3">Loyalty & Promos</p>
+                <nav className="space-y-1">
+                  <button
+                    onClick={() => setActiveTab('loyalty')}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs transition-all cursor-pointer ${activeTab === 'loyalty'
+                      ? 'bg-slate-800/90 text-white font-semibold border border-slate-700/80 shadow-2xs'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 font-medium'
+                      }`}
+                  >
+                    <Award size={15} className={activeTab === 'loyalty' ? 'text-[#FF6B00]' : 'text-slate-400'} />
+                    <span>Loyalty Programs</span>
+                    {activeTab === 'loyalty' && <ChevronRight size={13} className="ml-auto text-slate-400" />}
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('promotions')}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs transition-all cursor-pointer ${activeTab === 'promotions'
+                      ? 'bg-slate-800/90 text-white font-semibold border border-slate-700/80 shadow-2xs'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 font-medium'
+                      }`}
+                  >
+                    <Megaphone size={15} className={activeTab === 'promotions' ? 'text-[#FF6B00]' : 'text-slate-400'} />
+                    <span>Promotions Builder</span>
+                    {activeTab === 'promotions' && <ChevronRight size={13} className="ml-auto text-slate-400" />}
+                  </button>
+                </nav>
+              </div>
+
+              <div>
+                <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mb-1.5 px-3">AI & Analytics</p>
+                <nav className="space-y-1">
+                  <button
+                    onClick={() => setActiveTab('reports')}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs transition-all cursor-pointer ${activeTab === 'reports'
+                      ? 'bg-slate-800/90 text-white font-semibold border border-slate-700/80 shadow-2xs'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 font-medium'
+                      }`}
+                  >
+                    <BarChart3 size={15} className={activeTab === 'reports' ? 'text-[#FF6B00]' : 'text-slate-400'} />
+                    <span>Reports & Export</span>
+                    {activeTab === 'reports' && <ChevronRight size={13} className="ml-auto text-slate-400" />}
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('reviews')}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs transition-all cursor-pointer ${activeTab === 'reviews'
+                      ? 'bg-slate-800/90 text-white font-semibold border border-slate-700/80 shadow-2xs'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 font-medium'
+                      }`}
+                  >
+                    <MessageSquare size={15} className={activeTab === 'reviews' ? 'text-[#FF6B00]' : 'text-slate-400'} />
+                    <span>Reviews Sentiment</span>
+                    {activeTab === 'reviews' && <ChevronRight size={13} className="ml-auto text-slate-400" />}
+                  </button>
+                </nav>
+              </div>
+
+              <div>
+                <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mb-1.5 px-3">Control & Security</p>
+                <nav className="space-y-1">
+                  <button
+                    onClick={() => { setActiveTab('settings'); setSettingsForm((prev: any) => prev || { ...alertSettings }); }}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs transition-all cursor-pointer ${activeTab === 'settings'
+                      ? 'bg-slate-800/90 text-white font-semibold border border-slate-700/80 shadow-2xs'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 font-medium'
+                      }`}
+                  >
+                    <Settings size={15} className={activeTab === 'settings' ? 'text-[#FF6B00]' : 'text-slate-400'} />
+                    <span>Restaurant Settings</span>
+                    {activeTab === 'settings' && <ChevronRight size={13} className="ml-auto text-slate-400" />}
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('security')}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs transition-all cursor-pointer ${activeTab === 'security'
+                      ? 'bg-slate-800/90 text-white font-semibold border border-slate-700/80 shadow-2xs'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 font-medium'
+                      }`}
+                  >
+                    <Shield size={15} className={activeTab === 'security' ? 'text-[#FF6B00]' : 'text-slate-400'} />
+                    <span>Security Audit Log</span>
+                    {activeTab === 'security' && <ChevronRight size={13} className="ml-auto text-slate-400" />}
+                  </button>
+                </nav>
               </div>
             </div>
-            {/* Close sidebar button */}
-            <button
-              type="button"
-              onClick={toggleSidebar}
-              title="Close sidebar to expand screen"
-              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer flex-shrink-0"
-            >
-              <PanelLeftClose size={18} />
-            </button>
           </div>
 
-          {/* Navigation links matching Figma groups & active states */}
-          <div className="p-3.5 space-y-3.5 overflow-y-auto no-scrollbar max-h-[calc(100vh-145px)]">
-            <div>
-              <p className="text-[9px] text-slate-500 font-extrabold uppercase tracking-widest mb-2 px-3">Operations</p>
-              <nav className="space-y-1">
-                <button
-                  onClick={() => setActiveTab('overview')}
-                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'overview'
-                    ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
-                    }`}
-                >
-                  <LayoutDashboard size={15} className={activeTab === 'overview' ? 'text-[#FF6B00]' : 'text-slate-400'} />
-                  <span>Overview & Home</span>
-                  {activeTab === 'overview' && <ChevronRight size={13} className="ml-auto text-[#FF6B00]" />}
-                </button>
-              </nav>
-            </div>
-
-            <div>
-              <p className="text-[9px] text-slate-500 font-extrabold uppercase tracking-widest mb-2 px-3">Menu & QR Codes</p>
-              <nav className="space-y-1">
-                <button
-                  onClick={() => setActiveTab('menu')}
-                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'menu'
-                    ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
-                    }`}
-                >
-                  <BookOpen size={15} className={activeTab === 'menu' ? 'text-[#FF6B00]' : 'text-slate-400'} />
-                  <span>Menu Management</span>
-                  {activeTab === 'menu' && <ChevronRight size={13} className="ml-auto text-[#FF6B00]" />}
-                </button>
-                <button
-                  onClick={() => setActiveTab('qrcodes')}
-                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'qrcodes'
-                    ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
-                    }`}
-                >
-                  <QrCode size={15} className={activeTab === 'qrcodes' ? 'text-[#FF6B00]' : 'text-slate-400'} />
-                  <span>QR Code Manager</span>
-                  {activeTab === 'qrcodes' && <ChevronRight size={13} className="ml-auto text-[#FF6B00]" />}
-                </button>
-              </nav>
-            </div>
-
-            <div>
-              <p className="text-[9px] text-slate-500 font-extrabold uppercase tracking-widest mb-2 px-3">Logistics & Staff</p>
-              <nav className="space-y-1">
-                <button
-                  onClick={() => setActiveTab('staff')}
-                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'staff'
-                    ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
-                    }`}
-                >
-                  <UserCheck size={15} className={activeTab === 'staff' ? 'text-[#FF6B00]' : 'text-slate-400'} />
-                  <span>Waiter Management</span>
-                  {activeTab === 'staff' && <ChevronRight size={13} className="ml-auto text-[#FF6B00]" />}
-                </button>
-              </nav>
-            </div>
-
-            <div>
-              <p className="text-[9px] text-slate-500 font-extrabold uppercase tracking-widest mb-2 px-3">Loyalty & Promos</p>
-              <nav className="space-y-1">
-                <button
-                  onClick={() => setActiveTab('loyalty')}
-                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'loyalty'
-                    ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
-                    }`}
-                >
-                  <Award size={15} className={activeTab === 'loyalty' ? 'text-[#FF6B00]' : 'text-slate-400'} />
-                  <span>Loyalty Programs</span>
-                  {activeTab === 'loyalty' && <ChevronRight size={13} className="ml-auto text-[#FF6B00]" />}
-                </button>
-                <button
-                  onClick={() => setActiveTab('promotions')}
-                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'promotions'
-                    ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
-                    }`}
-                >
-                  <Megaphone size={15} className={activeTab === 'promotions' ? 'text-[#FF6B00]' : 'text-slate-400'} />
-                  <span>Promotions Builder</span>
-                  {activeTab === 'promotions' && <ChevronRight size={13} className="ml-auto text-[#FF6B00]" />}
-                </button>
-              </nav>
-            </div>
-
-            <div>
-              <p className="text-[9px] text-slate-500 font-extrabold uppercase tracking-widest mb-2 px-3">AI & Analytics</p>
-              <nav className="space-y-1">
-                <button
-                  onClick={() => setActiveTab('reports')}
-                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'reports'
-                    ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
-                    }`}
-                >
-                  <BarChart3 size={15} className={activeTab === 'reports' ? 'text-[#FF6B00]' : 'text-slate-400'} />
-                  <span>Reports & Export</span>
-                  {activeTab === 'reports' && <ChevronRight size={13} className="ml-auto text-[#FF6B00]" />}
-                </button>
-                <button
-                  onClick={() => setActiveTab('reviews')}
-                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'reviews'
-                    ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
-                    }`}
-                >
-                  <MessageSquare size={15} className={activeTab === 'reviews' ? 'text-[#FF6B00]' : 'text-slate-400'} />
-                  <span>Reviews Sentiment</span>
-                  {activeTab === 'reviews' && <ChevronRight size={13} className="ml-auto text-[#FF6B00]" />}
-                </button>
-              </nav>
-            </div>
-
-            <div>
-              <p className="text-[9px] text-slate-500 font-extrabold uppercase tracking-widest mb-2 px-3">Control & Security</p>
-              <nav className="space-y-1">
-                <button
-                  onClick={() => { setActiveTab('settings'); setSettingsForm((prev: any) => prev || { ...alertSettings }); }}
-                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'settings'
-                    ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
-                    }`}
-                >
-                  <Settings size={15} className={activeTab === 'settings' ? 'text-[#FF6B00]' : 'text-slate-400'} />
-                  <span>Restaurant Settings</span>
-                  {activeTab === 'settings' && <ChevronRight size={13} className="ml-auto text-[#FF6B00]" />}
-                </button>
-                <button
-                  onClick={() => setActiveTab('security')}
-                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'security'
-                    ? 'bg-[#FF6B00]/15 text-white font-bold border border-[#FF6B00]/40 shadow-xs'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/40 font-medium'
-                    }`}
-                >
-                  <Shield size={15} className={activeTab === 'security' ? 'text-[#FF6B00]' : 'text-slate-400'} />
-                  <span>Security Audit Log</span>
-                  {activeTab === 'security' && <ChevronRight size={13} className="ml-auto text-[#FF6B00]" />}
-                </button>
-              </nav>
-            </div>
-          </div>
-        </div>
-
-        {/* Sidebar Footer Profile & Logout Card from Figma */}
-        <div className="w-64 p-3 border-t border-gray-800/80">
-          <div className="p-3 rounded-2xl bg-[#161922] border border-slate-800/80 flex items-center justify-between">
-            <div className="flex items-center gap-2.5 overflow-hidden">
-              <div className="w-9 h-9 rounded-full bg-amber-100 text-amber-900 font-extrabold text-xs flex items-center justify-center shadow-xs flex-shrink-0">
-                AD
+          {/* Sidebar Footer Profile */}
+          <div className="p-3 border-t border-slate-800/80">
+            <div className="p-2.5 rounded-xl bg-slate-800/60 border border-slate-700/60 flex items-center justify-between">
+              <div className="flex items-center gap-2.5 overflow-hidden">
+                <div className="w-8 h-8 rounded-lg bg-slate-700 text-slate-200 font-bold text-xs flex items-center justify-center border border-slate-600/60 shrink-0">
+                  AD
+                </div>
+                <div className="overflow-hidden min-w-0">
+                  <p className="text-xs font-semibold text-white leading-tight truncate">Admin</p>
+                  <span className="text-[10px] text-slate-400 font-normal block truncate">Admin Console</span>
+                </div>
               </div>
-              <div className="overflow-hidden">
-                <p className="text-xs font-bold text-white leading-tight truncate">Admin</p>
-                <span className="text-[10px] text-slate-400 font-medium block">Role: Admin</span>
-              </div>
+              <button
+                onClick={onLogout}
+                title="Logout"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-700/60 transition-colors cursor-pointer shrink-0"
+              >
+                <LogOut size={15} />
+              </button>
             </div>
-            <button
-              onClick={onLogout}
-              title="Logout"
-              className="w-8 h-8 rounded-xl text-slate-400 hover:text-red-400 hover:bg-slate-800 flex items-center justify-center transition-colors cursor-pointer flex-shrink-0"
-            >
-              <LogOut size={16} />
-            </button>
           </div>
         </div>
       </aside>
 
-      {/* 2. MAIN WORKSPACE */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      {/* 2. MAIN WORKSPACE (Fluid & Auto-Expanding with flex-1 min-w-0) */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
 
         {/* Top Header */}
-        <header className="border-b px-6 py-3.5 flex justify-between items-center gap-4 z-10 flex-shrink-0 bg-white border-slate-200/80 shadow-2xs">
+        <header className="h-16 bg-white border-b border-slate-200/80 px-6 flex items-center justify-between sticky top-0 z-10 shrink-0 shadow-2xs">
           <div className="flex items-center gap-3">
             {/* Sidebar Collapse / Expand Toggle Button */}
             <button
@@ -1533,8 +1535,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
           </div>
         </header>
 
-        {/* Dynamic Inner Panel Viewport */}
-        <main className="flex-1 overflow-y-auto p-6 relative">
+        {/* Dynamic Inner Panel Viewport (Fluid & Auto-Expanding) */}
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6 min-w-0">
+          <div className="max-w-7xl w-full mx-auto space-y-6">
 
           {/* Global Tables Warning Removed */}
 
@@ -4851,6 +4854,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
             );
           })()}
 
+          </div>
         </main>
       </div>
 
