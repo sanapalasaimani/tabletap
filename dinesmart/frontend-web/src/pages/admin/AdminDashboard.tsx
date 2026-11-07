@@ -175,6 +175,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
   const [searchGlobalQuery, setSearchGlobalQuery] = useState('');
   const [menuViewMode, setMenuViewMode] = useState<'table' | 'grid'>('table');
   const [qrViewMode, setQrViewMode] = useState<'table' | 'grid'>('table');
+  const [waiterViewMode, setWaiterViewMode] = useState<'table' | 'grid'>('table');
+  const [waiterShiftFilter, setWaiterShiftFilter] = useState<'All' | 'Morning' | 'Evening' | 'Night'>('All');
+  const [waiterSearchQuery, setWaiterSearchQuery] = useState('');
+  const [auditSearchQuery, setAuditSearchQuery] = useState('');
   const [copiedTokenId, setCopiedTokenId] = useState<number | null>(null);
   const [reviewFilter, setReviewFilter] = useState<'all' | 'positive' | 'neutral' | 'critical' | 'unreplied'>('all');
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
@@ -2828,285 +2832,450 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
           {/* ----------------------------------------------------
               VIEW 6: WAITER STAFF MANAGEMENT
               ---------------------------------------------------- */}
-          {activeTab === 'staff' && (
-            <div className="space-y-6 animate-fade-in font-sans">
-              {/* Header Action Bar */}
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs">
-                <div>
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-10 h-10 rounded-2xl bg-orange-50 text-primary flex items-center justify-center font-bold">
-                      <Users size={20} />
+          {activeTab === 'staff' && (() => {
+            const filteredStaff = staff.filter(emp => {
+              if (waiterShiftFilter !== 'All' && emp.shift !== waiterShiftFilter) return false;
+              if (waiterSearchQuery.trim()) {
+                const q = waiterSearchQuery.toLowerCase();
+                const matchName = emp.name.toLowerCase().includes(q);
+                const matchId = emp.empid && emp.empid.toLowerCase().includes(q);
+                const matchMobile = emp.mobile && emp.mobile.includes(q);
+                return matchName || matchId || matchMobile;
+              }
+              return true;
+            });
+
+            return (
+              <div className="space-y-6 animate-fade-in font-sans">
+                {/* Enterprise Header Action Bar */}
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-1">
+                  <div>
+                    <div className="flex items-center gap-2.5">
+                      <h3 className="font-bold text-base text-slate-900 tracking-tight">Waiter Staff Roster</h3>
+                      <span className="text-[11px] font-semibold text-slate-600 bg-slate-100 border border-slate-200/80 px-2 py-0.5 rounded-full">
+                        {staff.length} {staff.length === 1 ? 'Staff' : 'Staff Members'}
+                      </span>
                     </div>
-                    <div>
-                      <h3 className="font-black text-lg text-slate-900 tracking-tight">
-                        Waiter Staff Management
-                      </h3>
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        Manage waiter accounts, terminal login credentials, and table assignments. Direct manual entries only.
-                      </p>
-                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">Direct terminal credentials, shift assignments, and real-time floor routing.</p>
                   </div>
-                </div>
 
-                <div className="flex items-center gap-2.5 shrink-0 flex-wrap sm:flex-nowrap">
-                  <a
-                    href="/downloads/TableTap_Waiter.apk"
-                    download="TableTap_Waiter.apk"
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black px-4 py-2.5 rounded-2xl transition-all flex items-center gap-2 cursor-pointer shadow-sm hover:shadow-md shrink-0"
-                    title="Download Waiter Android App APK"
-                  >
-                    <Smartphone size={15} />
-                    <span>Download Waiter APK</span>
-                    <Download size={13} className="opacity-90" />
-                  </a>
-
-                  <button
-                    onClick={fetchData}
-                    className="p-2.5 border border-slate-200 text-slate-600 hover:text-primary hover:border-orange-300 rounded-2xl cursor-pointer bg-slate-50/70 hover:bg-white transition-all shadow-xs"
-                    title="Refresh Waiters from database"
-                  >
-                    <RefreshCw size={15} />
-                  </button>
-
-                  <button
-                    onClick={handleOpenAddStaff}
-                    className="bg-primary hover:bg-orange-600 text-white text-xs font-black px-5 py-2.5 rounded-2xl transition-all flex items-center gap-2 cursor-pointer shadow-sm hover:shadow-md shrink-0"
-                  >
-                    <Plus size={16} />
-                    <span>+ Add Waiter</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Roster Quick KPI Cards */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <div className="bg-white p-4 rounded-3xl border border-slate-200/80 shadow-xs">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Total Waiters</span>
-                  <strong className="text-2xl font-black text-slate-900 mt-1 block">{staff.length}</strong>
-                  <span className="text-[10px] text-emerald-600 font-bold mt-1 inline-block">● Active on Floor</span>
-                </div>
-
-                <div className="bg-white p-4 rounded-3xl border border-slate-200/80 shadow-xs">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Morning Shift</span>
-                  <strong className="text-2xl font-black text-slate-900 mt-1 block">
-                    {staff.filter(s => s.shift === 'Morning').length}
-                  </strong>
-                  <span className="text-[10px] text-amber-600 font-bold mt-1 inline-block">☀️ 08:00 AM - 04:00 PM</span>
-                </div>
-
-                <div className="bg-white p-4 rounded-3xl border border-slate-200/80 shadow-xs">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Evening Shift</span>
-                  <strong className="text-2xl font-black text-slate-900 mt-1 block">
-                    {staff.filter(s => s.shift === 'Evening').length}
-                  </strong>
-                  <span className="text-[10px] text-orange-600 font-bold mt-1 inline-block">🌆 04:00 PM - 11:00 PM</span>
-                </div>
-
-                <div className="bg-white p-4 rounded-3xl border border-slate-200/80 shadow-xs">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Night Shift</span>
-                  <strong className="text-2xl font-black text-slate-900 mt-1 block">
-                    {staff.filter(s => s.shift === 'Night').length}
-                  </strong>
-                  <span className="text-[10px] text-purple-600 font-bold mt-1 inline-block">🌙 11:00 PM - Close</span>
-                </div>
-              </div>
-
-              {/* Waiter Roster Cards Grid */}
-              {staff.length === 0 ? (
-                <div className="text-center py-16 px-6 bg-white rounded-3xl border border-dashed border-slate-200">
-                  <div className="w-16 h-16 rounded-3xl bg-orange-50 text-primary mx-auto flex items-center justify-center mb-4 shadow-xs">
-                    <Users size={28} />
-                  </div>
-                  <h4 className="font-black text-base text-slate-900">No Waiters Registered</h4>
-                  <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
-                    There are currently no waiters on the roster. Add your waiters manually with direct terminal login credentials.
-                  </p>
-                  <button
-                    onClick={handleOpenAddStaff}
-                    className="mt-5 inline-flex items-center gap-2 px-5 py-2.5 bg-primary text-white text-xs font-black rounded-2xl hover:bg-orange-600 transition-all cursor-pointer shadow-sm"
-                  >
-                    <Plus size={15} />
-                    <span>Add First Waiter</span>
-                  </button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {staff.map(emp => {
-                    const showPw = revealedPasswords[emp.id];
-                    return (
-                      <div
-                        key={emp.id}
-                        className="p-5 rounded-3xl border border-slate-200/80 bg-white shadow-xs hover:shadow-md transition-all flex flex-col justify-between"
+                  <div className="flex items-center gap-2.5 shrink-0 flex-wrap sm:flex-nowrap justify-end self-stretch sm:self-auto">
+                    {/* View Switcher: Dense Table vs Compact Grid */}
+                    <div className="flex items-center bg-slate-100/80 p-0.5 rounded-xl border border-slate-200/60">
+                      <button
+                        type="button"
+                        onClick={() => setWaiterViewMode('table')}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                          waiterViewMode === 'table'
+                            ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                            : 'text-slate-500 hover:text-slate-900'
+                        }`}
+                        title="Dense Table View"
                       >
-                        <div>
-                          {/* Header with Waiter Photo, Name, and Shift */}
-                          <div className="flex items-start justify-between border-b border-slate-100 pb-3 mb-3 gap-3">
-                            <div className="flex items-center gap-3">
-                              <StaffAvatar photo={emp.photo} name={emp.name} size="lg" />
-                              <div>
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <h4 className="font-black text-base text-slate-900">{emp.name}</h4>
-                                  <span className="text-[10px] px-2.5 py-0.5 rounded-full font-black bg-orange-50 text-orange-600 border border-orange-200/70">
-                                    Waiter
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                                  <span className="text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-lg font-mono font-bold">
-                                    ID: {emp.empid}
-                                  </span>
-                                  <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200/60 px-2 py-0.5 rounded-lg font-bold">
-                                    Shift: {emp.shift}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
+                        <Table size={13} />
+                        <span>Table</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setWaiterViewMode('grid')}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                          waiterViewMode === 'grid'
+                            ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                            : 'text-slate-500 hover:text-slate-900'
+                        }`}
+                        title="Card Grid View"
+                      >
+                        <LayoutGrid size={13} />
+                        <span>Grid</span>
+                      </button>
+                    </div>
 
-                            <div className="text-right shrink-0">
-                              <span className="text-[10px] text-slate-400 block font-medium">Salary / Month</span>
-                              <strong className="text-sm font-black text-slate-900">{formatPrice(emp.salary)}</strong>
-                            </div>
-                          </div>
+                    <a
+                      href="/downloads/TableTap_Waiter.apk"
+                      download="TableTap_Waiter.apk"
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3.5 py-1.5 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0"
+                      title="Download Waiter Android App APK"
+                    >
+                      <Smartphone size={13} />
+                      <span>Waiter APK</span>
+                      <Download size={11} className="opacity-80" />
+                    </a>
 
-                          {/* Credentials & Contact Box */}
-                          <div className="grid grid-cols-2 gap-2 p-3 rounded-2xl bg-slate-50 border border-slate-100 mb-3 text-[11px]">
-                            <div>
-                              <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">Terminal Password</span>
-                              <div className="flex items-center gap-1.5 mt-0.5">
-                                <span className="font-mono font-black text-slate-900 text-xs">
-                                  {showPw ? (emp.password || '••••••') : '••••••••'}
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => setRevealedPasswords(prev => ({ ...prev, [emp.id]: !prev[emp.id] }))}
-                                  className="text-slate-400 hover:text-slate-700 cursor-pointer p-0.5"
-                                  title={showPw ? "Hide Password" : "Show Password"}
-                                >
-                                  {showPw ? <EyeOff size={13} /> : <Eye size={13} />}
-                                </button>
-                                {emp.password && (
-                                  <>
+                    <button
+                      onClick={fetchData}
+                      className="p-1.5 border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-xl cursor-pointer transition-all shadow-2xs"
+                      title="Refresh Staff Roster"
+                    >
+                      <RefreshCw size={13} />
+                    </button>
+
+                    <button
+                      onClick={handleOpenAddStaff}
+                      className="bg-[#FF6B00] hover:bg-[#e05e00] text-white text-xs font-semibold px-3.5 py-1.5 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0"
+                    >
+                      <Plus size={14} />
+                      <span>Add Waiter</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Unified Shift KPI Strip */}
+                <div className="bg-white border border-slate-200/80 rounded-2xl shadow-2xs divide-y sm:divide-y-0 sm:divide-x divide-slate-100 grid grid-cols-2 sm:grid-cols-4 overflow-hidden">
+                  <div className="p-4 sm:p-5">
+                    <span className="text-[10px] uppercase font-semibold text-slate-400 tracking-wider block">Total Roster</span>
+                    <div className="flex items-baseline gap-2 mt-1">
+                      <strong className="text-2xl font-bold font-mono text-slate-900">{staff.length}</strong>
+                      <span className="text-[10px] text-emerald-600 font-medium inline-flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Active
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="p-4 sm:p-5">
+                    <span className="text-[10px] uppercase font-semibold text-slate-400 tracking-wider block">Morning Shift</span>
+                    <div className="flex items-baseline gap-2 mt-1">
+                      <strong className="text-2xl font-bold font-mono text-slate-900">
+                        {staff.filter(s => s.shift === 'Morning').length}
+                      </strong>
+                      <span className="text-[10px] text-amber-600 font-medium">08:00 AM - 04:00 PM</span>
+                    </div>
+                  </div>
+
+                  <div className="p-4 sm:p-5">
+                    <span className="text-[10px] uppercase font-semibold text-slate-400 tracking-wider block">Evening Shift</span>
+                    <div className="flex items-baseline gap-2 mt-1">
+                      <strong className="text-2xl font-bold font-mono text-slate-900">
+                        {staff.filter(s => s.shift === 'Evening').length}
+                      </strong>
+                      <span className="text-[10px] text-orange-600 font-medium">04:00 PM - 11:00 PM</span>
+                    </div>
+                  </div>
+
+                  <div className="p-4 sm:p-5">
+                    <span className="text-[10px] uppercase font-semibold text-slate-400 tracking-wider block">Night Shift</span>
+                    <div className="flex items-baseline gap-2 mt-1">
+                      <strong className="text-2xl font-bold font-mono text-slate-900">
+                        {staff.filter(s => s.shift === 'Night').length}
+                      </strong>
+                      <span className="text-[10px] text-purple-600 font-medium">11:00 PM - Close</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Filter and Search Bar */}
+                <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 bg-white p-3 rounded-2xl border border-slate-200/80 shadow-2xs">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {(['All', 'Morning', 'Evening', 'Night'] as const).map(shiftKey => (
+                      <button
+                        key={shiftKey}
+                        type="button"
+                        onClick={() => setWaiterShiftFilter(shiftKey)}
+                        className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all cursor-pointer ${
+                          waiterShiftFilter === shiftKey
+                            ? 'bg-slate-900 text-white shadow-2xs font-semibold'
+                            : 'bg-slate-50 text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200/60'
+                        }`}
+                      >
+                        {shiftKey === 'All' ? 'All Shifts' : `${shiftKey} Shift`}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="relative w-full sm:w-64 shrink-0">
+                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search name, ID, mobile..."
+                      value={waiterSearchQuery}
+                      onChange={(e) => setWaiterSearchQuery(e.target.value)}
+                      className="w-full pl-9 pr-8 py-1.5 text-xs border border-slate-200 rounded-xl bg-slate-50/50 text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#FF6B00] focus:bg-white transition-all"
+                    />
+                    {waiterSearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setWaiterSearchQuery('')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs cursor-pointer"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Staff Roster: Dense Enterprise Table vs Refined Grid */}
+                {filteredStaff.length === 0 ? (
+                  <div className="text-center py-16 px-6 bg-white rounded-2xl border border-slate-200/80 shadow-2xs">
+                    <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 mx-auto flex items-center justify-center mb-3">
+                      <Users size={22} />
+                    </div>
+                    <h4 className="font-semibold text-sm text-slate-900">No Waiters Matching Filters</h4>
+                    <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                      Adjust your search query or shift filter to view registered staff.
+                    </p>
+                    <button
+                      onClick={() => { setWaiterShiftFilter('All'); setWaiterSearchQuery(''); }}
+                      className="mt-3 text-xs font-semibold text-[#FF6B00] hover:underline cursor-pointer"
+                    >
+                      Clear filters
+                    </button>
+                  </div>
+                ) : waiterViewMode === 'table' ? (
+                  /* HIGH-DENSITY ENTERPRISE STAFF TABLE */
+                  <div className="bg-white border border-slate-200/80 rounded-2xl shadow-2xs overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead>
+                          <tr className="border-b border-slate-100 bg-slate-50/75 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                            <th className="py-3.5 pl-6 pr-4">Staff Member</th>
+                            <th className="py-3.5 px-4">Shift & Timings</th>
+                            <th className="py-3.5 px-4">Terminal Access</th>
+                            <th className="py-3.5 px-4">Table Routing</th>
+                            <th className="py-3.5 px-4">Contact</th>
+                            <th className="py-3.5 px-4 text-right">Performance & Salary</th>
+                            <th className="py-3.5 pl-4 pr-6 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {filteredStaff.map(emp => {
+                            const showPw = revealedPasswords[emp.id];
+                            return (
+                              <tr key={emp.id} className="hover:bg-slate-50/60 transition-colors group">
+                                {/* Staff Member */}
+                                <td className="py-3.5 pl-6 pr-4 whitespace-nowrap">
+                                  <div className="flex items-center gap-3">
+                                    <StaffAvatar photo={emp.photo} name={emp.name} size="md" />
+                                    <div>
+                                      <div className="font-semibold text-slate-900 group-hover:text-[#FF6B00] transition-colors flex items-center gap-1.5">
+                                        <span>{emp.name}</span>
+                                        <span className="text-[10px] font-mono text-slate-400">ID: {emp.empid}</span>
+                                      </div>
+                                      <span className="text-[10px] font-medium text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200/60">
+                                        Waiter
+                                      </span>
+                                    </div>
+                                  </div>
+                                </td>
+
+                                {/* Shift */}
+                                <td className="py-3.5 px-4 whitespace-nowrap">
+                                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium ${
+                                    emp.shift === 'Morning'
+                                      ? 'bg-amber-50 text-amber-700 border border-amber-200/60'
+                                      : emp.shift === 'Evening'
+                                      ? 'bg-orange-50 text-orange-700 border border-orange-200/60'
+                                      : 'bg-purple-50 text-purple-700 border border-purple-200/60'
+                                  }`}>
+                                    <span>{emp.shift === 'Morning' ? '☀️' : emp.shift === 'Evening' ? '🌆' : '🌙'}</span>
+                                    <span>{emp.shift}</span>
+                                  </span>
+                                </td>
+
+                                {/* Terminal Access / Password */}
+                                <td className="py-3.5 px-4 whitespace-nowrap">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-mono text-[11px] bg-slate-50 border border-slate-200/80 text-slate-800 px-2 py-0.5 rounded select-all">
+                                      {showPw ? (emp.password || '••••••') : '••••••••'}
+                                    </span>
                                     <button
                                       type="button"
-                                      onClick={() => {
-                                        navigator.clipboard.writeText(emp.password || '');
-                                        alert(`Copied password for ${emp.name}`);
-                                      }}
-                                      className="text-slate-400 hover:text-slate-700 cursor-pointer p-0.5"
-                                      title="Copy Password"
+                                      onClick={() => setRevealedPasswords(prev => ({ ...prev, [emp.id]: !prev[emp.id] }))}
+                                      className="text-slate-400 hover:text-slate-700 p-1 rounded hover:bg-slate-100 transition-colors cursor-pointer"
+                                      title={showPw ? "Hide PIN" : "Reveal PIN"}
                                     >
-                                      <Copy size={13} />
+                                      {showPw ? <EyeOff size={12} /> : <Eye size={12} />}
+                                    </button>
+                                    {emp.password && (
+                                      <>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            navigator.clipboard.writeText(emp.password || '');
+                                            alert(`Copied password for ${emp.name}`);
+                                          }}
+                                          className="text-slate-400 hover:text-slate-700 p-1 rounded hover:bg-slate-100 transition-colors cursor-pointer"
+                                          title="Copy Password"
+                                        >
+                                          <Copy size={12} />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const shareText = `🍽️ Waiter Login Credentials\n👤 Name: ${emp.name}\n🆔 Employee ID: ${emp.empid}\n🔑 Password: ${emp.password || 'Contact Admin'}`;
+                                            navigator.clipboard.writeText(shareText);
+                                            alert(`Copied credentials for ${emp.name} to clipboard!`);
+                                          }}
+                                          className="text-slate-400 hover:text-emerald-600 p-1 rounded hover:bg-emerald-50 transition-colors cursor-pointer"
+                                          title="Copy Credentials to Share via WhatsApp"
+                                        >
+                                          <Share2 size={12} />
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
+                                </td>
+
+                                {/* Table Routing */}
+                                <td className="py-3.5 px-4 whitespace-nowrap">
+                                  {(!emp.assignedTables || emp.assignedTables.length === 0 || emp.assignedTables.length === tables.length) ? (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[11px] font-medium border border-emerald-200/60">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                      Full Floor
+                                    </span>
+                                  ) : (
+                                    <div className="flex flex-wrap gap-1 max-w-[150px]">
+                                      {emp.assignedTables.map(tId => (
+                                        <span key={tId} className="px-1.5 py-0.2 rounded bg-slate-100 text-slate-700 border border-slate-200/60 text-[10px] font-mono font-medium">
+                                          T-{tId < 10 ? `0${tId}` : tId}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                </td>
+
+                                {/* Contact */}
+                                <td className="py-3.5 px-4 whitespace-nowrap">
+                                  {emp.mobile ? (
+                                    <a
+                                      href={`tel:${emp.mobile}`}
+                                      className="font-mono text-slate-700 hover:text-[#FF6B00] flex items-center gap-1 transition-colors"
+                                    >
+                                      <Phone size={11} className="text-slate-400" />
+                                      <span>{emp.mobile}</span>
+                                    </a>
+                                  ) : (
+                                    <span className="text-slate-400 italic text-[11px]">—</span>
+                                  )}
+                                </td>
+
+                                {/* Performance & Salary */}
+                                <td className="py-3.5 px-4 whitespace-nowrap text-right">
+                                  <div className="font-semibold text-slate-900 font-mono text-xs">{formatPrice(emp.salary)}</div>
+                                  <div className="text-[10px] text-slate-400 flex items-center justify-end gap-1.5 mt-0.5">
+                                    <span className="text-amber-500 font-semibold">★ {emp.performance?.ratings || '5.0'}</span>
+                                    <span>·</span>
+                                    <span>{emp.performance?.ordersDelivered || 0} orders</span>
+                                  </div>
+                                </td>
+
+                                {/* Actions */}
+                                <td className="py-3.5 pl-4 pr-6 text-right whitespace-nowrap">
+                                  <div className="flex items-center justify-end gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenEditStaff(emp)}
+                                      className="p-1.5 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                                      title="Edit Waiter"
+                                    >
+                                      <Edit3 size={13} />
                                     </button>
                                     <button
                                       type="button"
-                                      onClick={() => {
-                                        const shareText = `🍽️ Waiter Login Credentials\n👤 Name: ${emp.name}\n🆔 Employee ID: ${emp.empid}\n🔑 Password: ${emp.password || 'Contact Admin'}`;
-                                        navigator.clipboard.writeText(shareText);
-                                        alert(`Copied credentials for ${emp.name} to clipboard!`);
-                                      }}
-                                      className="text-slate-400 hover:text-emerald-600 cursor-pointer p-0.5"
-                                      title="Copy Credentials to Share via WhatsApp"
+                                      onClick={() => handleDeleteStaffMember(emp.id, emp.name)}
+                                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                      title="Delete Waiter"
                                     >
-                                      <Share2 size={13} />
+                                      <Trash2 size={13} />
                                     </button>
-                                  </>
-                                )}
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : (
+                  /* REFINED COMPACT GRID VIEW */
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {filteredStaff.map(emp => {
+                      const showPw = revealedPasswords[emp.id];
+                      return (
+                        <div
+                          key={emp.id}
+                          className="p-4 rounded-2xl border border-slate-200/80 bg-white shadow-2xs hover:border-slate-300 transition-all flex flex-col justify-between"
+                        >
+                          <div>
+                            <div className="flex items-start justify-between border-b border-slate-100 pb-3 mb-3 gap-3">
+                              <div className="flex items-center gap-3 min-w-0">
+                                <StaffAvatar photo={emp.photo} name={emp.name} size="md" />
+                                <div className="min-w-0">
+                                  <h4 className="font-semibold text-xs text-slate-900 truncate">{emp.name}</h4>
+                                  <div className="flex items-center gap-1.5 mt-0.5">
+                                    <span className="text-[10px] font-mono text-slate-400">ID: {emp.empid}</span>
+                                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 font-medium">
+                                      {emp.shift}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="text-right shrink-0">
+                                <span className="font-mono font-bold text-slate-900 text-xs block">{formatPrice(emp.salary)}</span>
+                                <span className="text-[10px] text-amber-500 font-medium">★ {emp.performance?.ratings || '5.0'}</span>
                               </div>
                             </div>
 
-                            <div>
-                              <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">Phone / Mobile</span>
-                              {emp.mobile ? (
-                                <a
-                                  href={`tel:${emp.mobile}`}
-                                  className="font-bold text-primary hover:underline flex items-center gap-1 mt-0.5 truncate"
-                                >
-                                  <Phone size={11} className="shrink-0" />
-                                  <span>{emp.mobile}</span>
-                                </a>
+                            <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 mb-3 text-[11px] space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] text-slate-400 uppercase font-semibold">PIN</span>
+                                <div className="flex items-center gap-1">
+                                  <span className="font-mono text-slate-800 font-semibold">{showPw ? (emp.password || '••••••') : '••••••••'}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setRevealedPasswords(prev => ({ ...prev, [emp.id]: !prev[emp.id] }))}
+                                    className="text-slate-400 hover:text-slate-700"
+                                  >
+                                    {showPw ? <EyeOff size={11} /> : <Eye size={11} />}
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] text-slate-400 uppercase font-semibold">Mobile</span>
+                                <span className="font-mono text-slate-700">{emp.mobile || 'Not set'}</span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between text-[11px] mb-2">
+                              <span className="text-slate-400 text-[10px] uppercase font-semibold">Routing</span>
+                              {(!emp.assignedTables || emp.assignedTables.length === 0 || emp.assignedTables.length === tables.length) ? (
+                                <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded text-[10px] font-medium">Full Floor</span>
                               ) : (
-                                <span className="text-slate-400 italic">Not set</span>
+                                <span className="text-slate-700 bg-slate-100 px-2 py-0.5 rounded text-[10px] font-mono">
+                                  {emp.assignedTables.length} tables
+                                </span>
                               )}
                             </div>
-
-                            {emp.email && (
-                              <div className="col-span-2 border-t border-slate-200/60 pt-1.5 mt-0.5">
-                                <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">Email Address</span>
-                                <a href={`mailto:${emp.email}`} className="text-primary hover:underline flex items-center gap-1 font-bold truncate">
-                                  <Mail size={11} className="shrink-0" />
-                                  <span>{emp.email}</span>
-                                </a>
-                              </div>
-                            )}
                           </div>
 
-                          {/* Table Routing Assignment */}
-                          <div className="mb-3">
-                            <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block mb-1">
-                              Table Routing & Assignment
+                          <div className="border-t border-slate-100 pt-2.5 mt-1 flex justify-between items-center text-xs">
+                            <span className="text-[10px] text-slate-400">
+                              {emp.performance?.ordersDelivered || 0} orders delivered
                             </span>
-                            {(!emp.assignedTables || emp.assignedTables.length === 0 || emp.assignedTables.length === tables.length) ? (
-                              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200/70">
-                                ⚡ Serves All Tables (Full Floor)
-                              </span>
-                            ) : (
-                              <div className="flex flex-wrap gap-1.5">
-                                {emp.assignedTables.map(tId => (
-                                  <span key={tId} className="px-2.5 py-0.5 rounded-xl bg-orange-50 text-orange-700 border border-orange-200/70 text-xs font-bold">
-                                    Table #{tId}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Performance Badges */}
-                          <div className="grid grid-cols-3 gap-2 py-2.5 border-t border-b border-slate-100 text-center text-xs">
-                            <div>
-                              <span className="text-[10px] text-slate-400 block uppercase font-bold">Rating</span>
-                              <strong className="text-amber-500 font-bold">★ {emp.performance?.ratings || '5.0'}</strong>
-                            </div>
-                            <div>
-                              <span className="text-[10px] text-slate-400 block uppercase font-bold">Attendance</span>
-                              <strong className="text-emerald-600 font-bold">{emp.attendance || 100}%</strong>
-                            </div>
-                            <div>
-                              <span className="text-[10px] text-slate-400 block uppercase font-bold">Completed</span>
-                              <strong className="font-bold text-slate-900">{emp.performance?.ordersDelivered || 0} orders</strong>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Footer Actions */}
-                        <div className="pt-3 mt-2 flex justify-between items-center text-xs">
-                          <span className="text-[10px] text-slate-400">
-                            Avg serving: {emp.performance?.avgServingTime || 'N/A'}
-                          </span>
-                          {(role === 'Hotel Manager' || role === 'Admin' || role === 'Manager' || !role) && (
-                            <div className="flex gap-2">
+                            <div className="flex gap-1">
                               <button
                                 onClick={() => handleOpenEditStaff(emp)}
-                                className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold cursor-pointer flex items-center gap-1.5 transition-colors"
-                                title="Edit Waiter Details"
+                                className="p-1.5 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                                title="Edit"
                               >
-                                <Edit3 size={12} /> Edit
+                                <Edit3 size={12} />
                               </button>
                               <button
                                 onClick={() => handleDeleteStaffMember(emp.id, emp.name)}
-                                className="px-3.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl font-bold cursor-pointer flex items-center gap-1.5 transition-colors"
-                                title="Delete Waiter"
+                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                title="Delete"
                               >
-                                <Trash2 size={12} /> Delete
+                                <Trash2 size={12} />
                               </button>
                             </div>
-                          )}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
 
 
@@ -3115,27 +3284,132 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
               VIEW 9: LOYALTY PROGRAMS
               ---------------------------------------------------- */}
           {activeTab === 'loyalty' && (
-            <div className="space-y-6 animate-fade-in">
-              <div className="flex justify-between items-center border-b pb-3">
+            <div className="space-y-6 animate-fade-in font-sans">
+              {/* Enterprise Header */}
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-1">
                 <div>
-                  <h3 className="font-extrabold text-sm">Loyalty Rules & points</h3>
-                  <p className="text-[10px] text-gray-400">Establish reward conversion rules and adjust loyalty points.</p>
+                  <div className="flex items-center gap-2.5">
+                    <h3 className="font-bold text-base text-slate-900 tracking-tight">Loyalty Rewards & Tier Policies</h3>
+                    <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2.5 py-0.5 rounded-full">
+                      Active Program
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">Establish reward conversion parameters, points issuance ratios, and tier upgrade thresholds.</p>
                 </div>
+
                 <button
+                  type="button"
                   onClick={() => setEditLoyaltyModal(true)}
-                  className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2.5 px-4 rounded-xl cursor-pointer text-xs flex items-center gap-1.5"
+                  className="bg-[#FF6B00] hover:bg-[#e05e00] text-white text-xs font-semibold px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs self-stretch sm:self-auto justify-center"
                 >
-                  <Edit3 size={14} /> Edit Rules
+                  <Edit3 size={13} />
+                  <span>Configure Rules</span>
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-xs font-semibold">
-                <div className={`p-4 rounded-3xl border bg-white border-gray-50`}>
-                  <h4 className="font-extrabold text-xs mb-3">Loyalty Conversion Rules</h4>
-                  <div className="space-y-2">
-                    <p className="flex justify-between"><span>Standard Rule:</span> <strong className="text-primary font-black">₹100 = {loyaltyRules.pointsPerHundred} Points</strong></p>
-                    <p className="flex justify-between"><span>Silver Rewards:</span> <strong>{loyaltyRules.silverTierPoints} Points (Tier Upgrade)</strong></p>
-                    <p className="flex justify-between"><span>Gold Rewards:</span> <strong>{loyaltyRules.goldTierPoints} Points ({loyaltyRules.goldDiscountPercent}% Discount)</strong></p>
+              {/* Structured Two-Column Settings Layout */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+                {/* Panel 1: Loyalty Conversion Rules */}
+                <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-2xs">
+                  <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                    <div>
+                      <h4 className="text-xs font-semibold text-slate-800 tracking-tight">Conversion & Threshold Parameters</h4>
+                      <p className="text-[11px] text-slate-500 mt-0.5">Mathematical ratios applied during customer billing and checkout.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setEditLoyaltyModal(true)}
+                      className="text-xs font-semibold text-[#FF6B00] hover:underline cursor-pointer"
+                    >
+                      Edit
+                    </button>
+                  </div>
+
+                  <div className="divide-y divide-slate-100 text-xs">
+                    <div className="px-6 py-4 flex items-center justify-between hover:bg-slate-50/50 transition-colors">
+                      <div>
+                        <span className="font-medium text-slate-800 block">Base Earning Rule</span>
+                        <span className="text-[11px] text-slate-500">Points credited per rupee spent on finalized orders</span>
+                      </div>
+                      <span className="font-mono font-semibold text-slate-900 bg-slate-100 border border-slate-200/70 px-2.5 py-1 rounded-lg">
+                        ₹100 = {loyaltyRules.pointsPerHundred} Points
+                      </span>
+                    </div>
+
+                    <div className="px-6 py-4 flex items-center justify-between hover:bg-slate-50/50 transition-colors">
+                      <div>
+                        <span className="font-medium text-slate-800 block">Silver Rewards Threshold</span>
+                        <span className="text-[11px] text-slate-500">Lifetime points required to achieve Silver status</span>
+                      </div>
+                      <span className="font-mono font-semibold text-slate-900 bg-slate-100 border border-slate-200/70 px-2.5 py-1 rounded-lg">
+                        {loyaltyRules.silverTierPoints} Points
+                      </span>
+                    </div>
+
+                    <div className="px-6 py-4 flex items-center justify-between hover:bg-slate-50/50 transition-colors">
+                      <div>
+                        <span className="font-medium text-slate-800 block">Gold Rewards Threshold</span>
+                        <span className="text-[11px] text-slate-500">Lifetime points required for VIP Gold tier and discounts</span>
+                      </div>
+                      <span className="font-mono font-semibold text-slate-900 bg-slate-100 border border-slate-200/70 px-2.5 py-1 rounded-lg">
+                        {loyaltyRules.goldTierPoints} Points ({loyaltyRules.goldDiscountPercent}% Off)
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Panel 2: Customer Tier Benefits Matrix */}
+                <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-2xs">
+                  <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+                    <h4 className="text-xs font-semibold text-slate-800 tracking-tight">Active Tier Privileges</h4>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Perks automatically unlocked when guest accounts cross reward thresholds.</p>
+                  </div>
+
+                  <div className="divide-y divide-slate-100 text-xs">
+                    <div className="px-6 py-4 flex items-center justify-between hover:bg-slate-50/50 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <span className="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 font-bold flex items-center justify-center text-xs">
+                          B
+                        </span>
+                        <div>
+                          <span className="font-semibold text-slate-900 block">Bronze (Entry Tier)</span>
+                          <span className="text-[11px] text-slate-500">0 - {loyaltyRules.silverTierPoints - 1} Points</span>
+                        </div>
+                      </div>
+                      <span className="text-[11px] font-medium text-slate-600 bg-slate-100 px-2.5 py-1 rounded-md">
+                        Standard 1x Accrual
+                      </span>
+                    </div>
+
+                    <div className="px-6 py-4 flex items-center justify-between hover:bg-slate-50/50 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <span className="w-8 h-8 rounded-lg bg-slate-200 text-slate-800 font-bold flex items-center justify-center text-xs">
+                          S
+                        </span>
+                        <div>
+                          <span className="font-semibold text-slate-900 block">Silver Tier</span>
+                          <span className="text-[11px] text-slate-500">{loyaltyRules.silverTierPoints} - {loyaltyRules.goldTierPoints - 1} Points</span>
+                        </div>
+                      </div>
+                      <span className="text-[11px] font-medium text-slate-700 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-md">
+                        Priority Seating & Tier Upgrades
+                      </span>
+                    </div>
+
+                    <div className="px-6 py-4 flex items-center justify-between hover:bg-slate-50/50 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <span className="w-8 h-8 rounded-lg bg-amber-100 text-amber-800 font-bold flex items-center justify-center text-xs">
+                          G
+                        </span>
+                        <div>
+                          <span className="font-semibold text-slate-900 block">Gold VIP Tier</span>
+                          <span className="text-[11px] text-slate-500">{loyaltyRules.goldTierPoints}+ Points</span>
+                        </div>
+                      </div>
+                      <span className="text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200/60 px-2.5 py-1 rounded-md">
+                        {loyaltyRules.goldDiscountPercent}% Auto Bill Discount
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -3335,95 +3609,131 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
               '₹0'
             ];
 
+            const totalFilteredRevenue = reportOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+            const avgOrderValue = reportOrders.length > 0 ? Math.round(totalFilteredRevenue / reportOrders.length) : 0;
+            const peakDayEntry = Object.entries(daySalesMap).reduce((max, curr) => curr[1] > max[1] ? curr : max, ['None', 0]);
+            const peakDay = peakDayEntry[1] > 0 ? `${peakDayEntry[0]} (${formatPrice(peakDayEntry[1])})` : 'N/A';
+
             return (
               <div className="space-y-6 animate-fade-in font-sans">
-                {/* Header Section */}
-                <div className="flex justify-between items-center pb-2">
+                {/* Enterprise Header */}
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-1">
                   <div>
-                    <h2 className="font-extrabold text-2xl mb-1 text-gray-900 tracking-tight">Download Hotel Reports</h2>
-                    <p className="text-[13px] text-gray-500 max-w-2xl">
-                      Generate complete hotel reports — sales, orders, staff, payments and analytics — as Excel or PDF, or preview them before download.
-                    </p>
-                  </div>
-                  <div className="flex gap-3">
-                    <button onClick={handleExportExcel} className="flex items-center gap-2 border-transparent text-white font-bold py-2 px-4 rounded-xl text-sm bg-[#00a65a] hover:bg-[#008f4d] transition-colors shadow-sm cursor-pointer" title="Download Excel Spreadsheet">
-                      <FileSpreadsheet size={16} strokeWidth={2.5} />
-                      Excel
-                    </button>
-                    <button onClick={handleExportPDF} className="flex items-center gap-2 border-transparent text-white font-bold py-2 px-4 rounded-xl text-sm bg-[#dd4b39] hover:bg-[#c23321] transition-colors shadow-sm cursor-pointer" title="Download PDF Document">
-                      <FileText size={16} strokeWidth={2.5} />
-                      PDF
-                    </button>
+                    <div className="flex items-center gap-2.5">
+                      <h3 className="font-bold text-base text-slate-900 tracking-tight">Reports & Analytics Console</h3>
+                      <span className="text-[11px] font-semibold text-slate-600 bg-slate-100 border border-slate-200/80 px-2 py-0.5 rounded-full">
+                        {reportOrders.length} Orders in Scope
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">Automated accounting reports, revenue aggregations, and raw data exports.</p>
                   </div>
                 </div>
 
-                <div className="border-t border-gray-100 my-2"></div>
-
-                {/* Filter Section */}
-                <div className="p-5 rounded-2xl border shadow-sm bg-white border-gray-200 flex flex-wrap gap-4 justify-between items-center relative z-20">
-                  <div className="flex flex-wrap gap-4">
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Date Range Filter</label>
-                      <div className="relative">
-                        <select
-                          value={reportDateFilter}
-                          onChange={(e) => setReportDateFilter(e.target.value as any)}
-                          className="appearance-none border text-xs py-2 pl-3.5 pr-9 rounded-xl font-bold outline-none cursor-pointer transition-colors bg-white border-gray-300 text-gray-700 hover:border-gray-400"
-                        >
-                          <option value="Today">Today Only</option>
-                          <option value="This Week">This Week (Last 7 Days)</option>
-                          <option value="This Month">This Month (Last 30 Days)</option>
-                          <option value="All">All Time History</option>
-                        </select>
-                        <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
-                      </div>
+                {/* Unified Control Toolbar (Filters & Export Actions in 1 line) */}
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-3.5 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 shadow-2xs">
+                  {/* Filters Left */}
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    {/* Date Filter */}
+                    <div className="relative">
+                      <select
+                        value={reportDateFilter}
+                        onChange={(e) => setReportDateFilter(e.target.value as any)}
+                        className="appearance-none bg-slate-50 border border-slate-200 rounded-xl text-xs py-2 pl-3.5 pr-8 font-medium text-slate-700 outline-none hover:bg-slate-100 transition-colors cursor-pointer"
+                      >
+                        <option value="Today">Today Only</option>
+                        <option value="This Week">This Week (Last 7 Days)</option>
+                        <option value="This Month">This Month (Last 30 Days)</option>
+                        <option value="All">All Time History</option>
+                      </select>
+                      <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                     </div>
 
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Category Scope</label>
-                      <div className="relative">
-                        <select
-                          value={reportCategoryFilter}
-                          onChange={(e) => setReportCategoryFilter(e.target.value)}
-                          className="appearance-none border text-xs py-2 pl-3.5 pr-9 rounded-xl font-bold outline-none cursor-pointer transition-colors bg-white border-gray-300 text-gray-700 hover:border-gray-400"
-                        >
-                          <option value="All">All Food Categories</option>
-                          <option value="Breakfast">Breakfast</option>
-                          <option value="Main Course">Main Course</option>
-                          <option value="Starters">Starters</option>
-                          <option value="Breads">Breads</option>
-                          <option value="Beverages">Beverages</option>
-                          <option value="Desserts">Desserts</option>
-                        </select>
-                        <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
-                      </div>
+                    {/* Category Filter */}
+                    <div className="relative">
+                      <select
+                        value={reportCategoryFilter}
+                        onChange={(e) => setReportCategoryFilter(e.target.value)}
+                        className="appearance-none bg-slate-50 border border-slate-200 rounded-xl text-xs py-2 pl-3.5 pr-8 font-medium text-slate-700 outline-none hover:bg-slate-100 transition-colors cursor-pointer"
+                      >
+                        <option value="All">All Food Categories</option>
+                        <option value="Breakfast">Breakfast</option>
+                        <option value="Main Course">Main Course</option>
+                        <option value="Starters">Starters</option>
+                        <option value="Breads">Breads</option>
+                        <option value="Beverages">Beverages</option>
+                        <option value="Desserts">Desserts</option>
+                      </select>
+                      <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                     </div>
-                  </div>
 
-                  <div className="text-xs text-orange-600 font-bold self-end pb-1 bg-orange-50 px-3 py-1.5 rounded-xl border border-orange-100">
-                    ✓ PDF & Excel exports will strictly contain records matching your active filters.
-                  </div>
-                </div>
-
-                {/* Custom SVG Sales Chart */}
-                <div className="p-6 rounded-2xl border shadow-sm bg-white border-gray-200 relative z-10 mt-2">
-                  <div className="flex items-center justify-between mb-6">
-                    <div>
-                      <h4 className="font-extrabold text-sm text-gray-800">Weekly Sales Volume Chart</h4>
-                      <p className="text-[11px] text-gray-400">Total recorded sales aggregated across days of the week</p>
-                    </div>
-                    <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-lg">
-                      {reportOrders.length} matching order{reportOrders.length !== 1 ? 's' : ''}
+                    <span className="text-[11px] text-slate-400 hidden xl:inline">
+                      Exports will strictly match active filter scope.
                     </span>
                   </div>
 
-                  <div className="w-full h-[280px] relative">
+                  {/* Export Actions Right */}
+                  <div className="flex items-center gap-2 justify-end">
+                    <button
+                      type="button"
+                      onClick={handleExportExcel}
+                      className="text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white border border-slate-200 hover:bg-slate-50 px-3.5 py-2 rounded-xl transition-colors shadow-2xs flex items-center gap-1.5 cursor-pointer"
+                      title="Download Excel Spreadsheet"
+                    >
+                      <FileSpreadsheet size={14} className="text-emerald-600" />
+                      <span>Export Excel</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleExportPDF}
+                      className="text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white border border-slate-200 hover:bg-slate-50 px-3.5 py-2 rounded-xl transition-colors shadow-2xs flex items-center gap-1.5 cursor-pointer"
+                      title="Download PDF Document"
+                    >
+                      <FileText size={14} className="text-rose-600" />
+                      <span>Export PDF</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* KPI Summary Strip */}
+                <div className="bg-white border border-slate-200/80 rounded-2xl shadow-2xs divide-y sm:divide-y-0 sm:divide-x divide-slate-100 grid grid-cols-1 sm:grid-cols-3 overflow-hidden">
+                  <div className="p-4 sm:p-5">
+                    <span className="text-[10px] uppercase font-semibold text-slate-400 tracking-wider block">Filtered Gross Sales</span>
+                    <strong className="text-2xl font-bold font-mono text-slate-900 mt-1 block">{formatPrice(totalFilteredRevenue)}</strong>
+                    <span className="text-[11px] text-slate-500 mt-0.5 block">{reportOrders.length} processed orders</span>
+                  </div>
+
+                  <div className="p-4 sm:p-5">
+                    <span className="text-[10px] uppercase font-semibold text-slate-400 tracking-wider block">Average Order Value (AOV)</span>
+                    <strong className="text-2xl font-bold font-mono text-slate-900 mt-1 block">{formatPrice(avgOrderValue)}</strong>
+                    <span className="text-[11px] text-emerald-600 font-medium mt-0.5 block">Consistent guest spend</span>
+                  </div>
+
+                  <div className="p-4 sm:p-5">
+                    <span className="text-[10px] uppercase font-semibold text-slate-400 tracking-wider block">Peak Sales Day</span>
+                    <strong className="text-lg font-bold text-slate-900 mt-1.5 block truncate">{peakDay}</strong>
+                    <span className="text-[11px] text-slate-500 mt-0.5 block">Highest revenue volume day</span>
+                  </div>
+                </div>
+
+                {/* Custom Sales Volume Chart */}
+                <div className="p-6 rounded-2xl border border-slate-200/80 shadow-2xs bg-white">
+                  <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
+                    <div>
+                      <h4 className="font-semibold text-xs text-slate-800 tracking-tight">Weekly Sales Volume Chart</h4>
+                      <p className="text-[11px] text-slate-500 mt-0.5">Total recorded sales aggregated across days of the week</p>
+                    </div>
+                    <span className="text-[11px] font-medium bg-slate-100 text-slate-700 px-2.5 py-1 rounded-md border border-slate-200/60 font-mono">
+                      {reportOrders.length} Orders
+                    </span>
+                  </div>
+
+                  <div className="w-full h-[260px] relative">
                     {/* Y-Axis Grid Lines & Labels */}
-                    <div className="absolute inset-0 flex flex-col justify-between text-[11px] font-bold text-gray-400">
+                    <div className="absolute inset-0 flex flex-col justify-between text-[11px] font-mono font-medium text-slate-400 pointer-events-none">
                       {ySteps.map((step, idx) => (
                         <div key={idx} className="flex items-center gap-3">
                           <span className="w-12 text-right">{step}</span>
-                          <div className={`flex-1 ${idx === ySteps.length - 1 ? 'border-t border-gray-300' : 'border-t border-dashed border-gray-200'}`}></div>
+                          <div className={`flex-1 ${idx === ySteps.length - 1 ? 'border-t border-slate-200' : 'border-t border-dashed border-slate-100'}`}></div>
                         </div>
                       ))}
                     </div>
@@ -3438,14 +3748,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                         return (
                           <div key={day} className="w-[11%] h-full flex flex-col items-center justify-end group relative">
                             {/* Hover tooltip */}
-                            <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-8 bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg pointer-events-none whitespace-nowrap z-30 shadow-md">
+                            <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-8 bg-slate-900 text-white text-[10px] font-mono font-semibold py-1 px-2.5 rounded-lg pointer-events-none whitespace-nowrap z-30 shadow-md">
                               {day}: ₹{amount.toLocaleString('en-IN')}
                             </div>
                             <div
                               style={{ height: `${pct}%` }}
                               className={`w-full rounded-t-sm transition-all cursor-pointer ${amount > 0
-                                ? 'bg-[#ff7f24] hover:bg-[#ea580c] shadow-xs'
-                                : 'bg-slate-200 hover:bg-slate-300'
+                                ? 'bg-[#FF6B00] hover:bg-[#e05e00] shadow-2xs'
+                                : 'bg-slate-100 hover:bg-slate-200'
                                 }`}
                             ></div>
                           </div>
@@ -3454,7 +3764,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                     </div>
 
                     {/* X-Axis Labels */}
-                    <div className="absolute bottom-0 left-16 right-0 flex justify-around px-2 -mb-6 text-[11px] font-bold text-gray-500">
+                    <div className="absolute bottom-0 left-16 right-0 flex justify-around px-2 -mb-6 text-[11px] font-medium text-slate-500">
                       {dayKeys.map(day => (
                         <span key={day} className="w-[11%] text-center">{day}</span>
                       ))}
@@ -3470,277 +3780,392 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
           {/* ----------------------------------------------------
               VIEW 15: RESTAURANT SETTINGS
               ---------------------------------------------------- */}
-          {activeTab === 'settings' && (
-            <div className="space-y-6 animate-fade-in">
-              <div className="border-b pb-3">
-                <h3 className="font-extrabold text-sm">Restaurant Configurations</h3>
-                <p className="text-[10px] text-gray-400">Modify operating hours, tax metrics, invoice GST numbers, and system theme.</p>
-              </div>
+          {activeTab === 'settings' && (() => {
+            const currentSettings = settingsForm || alertSettings;
+            return (
+              <form className="space-y-6 animate-fade-in font-sans" onSubmit={handleSaveSettings}>
+                {/* Enterprise Header with Sticky Action Button */}
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-1">
+                  <div>
+                    <div className="flex items-center gap-2.5">
+                      <h3 className="font-bold text-base text-slate-900 tracking-tight">Restaurant Configurations</h3>
+                      <span className="text-[11px] font-semibold text-slate-600 bg-slate-100 border border-slate-200/80 px-2 py-0.5 rounded-full">
+                        {currentSettings.restaurantName || 'TableTap'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">Manage business identity, statutory tax identifiers, and physical floor addresses.</p>
+                  </div>
 
-              <div className={`p-6 rounded-3xl border shadow-sm bg-white border-gray-50`}>
-                {(() => {
-                  const currentSettings = settingsForm || alertSettings;
-                  return (
-                    <form className="space-y-4 text-xs font-semibold max-w-2xl" onSubmit={handleSaveSettings}>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-gray-400 mb-1">Restaurant Name</label>
-                          <input
-                            type="text"
-                            required
-                            className="w-full p-2.5 border rounded-xl bg-transparent"
-                            value={currentSettings.restaurantName || ''}
-                            onChange={(e) => setSettingsForm({ ...currentSettings, restaurantName: e.target.value })}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-gray-400 mb-1">Owner Name</label>
-                          <input
-                            type="text"
-                            placeholder="Enter Owner Name"
-                            required
-                            className="w-full p-2.5 border rounded-xl bg-transparent"
-                            value={currentSettings.ownerName || ''}
-                            onChange={(e) => setSettingsForm({ ...currentSettings, ownerName: e.target.value })}
-                          />
-                        </div>
+                  <div className="flex items-center gap-2.5 self-stretch sm:self-auto justify-end">
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="bg-[#FF6B00] hover:bg-[#e05e00] text-white text-xs font-semibold px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs self-stretch sm:self-auto justify-center disabled:opacity-50"
+                    >
+                      <Check size={14} />
+                      <span>{loading ? 'Saving Changes...' : 'Save Settings'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Section 1: General Business Identity */}
+                <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-2xs">
+                  <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+                    <h4 className="text-xs font-semibold text-slate-800 tracking-tight">General Business Identity</h4>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Primary brand names, administrative ownership, and direct guest communication lines.</p>
+                  </div>
+
+                  <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Restaurant Name</label>
+                      <input
+                        type="text"
+                        required
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-slate-800 text-xs focus:outline-none focus:border-[#FF6B00] focus:ring-1 focus:ring-[#FF6B00]/20 transition-all"
+                        value={currentSettings.restaurantName || ''}
+                        onChange={(e) => setSettingsForm({ ...currentSettings, restaurantName: e.target.value })}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Owner / General Manager</label>
+                      <input
+                        type="text"
+                        placeholder="Owner Name"
+                        required
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-slate-800 text-xs focus:outline-none focus:border-[#FF6B00] focus:ring-1 focus:ring-[#FF6B00]/20 transition-all"
+                        value={currentSettings.ownerName || ''}
+                        onChange={(e) => setSettingsForm({ ...currentSettings, ownerName: e.target.value })}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Branch Identifier</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Flagship Downtown"
+                        required
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-slate-800 text-xs focus:outline-none focus:border-[#FF6B00] focus:ring-1 focus:ring-[#FF6B00]/20 transition-all"
+                        value={currentSettings.branchName || ''}
+                        onChange={(e) => setSettingsForm({ ...currentSettings, branchName: e.target.value })}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Support & Billing Email</label>
+                      <input
+                        type="email"
+                        placeholder="admin@restaurant.com"
+                        required
+                        pattern="[a-zA-Z0-9._%+\-]+@gmail\.com$"
+                        title="Must be a valid @gmail.com address"
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-slate-800 text-xs focus:outline-none focus:border-[#FF6B00] focus:ring-1 focus:ring-[#FF6B00]/20 transition-all font-mono"
+                        value={currentSettings.email || ''}
+                        onChange={(e) => setSettingsForm({ ...currentSettings, email: e.target.value })}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Primary Mobile Contact</label>
+                      <input
+                        type="tel"
+                        placeholder="10-digit mobile"
+                        required
+                        pattern="^[6-9]\d{9}$"
+                        title="Must be a valid 10-digit Indian mobile number"
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-slate-800 text-xs focus:outline-none focus:border-[#FF6B00] focus:ring-1 focus:ring-[#FF6B00]/20 transition-all font-mono"
+                        value={currentSettings.mobile || ''}
+                        onChange={(e) => setSettingsForm({ ...currentSettings, mobile: e.target.value })}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Alternate Contact Phone</label>
+                      <input
+                        type="tel"
+                        placeholder="Secondary contact"
+                        required
+                        pattern="^[6-9]\d{9}$"
+                        title="Must be a valid 10-digit Indian mobile number"
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-slate-800 text-xs focus:outline-none focus:border-[#FF6B00] focus:ring-1 focus:ring-[#FF6B00]/20 transition-all font-mono"
+                        value={currentSettings.alternateMobile || ''}
+                        onChange={(e) => setSettingsForm({ ...currentSettings, alternateMobile: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section 2: Statutory Tax & Compliance */}
+                <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-2xs">
+                  <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+                    <h4 className="text-xs font-semibold text-slate-800 tracking-tight">Statutory Tax & Regulatory Registration</h4>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Government registration codes printed on guest invoices and tax filings.</p>
+                  </div>
+
+                  <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">GST Number / Tax ID</label>
+                      <input
+                        type="text"
+                        required
+                        pattern="^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$"
+                        title="Must be a valid 15-character GSTIN format"
+                        value={currentSettings.gstNo || ''}
+                        onChange={(e) => setSettingsForm({ ...currentSettings, gstNo: e.target.value })}
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-slate-800 text-xs focus:outline-none focus:border-[#FF6B00] font-mono"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">FSSAI License (India)</label>
+                      <input
+                        type="text"
+                        placeholder="14-digit FSSAI"
+                        required
+                        pattern="^[1-2]\d{13}$"
+                        title="Must be a valid 14-digit FSSAI license number"
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-slate-800 text-xs focus:outline-none focus:border-[#FF6B00] font-mono"
+                        value={currentSettings.fssai || ''}
+                        onChange={(e) => setSettingsForm({ ...currentSettings, fssai: e.target.value })}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Default Tax Percentage (%)</label>
+                      <input
+                        type="number"
+                        required
+                        min="0"
+                        max="100"
+                        value={currentSettings.tax || 0}
+                        onChange={(e) => setSettingsForm({ ...currentSettings, tax: parseInt(e.target.value) || 0 })}
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-slate-800 text-xs focus:outline-none focus:border-[#FF6B00] font-mono"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section 3: Physical Address & Geolocation */}
+                <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-2xs">
+                  <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+                    <h4 className="text-xs font-semibold text-slate-800 tracking-tight">Location Details & Geolocation</h4>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Physical property coordinates displayed on digital invoices and customer menus.</p>
+                  </div>
+
+                  <div className="p-6 space-y-4 text-xs">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Full Street Address</label>
+                      <textarea
+                        placeholder="Street Address, Building, Suite"
+                        required
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-slate-800 text-xs focus:outline-none focus:border-[#FF6B00]"
+                        rows={2}
+                        value={currentSettings.address || ''}
+                        onChange={(e) => setSettingsForm({ ...currentSettings, address: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">City</label>
+                        <input
+                          type="text"
+                          placeholder="City"
+                          required
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-slate-800 text-xs focus:outline-none focus:border-[#FF6B00]"
+                          value={currentSettings.city || ''}
+                          onChange={(e) => setSettingsForm({ ...currentSettings, city: e.target.value })}
+                        />
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-gray-400 mb-1">Branch Name</label>
-                          <input
-                            type="text"
-                            placeholder="Enter Branch Name"
-                            required
-                            className="w-full p-2.5 border rounded-xl bg-transparent"
-                            value={currentSettings.branchName || ''}
-                            onChange={(e) => setSettingsForm({ ...currentSettings, branchName: e.target.value })}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-gray-400 mb-1">Email Address</label>
-                          <input
-                            type="email"
-                            placeholder="Enter Email"
-                            required
-                            pattern="[a-zA-Z0-9._%+\-]+@gmail\.com$"
-                            title="Must be a valid @gmail.com address"
-                            className="w-full p-2.5 border rounded-xl bg-transparent"
-                            value={currentSettings.email || ''}
-                            onChange={(e) => setSettingsForm({ ...currentSettings, email: e.target.value })}
-                          />
-                        </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">State</label>
+                        <input
+                          type="text"
+                          placeholder="State"
+                          required
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-slate-800 text-xs focus:outline-none focus:border-[#FF6B00]"
+                          value={currentSettings.state || ''}
+                          onChange={(e) => setSettingsForm({ ...currentSettings, state: e.target.value })}
+                        />
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-gray-400 mb-1">Mobile Number</label>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Country</label>
+                        <input
+                          type="text"
+                          placeholder="Country"
+                          required
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-slate-800 text-xs focus:outline-none focus:border-[#FF6B00]"
+                          value={currentSettings.country || ''}
+                          onChange={(e) => setSettingsForm({ ...currentSettings, country: e.target.value })}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">PIN Code</label>
+                        <input
+                          type="text"
+                          placeholder="6-digit PIN"
+                          required
+                          pattern="^[1-9][0-9]{5}$"
+                          title="Must be a valid 6-digit Indian PIN code"
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-slate-800 text-xs focus:outline-none focus:border-[#FF6B00] font-mono"
+                          value={currentSettings.pinCode || ''}
+                          onChange={(e) => setSettingsForm({ ...currentSettings, pinCode: e.target.value })}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Nearby Landmark</label>
+                        <input
+                          type="text"
+                          placeholder="Landmark"
+                          required
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-slate-800 text-xs focus:outline-none focus:border-[#FF6B00]"
+                          value={currentSettings.landmark || ''}
+                          onChange={(e) => setSettingsForm({ ...currentSettings, landmark: e.target.value })}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Google Maps URL</label>
+                        <div className="flex gap-2">
                           <input
-                            type="tel"
-                            placeholder="Primary Contact"
+                            type="url"
+                            placeholder="Maps URL"
                             required
-                            pattern="^[6-9]\d{9}$"
-                            title="Must be a valid 10-digit Indian mobile number"
-                            className="w-full p-2.5 border rounded-xl bg-transparent"
-                            value={currentSettings.mobile || ''}
-                            onChange={(e) => setSettingsForm({ ...currentSettings, mobile: e.target.value })}
+                            value={currentSettings.mapsLocation || ''}
+                            onChange={(e) => setSettingsForm({ ...currentSettings, mapsLocation: e.target.value })}
+                            className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-slate-800 text-xs focus:outline-none focus:border-[#FF6B00] flex-1 font-mono text-[11px]"
                           />
-                        </div>
-                        <div>
-                          <label className="block text-gray-400 mb-1">Alternate Contact Number</label>
-                          <input
-                            type="tel"
-                            placeholder="Alternate Contact"
-                            required
-                            pattern="^[6-9]\d{9}$"
-                            title="Must be a valid 10-digit Indian mobile number"
-                            className="w-full p-2.5 border rounded-xl bg-transparent"
-                            value={currentSettings.alternateMobile || ''}
-                            onChange={(e) => setSettingsForm({ ...currentSettings, alternateMobile: e.target.value })}
-                          />
+                          <button
+                            type="button"
+                            onClick={handleGetLocation}
+                            className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 rounded-xl border border-slate-200/60 flex items-center justify-center cursor-pointer transition-colors shadow-2xs"
+                            title="Detect Current GPS Location"
+                          >
+                            <Map size={15} />
+                          </button>
                         </div>
                       </div>
-
-                      <div className={`border-t pt-4 mt-4 border-gray-100`}>
-                        <h4 className="font-bold text-gray-500 mb-3 uppercase tracking-wider">Registration Details</h4>
-                        <div className="grid grid-cols-3 gap-3">
-                          <div>
-                            <label className="block text-gray-400 mb-1">GST Number / Tax ID</label>
-                            <input
-                              type="text"
-                              required
-                              pattern="^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$"
-                              title="Must be a valid 15-character GSTIN format"
-                              value={currentSettings.gstNo || ''}
-                              onChange={(e) => setSettingsForm({ ...currentSettings, gstNo: e.target.value })}
-                              className="w-full p-2.5 border rounded-xl bg-transparent"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-gray-400 mb-1">FSSAI License Number (India)</label>
-                            <input
-                              type="text"
-                              placeholder="FSSAI Number"
-                              required
-                              pattern="^[1-2]\d{13}$"
-                              title="Must be a valid 14-digit FSSAI license number"
-                              className="w-full p-2.5 border rounded-xl bg-transparent"
-                              value={currentSettings.fssai || ''}
-                              onChange={(e) => setSettingsForm({ ...currentSettings, fssai: e.target.value })}
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-gray-400 mb-1">Tax Percentage (%)</label>
-                            <input
-                              type="number"
-                              required
-                              min="0"
-                              max="100"
-                              value={currentSettings.tax || 0}
-                              onChange={(e) => setSettingsForm({ ...currentSettings, tax: parseInt(e.target.value) || 0 })}
-                              className="w-full p-2.5 border rounded-xl bg-transparent"
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className={`border-t pt-4 mt-4 border-gray-100`}>
-                        <h4 className="font-bold text-gray-500 mb-3 uppercase tracking-wider">Location Details</h4>
-                        <div className="space-y-3">
-                          <div>
-                            <label className="block text-gray-400 mb-1">Address</label>
-                            <textarea
-                              placeholder="Street Address"
-                              required
-                              className="w-full p-2.5 border rounded-xl bg-transparent"
-                              rows={2}
-                              value={currentSettings.address || ''}
-                              onChange={(e) => setSettingsForm({ ...currentSettings, address: e.target.value })}
-                            />
-                          </div>
-                          <div className="grid grid-cols-3 gap-3">
-                            <div>
-                              <label className="block text-gray-400 mb-1">City</label>
-                              <input
-                                type="text"
-                                placeholder="City"
-                                required
-                                className="w-full p-2.5 border rounded-xl bg-transparent"
-                                value={currentSettings.city || ''}
-                                onChange={(e) => setSettingsForm({ ...currentSettings, city: e.target.value })}
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-gray-400 mb-1">State</label>
-                              <input
-                                type="text"
-                                placeholder="State"
-                                required
-                                className="w-full p-2.5 border rounded-xl bg-transparent"
-                                value={currentSettings.state || ''}
-                                onChange={(e) => setSettingsForm({ ...currentSettings, state: e.target.value })}
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-gray-400 mb-1">Country</label>
-                              <input
-                                type="text"
-                                placeholder="Country"
-                                required
-                                className="w-full p-2.5 border rounded-xl bg-transparent"
-                                value={currentSettings.country || ''}
-                                onChange={(e) => setSettingsForm({ ...currentSettings, country: e.target.value })}
-                              />
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-3 gap-3">
-                            <div>
-                              <label className="block text-gray-400 mb-1">PIN Code</label>
-                              <input
-                                type="text"
-                                placeholder="PIN Code"
-                                required
-                                pattern="^[1-9][0-9]{5}$"
-                                title="Must be a valid 6-digit Indian PIN code"
-                                className="w-full p-2.5 border rounded-xl bg-transparent"
-                                value={currentSettings.pinCode || ''}
-                                onChange={(e) => setSettingsForm({ ...currentSettings, pinCode: e.target.value })}
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-gray-400 mb-1">Landmark</label>
-                              <input
-                                type="text"
-                                placeholder="Nearby Landmark"
-                                required
-                                className="w-full p-2.5 border rounded-xl bg-transparent"
-                                value={currentSettings.landmark || ''}
-                                onChange={(e) => setSettingsForm({ ...currentSettings, landmark: e.target.value })}
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-gray-400 mb-1">Google Maps Location</label>
-                              <div className="flex gap-2">
-                                <input
-                                  type="url"
-                                  placeholder="Maps URL"
-                                  required
-                                  value={currentSettings.mapsLocation || ''}
-                                  onChange={(e) => setSettingsForm({ ...currentSettings, mapsLocation: e.target.value })}
-                                  className="w-full p-2.5 border rounded-xl bg-transparent flex-1"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={handleGetLocation}
-                                  className="bg-gray-100 hover:bg-gray-200 text-gray-700 dark:hover:bg-gray-700 p-2.5 rounded-xl border border-transparent flex items-center justify-center cursor-pointer transition-colors"
-                                  title="Detect Current Location"
-                                >
-                                  <Map size={18} />
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="pt-2">
-                        <button type="submit" className="bg-primary text-white font-bold py-2.5 px-5 rounded-xl cursor-pointer">
-                          {loading ? 'Saving...' : 'Save Changes'}
-                        </button>
-                      </div>
-                    </form>
-                  );
-                })()}
-              </div>
-            </div>
-          )}
+                    </div>
+                  </div>
+                </div>
+              </form>
+            );
+          })()}
 
           {/* ----------------------------------------------------
               VIEW 16: SECURITY & AUDIT LOGS
               ---------------------------------------------------- */}
-          {activeTab === 'security' && (
-            <div className="space-y-6 animate-fade-in">
-              <div className="border-b pb-3">
-                <h3 className="font-extrabold text-sm">Security Audit Logs</h3>
-                <p className="text-[10px] text-gray-400">Renders role-based access logs and database audit records.</p>
-              </div>
+          {activeTab === 'security' && (() => {
+            const filteredLogs = activityLogs.filter(log => {
+              if (!auditSearchQuery.trim()) return true;
+              const q = auditSearchQuery.toLowerCase();
+              return (
+                (log.action && log.action.toLowerCase().includes(q)) ||
+                (log.user_role && log.user_role.toLowerCase().includes(q)) ||
+                (log.timestamp && log.timestamp.toLowerCase().includes(q)) ||
+                (log.id && log.id.toLowerCase().includes(q))
+              );
+            });
 
-              <div className={`p-5 rounded-3xl border shadow-sm bg-white border-gray-50`}>
-                <h4 className="font-extrabold text-xs mb-3">Roster Audit Activity Logs</h4>
-                <div className="space-y-2.5">
-                  {activityLogs.map(log => (
-                    <div key={log.id} className="flex justify-between items-center text-xs font-semibold border-b pb-2">
-                      <div>
-                        <p className="text-gray-400">{log.timestamp} • <strong className="text-brand-text font-black">{log.user_role}</strong></p>
-                        <p className="mt-0.5">{log.action}</p>
-                      </div>
+            const handleExportAuditLogsCSV = () => {
+              const headers = ['Log ID', 'Timestamp', 'User Role', 'Action'];
+              const rows = filteredLogs.map(l => [l.id, l.timestamp, l.user_role, `"${(l.action || '').replace(/"/g, '""')}"`]);
+              const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+              const encodedUri = encodeURI(csvContent);
+              const link = document.createElement('a');
+              link.setAttribute('href', encodedUri);
+              link.setAttribute('download', `dinesmart_audit_logs_${new Date().toISOString().slice(0, 10)}.csv`);
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+            };
+
+            return (
+              <div className="space-y-6 animate-fade-in font-sans">
+                {/* Enterprise Header */}
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-1">
+                  <div>
+                    <div className="flex items-center gap-2.5">
+                      <h3 className="font-bold text-base text-slate-900 tracking-tight">Security & System Audit Trail</h3>
+                      <span className="text-[11px] font-semibold text-slate-600 bg-slate-100 border border-slate-200/80 px-2 py-0.5 rounded-full">
+                        {activityLogs.length} Events Logged
+                      </span>
                     </div>
-                  ))}
+                    <p className="text-xs text-slate-500 mt-0.5">Immutable administrative records, role privilege changes, and authentication timestamps.</p>
+                  </div>
+                </div>
+
+                {/* Audit Surface Container */}
+                <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-2xs">
+                  {/* Toolbar Header */}
+                  <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                    <div>
+                      <h4 className="text-xs font-semibold text-slate-800 tracking-tight">Immutable Activity Stream</h4>
+                      <p className="text-[11px] text-slate-500 mt-0.5">Cryptographic log of administrative actions, credentials, and floor events.</p>
+                    </div>
+
+                    <div className="flex items-center gap-2.5 w-full sm:w-auto">
+                      <div className="relative w-full sm:w-64">
+                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="text"
+                          placeholder="Search actions or IDs..."
+                          value={auditSearchQuery}
+                          onChange={(e) => setAuditSearchQuery(e.target.value)}
+                          className="text-xs bg-white border border-slate-200 rounded-xl pl-9 pr-3 py-1.5 text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#FF6B00] w-full"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleExportAuditLogsCSV}
+                        className="text-xs font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 px-3.5 py-1.5 rounded-xl transition-colors whitespace-nowrap shadow-2xs cursor-pointer"
+                      >
+                        Export CSV
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Audit Rows */}
+                  {filteredLogs.length === 0 ? (
+                    <div className="text-center py-12 px-4 text-xs text-slate-400 font-medium">
+                      No security audit events match the active search filter.
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-slate-100 text-xs">
+                      {filteredLogs.map(log => (
+                        <div key={log.id} className="px-5 py-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 hover:bg-slate-50/60 transition-colors">
+                          <div className="flex items-center gap-3 flex-wrap">
+                            <span className="text-slate-400 text-[11px] font-mono shrink-0">
+                              {log.timestamp}
+                            </span>
+                            <span className={`text-[10px] font-sans font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md border shrink-0 ${
+                              log.user_role === 'Admin' || log.user_role === 'Hotel Manager'
+                                ? 'bg-orange-50 text-[#FF6B00] border-orange-200/60'
+                                : 'bg-slate-100 text-slate-700 border-slate-200/60'
+                            }`}>
+                              {log.user_role || 'System'}
+                            </span>
+                            <span className="text-slate-800 font-normal">
+                              {log.action}
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-slate-400 font-mono shrink-0 sm:ml-4">
+                            ID: #{log.id}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* ----------------------------------------------------
               VIEW 17: QR CODE MANAGER
@@ -4139,217 +4564,148 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
 
             return (
               <div className="space-y-6 animate-fade-in max-w-7xl mx-auto">
-                {/* Header */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                {/* Enterprise Header */}
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-1">
                   <div>
-                    <span className="text-[11px] font-black uppercase tracking-widest text-[#FF6B00]">
-                      CUSTOMER FEEDBACK INTELLIGENCE
-                    </span>
-                    <h2 className="text-2xl font-black tracking-tight text-slate-900 mt-0.5">
-                      Customer Reviews & Sentiment
-                    </h2>
-                    <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
-                      Clear-cut administrative sentiment analytics, satisfaction metrics, and management response console.
-                    </p>
+                    <div className="flex items-center gap-2.5">
+                      <h3 className="font-bold text-base text-slate-900 tracking-tight">Customer Reviews & Sentiment</h3>
+                      <span className="text-[11px] font-semibold text-slate-600 bg-slate-100 border border-slate-200/80 px-2 py-0.5 rounded-full">
+                        {allRatings.length} Ratings Total
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">Administrative sentiment analytics, guest satisfaction scores, and management response console.</p>
                   </div>
                 </div>
 
-                {/* 1. TOP METRIC CARDS */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {/* Card 1: Overall Average Rating */}
-                  <div className="p-5 rounded-2xl border bg-white border-slate-200 shadow-2xs flex flex-col justify-between">
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Overall Rating</span>
-                        <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-500 flex items-center justify-center">
-                          <Star size={16} fill="currentColor" />
-                        </div>
-                      </div>
-                      <div className="flex items-baseline gap-2 mt-2">
-                        <strong className="text-3xl font-black text-slate-900">★ {overallRating}</strong>
-                        <span className="text-sm font-bold text-slate-400">/ 5.0</span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 font-medium mt-1">
-                        Calculated by all {allCustomerRevs.length} customer ratings
-                      </p>
+                {/* Unified Enterprise Analytics Bar (Replacing the 4 Separate Cards) */}
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-2xs flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-6">
+                  {/* Score & Rating Breakdown Block */}
+                  <div className="flex items-center gap-5">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-3xl font-bold font-mono text-slate-900 tracking-tight">{overallRating}</span>
+                      <span className="text-xs text-slate-400 font-medium">/ 5.0</span>
                     </div>
 
-                    {/* Star Breakdown Bars */}
-                    <div className="mt-4 pt-3 border-t border-slate-100 space-y-1.5">
-                      {[5, 4, 3, 2, 1].map(stars => {
-                        const count = starCounts[stars] || 0;
-                        const pct = allRatings.length > 0 ? Math.round((count / allRatings.length) * 100) : (stars === 5 ? 100 : 0);
-                        return (
-                          <div key={stars} className="flex items-center gap-2 text-[10px]">
-                            <span className="w-5 text-slate-500 font-bold">{stars}★</span>
-                            <div className="flex-1 bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                              <div
-                                className={`h-full rounded-full ${stars >= 4 ? 'bg-amber-400' : stars === 3 ? 'bg-slate-400' : 'bg-rose-400'}`}
-                                style={{ width: `${pct}%` }}
-                              />
-                            </div>
-                            <span className="w-6 text-right text-slate-400 font-medium">{count}</span>
-                          </div>
-                        );
-                      })}
+                    <div className="border-l border-slate-100 pl-4">
+                      <div className="flex items-center text-amber-500 text-xs font-semibold">
+                        <span>★★★★★</span>
+                        <span className="text-slate-500 ml-1.5 font-normal text-[11px]">Average Score</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-0.5">Calculated across {allRatings.length} customer ratings</p>
+                    </div>
+
+                    {/* Compact Star Mini-Bar */}
+                    <div className="hidden sm:flex items-center gap-2 border-l border-slate-100 pl-4 text-[10px] text-slate-500 font-mono">
+                      <span>5★: {starCounts[5] || 0}</span>
+                      <span>·</span>
+                      <span>4★: {starCounts[4] || 0}</span>
+                      <span>·</span>
+                      <span>≤3★: {(starCounts[3] || 0) + (starCounts[2] || 0) + (starCounts[1] || 0)}</span>
                     </div>
                   </div>
 
-                  {/* Card 2: Sentiment Polarity (Original Data) */}
-                  <div className="p-5 rounded-2xl border bg-white border-slate-200 shadow-2xs flex flex-col justify-between">
+                  {/* Vertical Divider (Desktop) */}
+                  <div className="hidden lg:block w-px h-10 bg-slate-100"></div>
+
+                  {/* Key Metrics Group */}
+                  <div className="grid grid-cols-3 gap-6 text-left">
                     <div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Sentiment Polarity</span>
-                        <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                          <Smile size={16} />
-                        </div>
-                      </div>
-                      <div className="flex items-baseline gap-2 mt-2">
-                        <strong className="text-3xl font-black text-emerald-600">{posPct}%</strong>
-                        <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                          Positive
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 font-medium mt-1">
-                        Based on original customer feedback dataset
-                      </p>
-                    </div>
-
-                    <div className="mt-4 pt-3 border-t border-slate-100 space-y-2">
-                      <div className="w-full h-2 rounded-full bg-slate-100 flex overflow-hidden">
-                        <div className="bg-emerald-500 h-full" style={{ width: `${posPct}%` }} title={`Positive: ${posPct}%`} />
-                        <div className="bg-slate-400 h-full" style={{ width: `${neutPct}%` }} title={`Neutral: ${neutPct}%`} />
-                        <div className="bg-rose-500 h-full" style={{ width: `${critPct}%` }} title={`Critical: ${critPct}%`} />
-                      </div>
-                      <div className="flex justify-between text-[10px] text-slate-500 font-semibold">
-                        <span className="text-emerald-700">{posCount} Positive</span>
-                        <span className="text-slate-600">{neutCount} Neutral</span>
-                        <span className="text-rose-600">{critCount} Critical</span>
+                      <div className="text-[10px] uppercase font-semibold text-slate-400 tracking-wider">Sentiment Polarity</div>
+                      <div className="text-xs font-semibold text-emerald-600 mt-1 flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <span>{posPct}% Positive</span>
                       </div>
                     </div>
-                  </div>
-
-                  {/* Card 3: Feedback Coverage */}
-                  <div className="p-5 rounded-2xl border bg-white border-slate-200 shadow-2xs flex flex-col justify-between">
                     <div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Written Reviews</span>
-                        <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-                          <MessageSquare size={16} />
-                        </div>
-                      </div>
-                      <div className="flex items-baseline gap-2 mt-2">
-                        <strong className="text-3xl font-black text-slate-900">{textReviews.length}</strong>
-                        <span className="text-xs font-bold text-slate-400">Reviews</span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 font-medium mt-1">
-                        Only reviews with written feedback displayed below
-                      </p>
+                      <div className="text-[10px] uppercase font-semibold text-slate-400 tracking-wider">Written Feedback</div>
+                      <div className="text-xs font-semibold text-slate-800 font-mono mt-1">{textReviews.length} Reviews</div>
                     </div>
-
-                    <div className="mt-4 pt-3 border-t border-slate-100">
-                      <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-[11px] text-slate-600 font-medium">
-                        <span className="font-bold text-slate-800">{starOnlyCount}</span> star-only ratings contribute directly to Overall Rating without text clutter.
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Card 4: Response Rate */}
-                  <div className="p-5 rounded-2xl border bg-white border-slate-200 shadow-2xs flex flex-col justify-between">
                     <div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Management Response</span>
-                        <div className="w-8 h-8 rounded-lg bg-orange-50 text-[#FF6B00] flex items-center justify-center">
-                          <CornerDownRight size={16} />
-                        </div>
+                      <div className="text-[10px] uppercase font-semibold text-slate-400 tracking-wider">Management Response</div>
+                      <div className="text-xs font-semibold text-slate-800 font-mono mt-1">
+                        {textReviews.length > 0 ? Math.round((repliedCount / textReviews.length) * 100) : 100}% Replied
                       </div>
-                      <div className="flex items-baseline gap-2 mt-2">
-                        <strong className="text-3xl font-black text-slate-900">
-                          {textReviews.length > 0 ? Math.round((repliedCount / textReviews.length) * 100) : 100}%
-                        </strong>
-                        <span className="text-xs font-bold text-slate-400">Replied</span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 font-medium mt-1">
-                        {unrepliedCount === 0 ? 'All customer reviews answered' : `${unrepliedCount} awaiting manager response`}
-                      </p>
-                    </div>
-
-                    <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                      <span className="text-slate-500 font-medium">{repliedCount} Replied</span>
-                      <span className={`font-bold px-2 py-0.5 rounded-full text-[10px] ${unrepliedCount > 0 ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
-                        {unrepliedCount} Pending
-                      </span>
                     </div>
                   </div>
                 </div>
 
                 {/* Sub-aspect Satisfaction Breakdown */}
                 {foodRatings.length > 0 && (serviceRatings.length > 0 || ambienceRatings.length > 0) && (
-                  <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-2xs flex flex-wrap items-center justify-between gap-4">
-                    <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                      Aspect Satisfaction Breakdown
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-wrap items-center justify-between gap-3 text-xs">
+                    <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-wider">
+                      Aspect Satisfaction Scores:
                     </span>
-                    <div className="flex items-center gap-6">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-slate-500 font-medium">Food Quality:</span>
-                        <strong className="text-xs font-black text-amber-600">★ {avgFood} / 5.0</strong>
+                    <div className="flex items-center gap-5">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-slate-500">Food Quality:</span>
+                        <strong className="font-mono text-amber-600 font-bold">★ {avgFood}</strong>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-slate-500 font-medium">Service Speed:</span>
-                        <strong className="text-xs font-black text-amber-600">★ {avgService} / 5.0</strong>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-slate-500">Service:</span>
+                        <strong className="font-mono text-amber-600 font-bold">★ {avgService}</strong>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-slate-500 font-medium">Ambience:</span>
-                        <strong className="text-xs font-black text-amber-600">★ {avgAmbience} / 5.0</strong>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-slate-500">Ambience:</span>
+                        <strong className="font-mono text-amber-600 font-bold">★ {avgAmbience}</strong>
                       </div>
                     </div>
                   </div>
                 )}
 
-                {/* Filter Tabs */}
-                <div className="flex flex-wrap items-center gap-2 pt-2 border-b border-slate-200 pb-3">
+                {/* Minimalist Clean Filter Tabs */}
+                <div className="flex items-center gap-1 border-b border-slate-200 text-xs font-medium overflow-x-auto">
                   <button
+                    type="button"
                     onClick={() => setReviewFilter('all')}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${reviewFilter === 'all'
-                      ? 'bg-slate-900 text-white shadow-xs'
-                      : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-                      }`}
+                    className={`pb-2.5 px-3.5 transition-all cursor-pointer whitespace-nowrap ${
+                      reviewFilter === 'all'
+                        ? 'text-[#FF6B00] border-b-2 border-[#FF6B00] font-semibold'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
                   >
                     All Comments ({textReviews.length})
                   </button>
                   <button
+                    type="button"
                     onClick={() => setReviewFilter('positive')}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${reviewFilter === 'positive'
-                      ? 'bg-emerald-600 text-white shadow-xs'
-                      : 'bg-white text-emerald-700 border border-emerald-200 hover:bg-emerald-50'
-                      }`}
+                    className={`pb-2.5 px-3.5 transition-all cursor-pointer whitespace-nowrap ${
+                      reviewFilter === 'positive'
+                        ? 'text-emerald-600 border-b-2 border-emerald-600 font-semibold'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
                   >
                     Positive ({posCount})
                   </button>
                   <button
+                    type="button"
                     onClick={() => setReviewFilter('neutral')}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${reviewFilter === 'neutral'
-                      ? 'bg-slate-600 text-white shadow-xs'
-                      : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-                      }`}
+                    className={`pb-2.5 px-3.5 transition-all cursor-pointer whitespace-nowrap ${
+                      reviewFilter === 'neutral'
+                        ? 'text-slate-800 border-b-2 border-slate-800 font-semibold'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
                   >
                     Neutral ({neutCount})
                   </button>
                   <button
+                    type="button"
                     onClick={() => setReviewFilter('critical')}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${reviewFilter === 'critical'
-                      ? 'bg-rose-600 text-white shadow-xs'
-                      : 'bg-white text-rose-700 border border-rose-200 hover:bg-rose-50'
-                      }`}
+                    className={`pb-2.5 px-3.5 transition-all cursor-pointer whitespace-nowrap ${
+                      reviewFilter === 'critical'
+                        ? 'text-rose-600 border-b-2 border-rose-600 font-semibold'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
                   >
                     Action Needed ({critCount})
                   </button>
                   <button
+                    type="button"
                     onClick={() => setReviewFilter('unreplied')}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${reviewFilter === 'unreplied'
-                      ? 'bg-[#FF6B00] text-white shadow-xs'
-                      : 'bg-white text-[#FF6B00] border border-orange-200 hover:bg-orange-50'
-                      }`}
+                    className={`pb-2.5 px-3.5 transition-all cursor-pointer whitespace-nowrap ${
+                      reviewFilter === 'unreplied'
+                        ? 'text-amber-600 border-b-2 border-amber-600 font-semibold'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
                   >
                     Needs Reply ({unrepliedCount})
                   </button>
