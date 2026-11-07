@@ -7,11 +7,11 @@ import {
   LayoutDashboard, ChefHat, Utensils, Layers, Users,
   Map, CreditCard, Award, Megaphone, UserCheck, BarChart3,
   Settings, Shield, QrCode, Image, MessageSquare, Search, Trash2,
-  Edit3, Plus, X, ChevronRight, Download, Sparkles, Filter, Check,
+  Edit3, Plus, X, ChevronRight, ChevronLeft, Download, Sparkles, Filter, Check,
   AlertTriangle, Moon, Sun, RefreshCw, FileText, Mail, MessageCircle,
-  CornerDownRight, UserPlus, Heart, TrendingUp, DollarSign, Calendar,
+  CornerDownRight, UserPlus, Heart, TrendingUp, DollarSign, Calendar, CalendarDays,
   TrendingDown, ArrowUpRight, ArrowDownRight, Clock, Star, Eye, EyeOff, Phone, Copy, FileSpreadsheet, ChevronDown, ExternalLink,
-  Upload, Smartphone, Share2, CheckCircle2,
+  Upload, Smartphone, Share2, CheckCircle2, AlertCircle, Receipt,
   Bell, LogOut, Activity, BookOpen, Smile, Meh, Frown
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, CartesianGrid, AreaChart, Area } from 'recharts';
@@ -165,6 +165,82 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
     const clockTimer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(clockTimer);
   }, []);
+
+  // --- DATE-WISE ORDERS CALENDAR FEATURE ---
+  const getOrderLocalDateStr = (dateInput?: string | Date): string => {
+    if (!dateInput) return '';
+    const d = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
+    if (isNaN(d.getTime())) return '';
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  const [selectedOrderDate, setSelectedOrderDate] = useState<string>(() => {
+    return getOrderLocalDateStr(new Date());
+  });
+  const [isAllDatesMode, setIsAllDatesMode] = useState<boolean>(false);
+  const [showCalendarDropdown, setShowCalendarDropdown] = useState<boolean>(false);
+  const [showDateOrdersModal, setShowDateOrdersModal] = useState<boolean>(false);
+  const [dateOrdersSearch, setDateOrdersSearch] = useState<string>('');
+  const [dateOrdersStatusFilter, setDateOrdersStatusFilter] = useState<string>('All');
+  const [dateOrdersPaymentFilter, setDateOrdersPaymentFilter] = useState<string>('All');
+  const [selectedOrderForDetail, setSelectedOrderForDetail] = useState<Order | null>(null);
+
+  // Compute orders belonging to selected date or all dates
+  const dateWiseOrders = React.useMemo(() => {
+    if (isAllDatesMode) return orders;
+    return orders.filter(o => getOrderLocalDateStr(o.createdAt) === selectedOrderDate);
+  }, [orders, selectedOrderDate, isAllDatesMode]);
+
+  // Unique dates with recorded orders
+  const recordedDatesSummary = React.useMemo(() => {
+    const map: Record<string, { dateStr: string; count: number; revenue: number }> = {};
+    orders.forEach(o => {
+      const dStr = getOrderLocalDateStr(o.createdAt);
+      if (!dStr) return;
+      if (!map[dStr]) map[dStr] = { dateStr: dStr, count: 0, revenue: 0 };
+      map[dStr].count++;
+      if ((o.status as any) !== 'Cancelled') {
+        map[dStr].revenue += Number(o.total || 0);
+      }
+    });
+    return Object.values(map).sort((a, b) => b.dateStr.localeCompare(a.dateStr));
+  }, [orders]);
+
+  const formatFriendlyDate = (dateStr: string) => {
+    if (isAllDatesMode) return 'All Recorded Dates';
+    const parts = dateStr.split('-');
+    if (parts.length !== 3) return dateStr;
+    const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    const todayStr = getOrderLocalDateStr(new Date());
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = getOrderLocalDateStr(yesterday);
+
+    const baseFormat = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    if (dateStr === todayStr) return `Today • ${baseFormat}`;
+    if (dateStr === yesterdayStr) return `Yesterday • ${baseFormat}`;
+    return baseFormat;
+  };
+
+  const handleStepDay = (deltaDays: number) => {
+    const parts = selectedOrderDate.split('-');
+    if (parts.length !== 3) return;
+    const cur = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    cur.setDate(cur.getDate() + deltaDays);
+    setSelectedOrderDate(getOrderLocalDateStr(cur));
+    setIsAllDatesMode(false);
+  };
+
+  const handleExportDateOrdersExcel = () => {
+    generateComprehensiveExcel({ orders: dateWiseOrders, staff, menuItems }, alertSettings);
+  };
+
+  const handleExportDateOrdersPDF = () => {
+    generateComprehensivePDF({ orders: dateWiseOrders, staff, menuItems }, alertSettings);
+  };
 
 
   const handleGetLocation = () => {
@@ -1224,10 +1300,169 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Date Pill from Figma */}
-            <div className="flex items-center gap-2 px-3.5 py-1.5 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl shadow-2xs">
-              <Calendar size={13} className="text-slate-400" />
-              <span>{currentTime.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+            {/* Interactive Date & Calendar Selector */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowCalendarDropdown(prev => !prev)}
+                className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-bold rounded-xl shadow-2xs border transition-all cursor-pointer select-none ${
+                  !isAllDatesMode && selectedOrderDate !== getOrderLocalDateStr(new Date())
+                    ? 'bg-orange-50 border-orange-300 text-orange-950 hover:bg-orange-100 ring-2 ring-orange-400/20'
+                    : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+                }`}
+                title="Click to check date-wise orders or select a calendar date"
+              >
+                <Calendar size={14} className={!isAllDatesMode && selectedOrderDate !== getOrderLocalDateStr(new Date()) ? 'text-[#FF6B00]' : 'text-slate-400'} />
+                <span>{formatFriendlyDate(selectedOrderDate)}</span>
+                <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600">
+                  {dateWiseOrders.length} {dateWiseOrders.length === 1 ? 'order' : 'orders'}
+                </span>
+                <ChevronDown size={12} className={`text-slate-400 transition-transform ${showCalendarDropdown ? 'rotate-180' : ''}`} />
+              </button>
+
+              {/* Calendar Dropdown Popover */}
+              {showCalendarDropdown && (
+                <>
+                  <div 
+                    className="fixed inset-0 z-40 bg-transparent" 
+                    onClick={() => setShowCalendarDropdown(false)} 
+                  />
+                  <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-slate-200 p-4 z-50 animate-in fade-in zoom-in-95 duration-100">
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
+                      <div className="flex items-center gap-2">
+                        <Calendar size={15} className="text-[#FF6B00]" />
+                        <span className="font-extrabold text-xs text-slate-900">Check Date-wise Orders</span>
+                      </div>
+                      <button
+                        onClick={() => setShowCalendarDropdown(false)}
+                        className="text-slate-400 hover:text-slate-600 p-1 rounded-lg cursor-pointer"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+
+                    {/* Quick Presets */}
+                    <div className="flex items-center gap-1.5 mb-3">
+                      <button
+                        onClick={() => {
+                          setSelectedOrderDate(getOrderLocalDateStr(new Date()));
+                          setIsAllDatesMode(false);
+                          setShowCalendarDropdown(false);
+                        }}
+                        className={`flex-1 py-1.5 px-2 text-[11px] font-bold rounded-lg border text-center transition-colors cursor-pointer ${
+                          !isAllDatesMode && selectedOrderDate === getOrderLocalDateStr(new Date())
+                            ? 'bg-[#FF6B00] text-white border-[#FF6B00]'
+                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        Today
+                      </button>
+                      <button
+                        onClick={() => {
+                          const y = new Date();
+                          y.setDate(y.getDate() - 1);
+                          setSelectedOrderDate(getOrderLocalDateStr(y));
+                          setIsAllDatesMode(false);
+                          setShowCalendarDropdown(false);
+                        }}
+                        className={`flex-1 py-1.5 px-2 text-[11px] font-bold rounded-lg border text-center transition-colors cursor-pointer ${
+                          !isAllDatesMode && selectedOrderDate === getOrderLocalDateStr(new Date(Date.now() - 86400000))
+                            ? 'bg-[#FF6B00] text-white border-[#FF6B00]'
+                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        Yesterday
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsAllDatesMode(true);
+                          setShowCalendarDropdown(false);
+                        }}
+                        className={`flex-1 py-1.5 px-2 text-[11px] font-bold rounded-lg border text-center transition-colors cursor-pointer ${
+                          isAllDatesMode
+                            ? 'bg-[#FF6B00] text-white border-[#FF6B00]'
+                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        All Dates
+                      </button>
+                    </div>
+
+                    {/* Specific Calendar Date Picker */}
+                    <div className="mb-3 p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                        Select Custom Calendar Date:
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="date"
+                          value={selectedOrderDate}
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              setSelectedOrderDate(e.target.value);
+                              setIsAllDatesMode(false);
+                            }
+                          }}
+                          className="flex-1 text-xs font-bold bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-slate-800 outline-none focus:border-[#FF6B00] focus:ring-1 focus:ring-[#FF6B00]"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Recorded Dates with Orders */}
+                    <div className="mb-3">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
+                        Dates with Orders Activity ({recordedDatesSummary.length})
+                      </span>
+                      <div className="max-h-36 overflow-y-auto space-y-1 pr-1 text-xs no-scrollbar">
+                        {recordedDatesSummary.map(item => {
+                          const isSelected = !isAllDatesMode && selectedOrderDate === item.dateStr;
+                          return (
+                            <button
+                              key={item.dateStr}
+                              onClick={() => {
+                                setSelectedOrderDate(item.dateStr);
+                                setIsAllDatesMode(false);
+                                setShowCalendarDropdown(false);
+                              }}
+                              className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-all cursor-pointer ${
+                                isSelected
+                                  ? 'bg-orange-50 text-orange-900 font-extrabold border border-orange-200'
+                                  : 'hover:bg-slate-50 text-slate-700 font-medium'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-[11px]">{item.dateStr}</span>
+                                {item.dateStr === getOrderLocalDateStr(new Date()) && (
+                                  <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded-full">
+                                    Today
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1.5 text-[11px]">
+                                <span className="font-bold text-slate-900">{item.count} {item.count === 1 ? 'order' : 'orders'}</span>
+                                <span className="text-slate-400">•</span>
+                                <span className="font-bold text-[#FF6B00]">₹{item.revenue.toLocaleString('en-IN')}</span>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Open Orders Explorer Modal Button */}
+                    <button
+                      onClick={() => {
+                        setShowCalendarDropdown(false);
+                        setShowDateOrdersModal(true);
+                      }}
+                      className="w-full py-2.5 px-3 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-extrabold text-xs rounded-xl shadow-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                    >
+                      <Eye size={13} />
+                      <span>Explore Orders ({dateWiseOrders.length})</span>
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* User Avatar Circle */}
@@ -1247,15 +1482,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
               ---------------------------------------------------- */}
           {activeTab === 'overview' && (() => {
             const validOrders = orders.filter(o => (o.status as any) !== 'Cancelled');
-            const todayDateStr = new Date().toISOString().split('T')[0];
-            const todayValidOrders = validOrders.filter(o => {
-              const d = o.createdAt ? new Date(o.createdAt).toISOString().split('T')[0] : '';
-              return d === todayDateStr;
-            });
+            const todayDateStr = getOrderLocalDateStr(new Date());
+            const activeDateOrders = dateWiseOrders;
+            const validActiveDateOrders = activeDateOrders.filter(o => (o.status as any) !== 'Cancelled');
 
-            const todayRevenue = todayValidOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+            const dateRevenue = validActiveDateOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
             const totalRecordedRevenue = validOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
-            const displayRevenue = todayValidOrders.length > 0 ? todayRevenue : totalRecordedRevenue;
+            const displayRevenue = isAllDatesMode ? totalRecordedRevenue : (activeDateOrders.length > 0 ? dateRevenue : totalRecordedRevenue);
 
             const occupiedTablesCount = tables.filter(t => t.status === 'Ordered' || t.status === 'Cooking' || t.status === 'Serving' || t.status === 'Billing').length;
             const availableTablesCount = tables.filter(t => t.status === 'Available').length;
@@ -1271,7 +1504,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                 const bucketMap: Record<string, number> = {};
                 hourSlots.forEach(h => { bucketMap[h] = 0; });
 
-                const ordersToUse = todayValidOrders.length > 0 ? todayValidOrders : validOrders;
+                const ordersToUse = activeDateOrders.length > 0 ? activeDateOrders : validOrders;
                 ordersToUse.forEach(o => {
                   const date = o.createdAt ? new Date(o.createdAt) : null;
                   const hour = date ? date.getHours() : 12;
@@ -1331,8 +1564,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
               { name: 'Reserved/Cleaning', value: otherTablesCount, color: '#6366F1' }
             ];
 
-            // Recent Orders list purely from original database orders
-            const displayRecentOrders = orders.slice(0, 5).map(o => {
+            // Recent Orders list purely from original database orders for the chosen date
+            const displayRecentOrders = activeDateOrders.map(o => {
               const tableNum = Number(o.tableId);
               const matchedStaff = staff.find(s => s.assignedTables && !isNaN(tableNum) && s.assignedTables.includes(tableNum));
               return {
@@ -1341,6 +1574,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                 waiter: (o as any).waiterName || matchedStaff?.name || 'Floor Staff',
                 amount: Number(o.total || 0),
                 status: o.status,
+                rawOrder: o,
                 time: o.createdAt ? new Date(o.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recent'
               };
             });
@@ -1384,12 +1618,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                       </span>
                     </div>
                     <div className="mt-4">
-                      <span className="text-xs font-semibold text-slate-400 block">Today's Revenue</span>
+                      <span className="text-xs font-semibold text-slate-400 block">
+                        {isAllDatesMode ? 'All-Time Revenue' : `${formatFriendlyDate(selectedOrderDate)} Revenue`}
+                      </span>
                       <strong className="text-2xl font-black text-slate-900 tracking-tight mt-1 block">
                         ₹{displayRevenue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </strong>
-                      <div className="mt-2 flex items-center gap-1 text-xs font-bold text-slate-500">
-                        <span>{todayValidOrders.length > 0 ? `${todayValidOrders.length} orders today` : `${validOrders.length} all-time orders`}</span>
+                      <div className="mt-2 flex items-center justify-between text-xs font-bold text-slate-500">
+                        <span>{activeDateOrders.length} {activeDateOrders.length === 1 ? 'order' : 'orders'} {isAllDatesMode ? 'recorded' : 'on date'}</span>
+                        <span 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowDateOrdersModal(true);
+                          }}
+                          className="text-[#FF6B00] hover:underline flex items-center gap-0.5 text-[11px]"
+                        >
+                          <span>Explore</span>
+                          <ArrowUpRight size={12} />
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -1594,10 +1840,42 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   {/* Left: Recent orders (2 cols) */}
                   <div className="lg:col-span-2 p-6 rounded-2xl border bg-white border-slate-200/90 shadow-2xs">
-                    <div className="flex justify-between items-start mb-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
                       <div>
-                        <h3 className="font-extrabold text-base text-slate-900">Recent orders</h3>
-                        <p className="text-xs text-slate-400 mt-0.5">Latest orders across all service areas</p>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-extrabold text-base text-slate-900">
+                            {isAllDatesMode ? 'All Recorded Orders' : `Orders on ${formatFriendlyDate(selectedOrderDate)}`}
+                          </h3>
+                          <span className="text-xs font-extrabold px-2 py-0.5 rounded-full bg-orange-100 text-[#FF6B00]">
+                            {displayRecentOrders.length} {displayRecentOrders.length === 1 ? 'order' : 'orders'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          {isAllDatesMode 
+                            ? 'All customer orders across all historical dates' 
+                            : `Displaying orders recorded on ${selectedOrderDate}`}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {!isAllDatesMode && selectedOrderDate !== getOrderLocalDateStr(new Date()) && (
+                          <button
+                            onClick={() => {
+                              setSelectedOrderDate(getOrderLocalDateStr(new Date()));
+                              setIsAllDatesMode(false);
+                            }}
+                            className="px-2.5 py-1 text-[11px] font-bold text-slate-500 hover:text-slate-800 bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                          >
+                            Reset to Today
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setShowDateOrdersModal(true)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-[#FF6B00] hover:bg-orange-600 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-sm active:scale-95"
+                          title="Open full interactive Date-Wise Orders Explorer"
+                        >
+                          <Eye size={13} />
+                          <span>Explore All ({displayRecentOrders.length})</span>
+                        </button>
                       </div>
                     </div>
 
@@ -1612,19 +1890,48 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                             <th className="py-2.5 px-3">Amount</th>
                             <th className="py-2.5 px-3 text-center">Status</th>
                             <th className="py-2.5 px-3 text-right">Time</th>
+                            <th className="py-2.5 px-3 text-center">Receipt</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50 font-medium">
                           {displayRecentOrders.length === 0 ? (
                             <tr>
-                              <td colSpan={6} className="py-8 text-center text-slate-400 font-medium">
-                                No customer orders recorded yet. Orders placed by guests or staff will appear here.
+                              <td colSpan={7} className="py-10 text-center text-slate-400 font-medium">
+                                <Calendar size={28} className="mx-auto mb-2 text-slate-300" />
+                                <p className="font-semibold text-slate-700">No customer orders recorded on {selectedOrderDate}.</p>
+                                <p className="text-[11px] text-slate-400 mt-0.5">Pick another date from the calendar header or switch to Today / All Dates.</p>
+                                <div className="mt-3 flex items-center justify-center gap-2">
+                                  <button
+                                    onClick={() => {
+                                      setSelectedOrderDate(getOrderLocalDateStr(new Date()));
+                                      setIsAllDatesMode(false);
+                                    }}
+                                    className="px-3 py-1.5 bg-[#FF6B00] text-white text-xs font-bold rounded-xl hover:bg-orange-600 transition-colors shadow-sm cursor-pointer"
+                                  >
+                                    Switch to Today
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setIsAllDatesMode(true);
+                                    }}
+                                    className="px-3 py-1.5 bg-slate-100 text-slate-700 text-xs font-bold rounded-xl hover:bg-slate-200 transition-colors cursor-pointer"
+                                  >
+                                    View All Dates ({orders.length})
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           ) : (
                             displayRecentOrders.map((order, idx) => (
-                              <tr key={idx} className="hover:bg-slate-50/70 transition-colors">
-                                <td className="py-3 px-3 font-bold text-slate-900 font-mono">{order.id}</td>
+                              <tr 
+                                key={idx} 
+                                onClick={() => setSelectedOrderForDetail(order.rawOrder)}
+                                className="hover:bg-orange-50/60 transition-colors cursor-pointer group"
+                                title="Click to view detailed itemized order bill & receipt"
+                              >
+                                <td className="py-3 px-3 font-bold text-slate-900 font-mono flex items-center gap-1.5">
+                                  <span>{order.id}</span>
+                                </td>
                                 <td className="py-3 px-3 text-slate-700 font-semibold">{order.location}</td>
                                 <td className="py-3 px-3 text-slate-500">{order.waiter}</td>
                                 <td className="py-3 px-3 font-extrabold text-slate-900">
@@ -1641,6 +1948,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                                   </span>
                                 </td>
                                 <td className="py-3 px-3 text-right text-slate-400 text-[11px]">{order.time}</td>
+                                <td className="py-3 px-3 text-center">
+                                  <span className="p-1.5 rounded-lg text-slate-400 group-hover:text-[#FF6B00] group-hover:bg-orange-100/70 inline-flex items-center justify-center transition-colors">
+                                    <Receipt size={14} />
+                                  </span>
+                                </td>
                               </tr>
                             ))
                           )}
@@ -4076,6 +4388,444 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                 Verify & Edit
               </button>
             </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* 6. DATE-WISE ORDERS EXPLORER MODAL (PORTALIZED) */}
+      {showDateOrdersModal && createPortal(
+        <div className="fixed inset-0 z-[9995] flex items-center justify-center p-3 sm:p-6 bg-black/60 backdrop-blur-xs overflow-y-auto animate-fade-in font-sans">
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative my-auto w-full max-w-5xl rounded-3xl bg-white border border-slate-200 shadow-2xl flex flex-col max-h-[92vh] overflow-hidden"
+          >
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-50/70">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-orange-100 text-[#FF6B00] flex items-center justify-center font-black">
+                  <CalendarDays size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-slate-900 leading-tight">
+                    Date-wise Orders Explorer
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    {isAllDatesMode 
+                      ? 'Viewing all historical orders' 
+                      : `Inspecting orders for ${formatFriendlyDate(selectedOrderDate)}`}
+                  </p>
+                </div>
+              </div>
+
+              {/* Date Navigation Controls */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => handleStepDay(-1)}
+                  className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
+                  title="Previous Day"
+                >
+                  <ChevronLeft size={14} />
+                  <span>Prev</span>
+                </button>
+
+                <div className="relative">
+                  <input
+                    type="date"
+                    value={selectedOrderDate}
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        setSelectedOrderDate(e.target.value);
+                        setIsAllDatesMode(false);
+                      }
+                    }}
+                    className="text-xs font-extrabold bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-slate-800 outline-none focus:border-[#FF6B00] focus:ring-1 focus:ring-[#FF6B00] cursor-pointer shadow-2xs"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleStepDay(1)}
+                  className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
+                  title="Next Day"
+                >
+                  <span>Next</span>
+                  <ChevronRight size={14} />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedOrderDate(getOrderLocalDateStr(new Date()));
+                    setIsAllDatesMode(false);
+                  }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
+                    !isAllDatesMode && selectedOrderDate === getOrderLocalDateStr(new Date())
+                      ? 'bg-[#FF6B00] text-white border-[#FF6B00]'
+                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  Today
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsAllDatesMode(!isAllDatesMode)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
+                    isAllDatesMode
+                      ? 'bg-slate-900 text-white border-slate-900'
+                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  {isAllDatesMode ? 'Specific Date' : 'All Dates'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowDateOrdersModal(false)}
+                  className="w-8 h-8 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 flex items-center justify-center transition-colors cursor-pointer ml-1"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Date Summary Cards & Filtered List */}
+            {(() => {
+              const currentOrders = dateWiseOrders;
+              const valid = currentOrders.filter(o => (o.status as any) !== 'Cancelled');
+              const revenue = valid.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+              const aov = valid.length > 0 ? revenue / valid.length : 0;
+              const delivered = currentOrders.filter(o => o.status === 'Delivered').length;
+              const kitchen = currentOrders.filter(o => o.status === 'Preparing' || o.status === 'Ready to Serve' || (o.status as any) === 'Ready' || o.status === 'Confirmed').length;
+              const paidCount = currentOrders.filter(o => o.paymentStatus === 'Paid').length;
+              const unpaidCount = currentOrders.filter(o => o.paymentStatus !== 'Paid' && (o.status as any) !== 'Cancelled').length;
+
+              // Filtered list based on search and sub-filters
+              const filteredList = currentOrders.filter(o => {
+                if (dateOrdersStatusFilter !== 'All') {
+                  if (dateOrdersStatusFilter === 'Delivered' && o.status !== 'Delivered') return false;
+                  if (dateOrdersStatusFilter === 'Kitchen' && !(o.status === 'Preparing' || o.status === 'Ready to Serve' || (o.status as any) === 'Ready' || o.status === 'Confirmed')) return false;
+                  if (dateOrdersStatusFilter === 'Cancelled' && (o.status as any) !== 'Cancelled') return false;
+                }
+                if (dateOrdersPaymentFilter !== 'All') {
+                  if (dateOrdersPaymentFilter === 'Paid' && o.paymentStatus !== 'Paid') return false;
+                  if (dateOrdersPaymentFilter === 'Pending' && o.paymentStatus === 'Paid') return false;
+                }
+                if (dateOrdersSearch.trim()) {
+                  const q = dateOrdersSearch.toLowerCase().trim();
+                  const matchId = o.id.toLowerCase().includes(q);
+                  const matchTable = String(o.tableId).includes(q);
+                  const matchPhone = (o.customerPhone || '').toLowerCase().includes(q);
+                  const matchDish = (o.items || []).some(it => it.name.toLowerCase().includes(q));
+                  if (!matchId && !matchTable && !matchPhone && !matchDish) return false;
+                }
+                return true;
+              });
+
+              return (
+                <div className="flex-1 flex flex-col overflow-hidden">
+                  {/* KPI Bar */}
+                  <div className="p-4 bg-slate-50/50 border-b border-slate-100 grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-2xs">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Orders on Date</span>
+                      <strong className="text-xl font-black text-slate-900 mt-0.5 block">{currentOrders.length}</strong>
+                      <span className="text-[10px] text-slate-500 font-semibold">{delivered} delivered • {kitchen} active</span>
+                    </div>
+
+                    <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-2xs">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Date Revenue</span>
+                      <strong className="text-xl font-black text-[#FF6B00] mt-0.5 block">₹{revenue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                      <span className="text-[10px] text-slate-500 font-semibold">{paidCount} paid • {unpaidCount} unpaid</span>
+                    </div>
+
+                    <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-2xs">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Average Order</span>
+                      <strong className="text-xl font-black text-slate-900 mt-0.5 block">₹{aov.toFixed(2)}</strong>
+                      <span className="text-[10px] text-slate-500 font-semibold">Per delivered check</span>
+                    </div>
+
+                    <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col justify-between">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Export Date Data</span>
+                      <div className="flex items-center gap-2 mt-1">
+                        <button
+                          type="button"
+                          onClick={handleExportDateOrdersExcel}
+                          className="flex-1 py-1.5 px-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold flex items-center justify-center gap-1 shadow-2xs transition-colors cursor-pointer"
+                          title="Export to Excel"
+                        >
+                          <FileSpreadsheet size={12} />
+                          <span>Excel</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleExportDateOrdersPDF}
+                          className="flex-1 py-1.5 px-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-[11px] font-bold flex items-center justify-center gap-1 shadow-2xs transition-colors cursor-pointer"
+                          title="Export to PDF"
+                        >
+                          <FileText size={12} />
+                          <span>PDF</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Filter & Search Strip */}
+                  <div className="p-3 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-white">
+                    <div className="relative flex-1 min-w-[220px]">
+                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
+                        value={dateOrdersSearch}
+                        onChange={(e) => setDateOrdersSearch(e.target.value)}
+                        placeholder="Search order #, table, customer phone, dish..."
+                        className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:border-[#FF6B00] transition-colors"
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-wrap text-xs">
+                      <div className="flex items-center bg-slate-100 p-0.5 rounded-xl text-[11px] font-bold">
+                        {(['All', 'Delivered', 'Kitchen', 'Cancelled'] as const).map(st => (
+                          <button
+                            key={st}
+                            onClick={() => setDateOrdersStatusFilter(st)}
+                            className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
+                              dateOrdersStatusFilter === st
+                                ? 'bg-white text-slate-900 shadow-2xs'
+                                : 'text-slate-500 hover:text-slate-900'
+                            }`}
+                          >
+                            {st}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="flex items-center bg-slate-100 p-0.5 rounded-xl text-[11px] font-bold">
+                        {(['All', 'Paid', 'Pending'] as const).map(pt => (
+                          <button
+                            key={pt}
+                            onClick={() => setDateOrdersPaymentFilter(pt)}
+                            className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
+                              dateOrdersPaymentFilter === pt
+                                ? 'bg-white text-slate-900 shadow-2xs'
+                                : 'text-slate-500 hover:text-slate-900'
+                            }`}
+                          >
+                            {pt}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Orders Table */}
+                  <div className="flex-1 overflow-y-auto no-scrollbar p-4">
+                    {filteredList.length === 0 ? (
+                      <div className="py-16 text-center text-slate-400">
+                        <Calendar size={36} className="mx-auto mb-2 text-slate-300" />
+                        <h4 className="font-extrabold text-sm text-slate-700">No orders match the filter</h4>
+                        <p className="text-xs text-slate-400 mt-1">
+                          Try adjusting your search query, status filters, or pick another calendar date above.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto no-scrollbar border border-slate-200/80 rounded-2xl">
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-slate-50 text-[10px] uppercase font-bold tracking-wider text-slate-500 border-b border-slate-200">
+                            <tr>
+                              <th className="py-3 px-3.5">Order ID</th>
+                              <th className="py-3 px-3.5">Time</th>
+                              <th className="py-3 px-3.5">Table</th>
+                              <th className="py-3 px-3.5">Customer</th>
+                              <th className="py-3 px-3.5">Items Ordered</th>
+                              <th className="py-3 px-3.5 text-center">Status</th>
+                              <th className="py-3 px-3.5 text-center">Payment</th>
+                              <th className="py-3 px-3.5 text-right">Amount</th>
+                              <th className="py-3 px-3.5 text-center">Receipt</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 font-medium bg-white">
+                            {filteredList.map((order) => {
+                              const orderTime = order.createdAt 
+                                ? new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
+                                : '--:--';
+                              const totalQty = (order.items || []).reduce((s, it) => s + (it.quantity || 1), 0);
+
+                              return (
+                                <tr
+                                  key={order.id}
+                                  onClick={() => setSelectedOrderForDetail(order)}
+                                  className="hover:bg-orange-50/50 transition-colors cursor-pointer group"
+                                  title="Click to view full itemized receipt & breakdown"
+                                >
+                                  <td className="py-3 px-3.5 font-bold font-mono text-slate-900">
+                                    #{order.id}
+                                  </td>
+                                  <td className="py-3 px-3.5 text-slate-500 font-medium whitespace-nowrap">
+                                    {orderTime}
+                                  </td>
+                                  <td className="py-3 px-3.5 font-extrabold text-slate-800">
+                                    Table #{order.tableId || 'Dine-In'}
+                                  </td>
+                                  <td className="py-3 px-3.5 text-slate-600 font-mono text-[11px]">
+                                    {order.customerPhone ? order.customerPhone : 'Guest'}
+                                  </td>
+                                  <td className="py-3 px-3.5 max-w-xs">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700">
+                                        {totalQty} {totalQty === 1 ? 'item' : 'items'}
+                                      </span>
+                                      <span className="text-slate-800 font-semibold truncate block max-w-[200px]" title={(order.items || []).map(i => `${i.name} x${i.quantity}`).join(', ')}>
+                                        {(order.items || []).map(i => `${i.name} x${i.quantity}`).join(', ')}
+                                      </span>
+                                    </div>
+                                  </td>
+                                  <td className="py-3 px-3.5 text-center whitespace-nowrap">
+                                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold inline-block ${
+                                      order.status === 'Preparing'
+                                        ? 'bg-orange-50 text-orange-600 border border-orange-200/50'
+                                        : (order.status === 'Ready to Serve' || (order.status as any) === 'Ready')
+                                          ? 'bg-sky-50 text-sky-600 border border-sky-200/50'
+                                          : order.status === 'Delivered'
+                                            ? 'bg-emerald-50 text-emerald-600 border border-emerald-200/50'
+                                            : 'bg-slate-100 text-slate-600'
+                                    }`}>
+                                      {order.status}
+                                    </span>
+                                  </td>
+                                  <td className="py-3 px-3.5 text-center whitespace-nowrap">
+                                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold inline-block ${
+                                      order.paymentStatus === 'Paid'
+                                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
+                                        : 'bg-amber-50 text-amber-700 border border-amber-200/60'
+                                    }`}>
+                                      {order.paymentStatus === 'Paid' ? 'Paid (Cash)' : 'Pending'}
+                                    </span>
+                                  </td>
+                                  <td className="py-3 px-3.5 text-right font-black text-slate-900 whitespace-nowrap">
+                                    ₹{Number(order.total || 0).toFixed(2)}
+                                  </td>
+                                  <td className="py-3 px-3.5 text-center">
+                                    <span className="p-1.5 rounded-lg text-slate-400 group-hover:text-[#FF6B00] group-hover:bg-orange-100/70 inline-flex items-center justify-center transition-colors">
+                                      <Receipt size={14} />
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* 7. ORDER RECEIPT & DETAILS MODAL (PORTALIZED) */}
+      {selectedOrderForDetail && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto animate-fade-in font-sans">
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative my-auto w-full max-w-md rounded-3xl bg-white border border-slate-200 shadow-2xl p-6"
+          >
+            <div className="flex justify-between items-start border-b border-slate-100 pb-3 mb-4">
+              <div>
+                <span className="text-[10px] uppercase font-bold tracking-wider text-orange-600 bg-orange-50 px-2 py-0.5 rounded-md">
+                  Table #{selectedOrderForDetail.tableId} • Receipt
+                </span>
+                <h3 className="font-black text-lg text-slate-900 mt-1">
+                  Order #{selectedOrderForDetail.id}
+                </h3>
+                <p className="text-[11px] text-slate-400">
+                  {selectedOrderForDetail.createdAt ? new Date(selectedOrderForDetail.createdAt).toLocaleString() : 'N/A'}
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedOrderForDetail(null)}
+                className="w-8 h-8 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Customer Details */}
+            <div className="bg-slate-50 p-3 rounded-2xl mb-4 text-xs font-semibold space-y-1">
+              <div className="flex justify-between text-slate-600">
+                <span>Customer Phone:</span>
+                <span className="font-mono text-slate-900">{selectedOrderForDetail.customerPhone || 'Walk-In Guest'}</span>
+              </div>
+              <div className="flex justify-between text-slate-600">
+                <span>Payment Status:</span>
+                <span className={`font-bold ${selectedOrderForDetail.paymentStatus === 'Paid' ? 'text-emerald-600' : 'text-amber-600'}`}>
+                  {selectedOrderForDetail.paymentStatus === 'Paid' ? 'Paid (Cash Settle)' : 'Pending Cash Payment'}
+                </span>
+              </div>
+              <div className="flex justify-between text-slate-600">
+                <span>Kitchen Status:</span>
+                <span className="font-bold text-slate-900">{selectedOrderForDetail.status}</span>
+              </div>
+            </div>
+
+            {/* Itemized List */}
+            <div className="mb-4">
+              <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block mb-2">Dishes Ordered</span>
+              <div className="space-y-2 max-h-48 overflow-y-auto no-scrollbar pr-1">
+                {(selectedOrderForDetail.items || []).map((it, idx) => (
+                  <div key={idx} className="flex justify-between items-start text-xs border-b border-slate-50 pb-2">
+                    <div>
+                      <p className="font-bold text-slate-900">{it.name} <span className="text-orange-600">x{it.quantity}</span></p>
+                      {it.instructions && it.instructions.length > 0 && (
+                        <p className="text-[10px] text-slate-400 italic">
+                          {Array.isArray(it.instructions) ? it.instructions.join(', ') : it.instructions}
+                        </p>
+                      )}
+                    </div>
+                    <span className="font-extrabold text-slate-900">₹{(it.price * it.quantity).toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Bill Summary */}
+            <div className="border-t border-slate-100 pt-3 space-y-1.5 text-xs font-semibold">
+              <div className="flex justify-between text-slate-500">
+                <span>Subtotal:</span>
+                <span>₹{Number(selectedOrderForDetail.subtotal || 0).toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-slate-500">
+                <span>GST (5%):</span>
+                <span>₹{Number(selectedOrderForDetail.gst || 0).toFixed(2)}</span>
+              </div>
+              {Number(selectedOrderForDetail.discount || 0) > 0 && (
+                <div className="flex justify-between text-emerald-600 font-bold">
+                  <span>Discount Applied:</span>
+                  <span>-₹{Number(selectedOrderForDetail.discount).toFixed(2)}</span>
+                </div>
+              )}
+              {Number(selectedOrderForDetail.tip || 0) > 0 && (
+                <div className="flex justify-between text-slate-500">
+                  <span>Waiter Tip:</span>
+                  <span>₹{Number(selectedOrderForDetail.tip).toFixed(2)}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-sm font-black text-slate-900 border-t border-slate-200/80 pt-2">
+                <span>Total Bill:</span>
+                <span className="text-[#FF6B00]">₹{Number(selectedOrderForDetail.total || 0).toFixed(2)}</span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setSelectedOrderForDetail(null)}
+              className="w-full mt-5 py-2.5 bg-slate-900 hover:bg-black text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-md"
+            >
+              Close Receipt
+            </button>
           </div>
         </div>,
         document.body

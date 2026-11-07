@@ -33,11 +33,11 @@ const getEnv = (key: string, def = '') => {
         }
       }
     }
-  } catch {}
+  } catch { }
   return def;
 };
 
-const FALLBACK_KEY_BYTES = [103,115,107,95,80,83,49,103,116,109,103,70,57,98,55,111,81,118,89,113,76,77,97,57,87,71,100,121,98,51,70,89,105,102,75,87,79,87,79,87,98,71,103,73,70,78,103,97,104,71,74,54,81,85,120,50];
+const FALLBACK_KEY_BYTES = [103, 115, 107, 95, 80, 83, 49, 103, 116, 109, 103, 70, 57, 98, 55, 111, 81, 118, 89, 113, 76, 77, 97, 57, 87, 71, 100, 121, 98, 51, 70, 89, 105, 102, 75, 87, 79, 87, 79, 87, 98, 71, 103, 73, 70, 78, 103, 97, 104, 71, 74, 54, 81, 85, 120, 50];
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const getApiKey = () => {
@@ -320,7 +320,7 @@ export const ragOrchestrator = {
       let toolArgs = {};
       try {
         toolArgs = JSON.parse(call.function.arguments || '{}');
-      } catch (e) {}
+      } catch (e) { }
 
       toolResult = await executeToolCall(toolUsed, toolArgs);
       citations.push({
@@ -383,9 +383,9 @@ export const ragOrchestrator = {
         max_tokens: 1024,
         messages: [
           { role: 'system', content: SYNTHESIS_SYSTEM },
-          { 
-            role: 'user', 
-            content: `User Question: "${effectiveQuery}"\n\nLIVE DATABASE DATA / VERIFIED FACTS:\n${JSON.stringify(toolResult, null, 2)}\n\nAnswer the restaurant owner directly following the critical rules.` 
+          {
+            role: 'user',
+            content: `User Question: "${effectiveQuery}"\n\nLIVE DATABASE DATA / VERIFIED FACTS:\n${JSON.stringify(toolResult, null, 2)}\n\nAnswer the restaurant owner directly following the critical rules.`
           }
         ]
       });
