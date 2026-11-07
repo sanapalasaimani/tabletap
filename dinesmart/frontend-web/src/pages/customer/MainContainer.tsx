@@ -16,7 +16,21 @@ import { CallWaiterModal } from '../../components/customer/CallWaiterModal';
 import { CheckoutOverlay } from '../../components/customer/CheckoutOverlay';
 
 // Icons
-import { Home, Search, ShoppingCart, Clock, User, ConciergeBell, RefreshCw, AlertTriangle, LogOut, ShieldCheck, Check } from 'lucide-react';
+import {
+  Home, Search, ShoppingCart, Clock, User, ConciergeBell,
+  RefreshCw, AlertTriangle, LogOut, ShieldCheck, Check,
+  ChefHat, Flame, BellRing, CheckCircle2, ChevronRight, X
+} from 'lucide-react';
+import { soundEffects } from '../../utils/soundEffects';
+
+interface FoodTrackingToast {
+  orderId: string;
+  status: Order['status'];
+  title: string;
+  message: string;
+  stageName: string;
+  timestamp: string;
+}
 
 export const MainContainer: React.FC = () => {
   const { tableId: routeTableId } = useParams<{ tableId: string }>();
@@ -42,6 +56,12 @@ export const MainContainer: React.FC = () => {
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [checkoutTargetOrder, setCheckoutTargetOrder] = useState<Order | null>(null);
   const [showExitModal, setShowExitModal] = useState(false);
+
+  // Live Food Tracking Notification Pop-up State
+  const [foodTrackingToast, setFoodTrackingToast] = useState<FoodTrackingToast | null>(null);
+  const previousStatusRef = useRef<Order['status'] | null>(null);
+  const previousOrderIdRef = useRef<string | null>(null);
+  const initialMountRef = useRef<boolean>(true);
 
   // Refs for tracking in popstate event listener
   const activeTabRef = useRef(activeTab);
@@ -183,6 +203,82 @@ export const MainContainer: React.FC = () => {
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
+
+  // Real-time Order Status & Food Preparation Tracking Pop-up with Sound
+  useEffect(() => {
+    if (!activeOrder) {
+      previousStatusRef.current = null;
+      previousOrderIdRef.current = null;
+      return;
+    }
+
+    // On initial page mount, record current order state without re-alerting unless status changes
+    if (initialMountRef.current) {
+      initialMountRef.current = false;
+      previousStatusRef.current = activeOrder.status;
+      previousOrderIdRef.current = activeOrder.id;
+      return;
+    }
+
+    const isNewOrder = previousOrderIdRef.current !== activeOrder.id;
+    const isStatusChange = previousStatusRef.current !== activeOrder.status;
+
+    if (isNewOrder || isStatusChange) {
+      previousStatusRef.current = activeOrder.status;
+      previousOrderIdRef.current = activeOrder.id;
+
+      let title = 'Order Update';
+      let message = `Order #${activeOrder.id} status is now ${activeOrder.status}.`;
+      let stageName: string = activeOrder.status;
+
+      if (activeOrder.status === 'Confirmed') {
+        title = 'Order Confirmed! 📋';
+        message = `Kitchen received Order #${activeOrder.id}. Preparing will begin shortly.`;
+        stageName = 'Order Confirmed';
+      } else if (activeOrder.status === 'Preparing') {
+        title = 'Chef is Preparing 🥗';
+        message = `Chef is gathering fresh ingredients for Table #${activeOrder.tableId}.`;
+        stageName = 'Preparing Ingredients';
+      } else if (activeOrder.status === 'Cooking') {
+        title = 'Cooking in Progress 🔥';
+        message = `Your delicious food is being freshly cooked right now!`;
+        stageName = 'Cooking in Kitchen';
+      } else if (activeOrder.status === 'Ready to Serve') {
+        title = 'Food Ready to Serve! 🍽️';
+        message = `Dishes are ready! Waiter is bringing them to Table #${activeOrder.tableId}.`;
+        stageName = 'Ready to Serve';
+      } else if (activeOrder.status === 'Delivered') {
+        title = 'Order Delivered! 🎉';
+        message = `Your meal has arrived at Table #${activeOrder.tableId}. Enjoy your food!`;
+        stageName = 'Delivered to Table';
+      }
+
+      // Play audio notification chime with Web Audio API
+      if (activeOrder.status === 'Delivered') {
+        soundEffects.playCelebrationChime();
+      } else {
+        soundEffects.playNotificationChime();
+      }
+
+      setFoodTrackingToast({
+        orderId: activeOrder.id,
+        status: activeOrder.status,
+        title,
+        message,
+        stageName,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      });
+    }
+  }, [activeOrder?.id, activeOrder?.status, activeOrder?.tableId]);
+
+  // Auto-dismiss notification toast after 8 seconds
+  useEffect(() => {
+    if (!foodTrackingToast) return;
+    const timer = setTimeout(() => {
+      setFoodTrackingToast(null);
+    }, 8000);
+    return () => clearTimeout(timer);
+  }, [foodTrackingToast]);
 
   const handleNavigateToSearch = (category?: MenuItem['category']) => {
     setInitialSearchCategory(category);
@@ -399,6 +495,28 @@ export const MainContainer: React.FC = () => {
         </div>
       </header>
 
+      {/* Live Order Micro-Tracker Banner (Visible across customer tabs while food is preparing) */}
+      {activeOrder && activeOrder.status !== 'Delivered' && activeTab !== 'orders' && (
+        <div 
+          onClick={() => handleNavigateToTab('orders')}
+          className="bg-gradient-to-r from-orange-500/10 via-amber-500/10 to-orange-500/10 border-b border-orange-200/60 px-4 py-2 flex items-center justify-between text-xs font-bold text-orange-950 cursor-pointer hover:bg-orange-100/60 transition-colors z-20 flex-shrink-0"
+        >
+          <div className="flex items-center gap-2">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span>
+            </span>
+            <span className="font-extrabold text-[11px] text-orange-950">
+              Kitchen Status: <span className="text-[#FF6B00]">{activeOrder.status}</span>
+            </span>
+          </div>
+          <div className="flex items-center gap-1 text-[11px] text-orange-600 font-black">
+            <span>Track Live</span>
+            <ChevronRight size={12} />
+          </div>
+        </div>
+      )}
+
       {/* 2. MAIN SCROLLABLE VIEWPORT */}
       <main className="flex-1 overflow-y-auto pb-24 relative bg-brand-bg no-scrollbar">
         {activeTab === 'home' && (
@@ -570,6 +688,82 @@ export const MainContainer: React.FC = () => {
                 Exit Session
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. LIVE FOOD TRACKING NOTIFICATION POP-UP WITH AUDIO SOUND */}
+      {foodTrackingToast && (
+        <div className="fixed top-4 left-4 right-4 max-w-[440px] mx-auto z-50 animate-in slide-in-from-top-6 fade-in duration-300 pointer-events-auto font-sans">
+          <div className="bg-slate-900/95 backdrop-blur-md text-white rounded-3xl p-4 shadow-2xl border border-orange-500/30 flex items-start gap-3.5 ring-1 ring-white/10">
+            {/* Status Animated Icon */}
+            <div className={`w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg ${
+              foodTrackingToast.status === 'Delivered'
+                ? 'bg-gradient-to-tr from-emerald-500 to-teal-400 text-white shadow-emerald-500/25'
+                : foodTrackingToast.status === 'Ready to Serve'
+                ? 'bg-gradient-to-tr from-amber-500 to-orange-400 text-white shadow-amber-500/25'
+                : 'bg-gradient-to-tr from-orange-500 to-amber-500 text-white shadow-orange-500/25'
+            }`}>
+              {foodTrackingToast.status === 'Confirmed' && <Clock size={20} className="animate-pulse" />}
+              {foodTrackingToast.status === 'Preparing' && <ChefHat size={20} className="animate-bounce" />}
+              {foodTrackingToast.status === 'Cooking' && <Flame size={20} className="animate-pulse text-amber-200" />}
+              {foodTrackingToast.status === 'Ready to Serve' && <BellRing size={20} className="animate-bounce" />}
+              {foodTrackingToast.status === 'Delivered' && <CheckCircle2 size={20} />}
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-1">
+                <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                  foodTrackingToast.status === 'Delivered'
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                    : 'bg-orange-500/20 text-orange-300 border border-orange-500/30'
+                }`}>
+                  {foodTrackingToast.stageName}
+                </span>
+                <span className="text-[10px] text-slate-400 font-semibold">{foodTrackingToast.timestamp}</span>
+              </div>
+
+              <h4 className="text-xs font-black text-white mt-1 leading-snug">
+                {foodTrackingToast.title}
+              </h4>
+              <p className="text-[11px] text-slate-300 mt-0.5 line-clamp-2 leading-relaxed">
+                {foodTrackingToast.message}
+              </p>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-2 mt-2.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleNavigateToTab('orders');
+                    setFoodTrackingToast(null);
+                  }}
+                  className="flex items-center gap-1.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white text-[11px] font-bold px-3 py-1.5 rounded-xl shadow-md shadow-orange-500/20 transition-all cursor-pointer"
+                >
+                  <span>Track Live</span>
+                  <ChevronRight size={13} />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setFoodTrackingToast(null)}
+                  className="text-slate-400 hover:text-white text-[11px] font-semibold px-2 py-1.5 transition-colors cursor-pointer"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+
+            {/* Close Button */}
+            <button
+              type="button"
+              onClick={() => setFoodTrackingToast(null)}
+              className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors flex-shrink-0 cursor-pointer"
+              title="Close notification"
+            >
+              <X size={16} />
+            </button>
           </div>
         </div>
       )}

@@ -12,7 +12,7 @@ import {
   CornerDownRight, UserPlus, Heart, TrendingUp, DollarSign, Calendar, CalendarDays,
   TrendingDown, ArrowUpRight, ArrowDownRight, Clock, Star, Eye, EyeOff, Phone, Copy, FileSpreadsheet, ChevronDown, ExternalLink,
   Upload, Smartphone, Share2, CheckCircle2, AlertCircle, Receipt,
-  Bell, LogOut, Activity, BookOpen, Smile, Meh, Frown
+  Bell, LogOut, Activity, BookOpen, Smile, Meh, Frown, PanelLeftClose, PanelLeftOpen
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, CartesianGrid, AreaChart, Area } from 'recharts';
 import {
@@ -127,6 +127,20 @@ interface ActivityLog {
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }) => {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
+
+  // Left Sidebar Collapsed / Expanded state (persisted in localStorage)
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(() => {
+    const saved = localStorage.getItem('dinesmart_admin_sidebar_open');
+    return saved !== null ? saved === 'true' : true;
+  });
+
+  const toggleSidebar = () => {
+    setIsSidebarOpen(prev => {
+      const next = !prev;
+      localStorage.setItem('dinesmart_admin_sidebar_open', String(next));
+      return next;
+    });
+  };
 
   // Real-time Database States
   const [orders, setOrders] = useState<Order[]>([]);
@@ -1093,21 +1107,36 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
     <div className="flex h-screen overflow-hidden font-sans bg-slate-50 text-brand-text">
 
       {/* 1. SIDEBAR NAVIGATION */}
-      <aside className="w-64 flex flex-col justify-between flex-shrink-0 z-20 border-r bg-[#11141D] text-white border-slate-800">
-        <div>
+      <aside
+        className={`${
+          isSidebarOpen ? 'w-64 translate-x-0 opacity-100' : 'w-0 -translate-x-full opacity-0 pointer-events-none border-r-0'
+        } transition-all duration-300 ease-in-out flex flex-col justify-between flex-shrink-0 z-20 border-r bg-[#11141D] text-white border-slate-800 overflow-hidden select-none`}
+      >
+        <div className="w-64">
           {/* Logo Header from Figma */}
-          <div className="p-5 border-b flex items-center gap-3 border-gray-800/80">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#FF6B00] to-amber-600 flex items-center justify-center text-white shadow-md shadow-orange-500/20 flex-shrink-0">
-              <div className="flex items-end gap-1 h-4">
-                <span className="w-1 h-2 bg-white rounded-full"></span>
-                <span className="w-1 h-4 bg-white rounded-full"></span>
-                <span className="w-1 h-2.5 bg-white rounded-full"></span>
+          <div className="p-4 border-b flex items-center justify-between border-gray-800/80">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#FF6B00] to-amber-600 flex items-center justify-center text-white shadow-md shadow-orange-500/20 flex-shrink-0">
+                <div className="flex items-end gap-1 h-4">
+                  <span className="w-1 h-2 bg-white rounded-full"></span>
+                  <span className="w-1 h-4 bg-white rounded-full"></span>
+                  <span className="w-1 h-2.5 bg-white rounded-full"></span>
+                </div>
+              </div>
+              <div className="min-w-0">
+                <h2 className="font-extrabold text-sm tracking-tight leading-none text-white truncate">DineSmart</h2>
+                <span className="text-[9px] text-slate-400 font-bold tracking-widest uppercase mt-1 block">Manager Panel</span>
               </div>
             </div>
-            <div>
-              <h2 className="font-extrabold text-sm tracking-tight leading-none text-white">DineSmart</h2>
-              <span className="text-[9px] text-slate-400 font-bold tracking-widest uppercase mt-1 block">Manager Panel</span>
-            </div>
+            {/* Close sidebar button */}
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              title="Close sidebar to expand screen"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer flex-shrink-0"
+            >
+              <PanelLeftClose size={18} />
+            </button>
           </div>
 
           {/* Navigation links matching Figma groups & active states */}
@@ -1261,7 +1290,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
         </div>
 
         {/* Sidebar Footer Profile & Logout Card from Figma */}
-        <div className="p-3 border-t border-gray-800/80">
+        <div className="w-64 p-3 border-t border-gray-800/80">
           <div className="p-3 rounded-2xl bg-[#161922] border border-slate-800/80 flex items-center justify-between">
             <div className="flex items-center gap-2.5 overflow-hidden">
               <div className="w-9 h-9 rounded-full bg-amber-100 text-amber-900 font-extrabold text-xs flex items-center justify-center shadow-xs flex-shrink-0">
@@ -1289,6 +1318,30 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
         {/* Top Header */}
         <header className="border-b px-6 py-3.5 flex justify-between items-center gap-4 z-10 flex-shrink-0 bg-white border-slate-200/80 shadow-2xs">
           <div className="flex items-center gap-3">
+            {/* Sidebar Collapse / Expand Toggle Button */}
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all text-xs font-bold shadow-2xs cursor-pointer ${
+                !isSidebarOpen
+                  ? 'bg-orange-50 border-orange-300 text-orange-950 hover:bg-orange-100 ring-2 ring-orange-400/20'
+                  : 'bg-white border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+              }`}
+              title={isSidebarOpen ? "Close sidebar to expand screen" : "Open sidebar"}
+            >
+              {isSidebarOpen ? (
+                <>
+                  <PanelLeftClose size={15} className="text-slate-500" />
+                  <span className="hidden sm:inline">Close Sidebar</span>
+                </>
+              ) : (
+                <>
+                  <PanelLeftOpen size={15} className="text-[#FF6B00]" />
+                  <span>Open Menu</span>
+                </>
+              )}
+            </button>
+
             {/* Last sync pill */}
             <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200/80 flex-shrink-0">
               <span className="relative flex h-2 w-2">

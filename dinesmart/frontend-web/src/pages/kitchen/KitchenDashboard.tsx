@@ -408,40 +408,44 @@ export const KitchenDashboard: React.FC<KitchenDashboardProps> = ({ onLogout }) 
   };
 
   return (
-    <div className="flex h-screen bg-slate-50 text-slate-800 overflow-hidden max-w-none font-sans">
+    <div className="flex flex-col h-screen bg-slate-50 text-slate-800 overflow-hidden max-w-none font-sans">
       
-      {/* 1. SIDEBAR CONTAINER (Light Theme) */}
+      {/* 1. TOP KITCHEN DASHBOARD NAVIGATION BANNER */}
       {!isMaximized && (
-        <aside className="w-64 bg-white border-r border-slate-200 flex flex-col justify-between flex-shrink-0 z-20">
-        <div>
+        <header className="bg-white border-b border-slate-200 px-6 py-3 flex flex-wrap items-center justify-between gap-4 z-20 flex-shrink-0 shadow-2xs">
           {/* Brand Header */}
-          <div className="p-5 border-b border-slate-100 flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-tr from-primary to-orange-500 rounded-xl flex items-center justify-center text-white shadow-md shadow-primary/20">
-              <ChefHat size={22} className="rotate-3" />
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 bg-gradient-to-tr from-primary to-orange-500 rounded-xl flex items-center justify-center text-white shadow-md shadow-primary/20 flex-shrink-0">
+              <ChefHat size={20} className="rotate-3" />
             </div>
             <div>
-              <h2 className="font-extrabold text-sm tracking-tight leading-none bg-gradient-to-r from-primary to-amber-600 bg-clip-text text-transparent font-sans">
-                Kitchen Dashboard
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="font-extrabold text-sm tracking-tight leading-none bg-gradient-to-r from-primary to-amber-600 bg-clip-text text-transparent font-sans">
+                  Kitchen Dashboard
+                </h2>
+                {loading && <RefreshCw size={12} className="text-primary animate-spin" />}
+              </div>
+              <p className="text-[10px] text-slate-400 font-semibold mt-1 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+                <span>Live Synced • {lastRefreshed || 'Just now'}</span>
+              </p>
             </div>
           </div>
 
-          {/* Navigation Options (Completed orders tab removed) */}
-          <nav className="p-4 space-y-1">
+          {/* Navigation Options - Moved from Left Sidebar to Top Banner */}
+          <nav className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-2xl border border-slate-200/80">
             <button
               onClick={() => setActiveTab('dashboard')}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 activeTab === 'dashboard' 
-                  ? 'bg-primary/10 text-primary border-l-4 border-primary font-extrabold shadow-sm' 
-                  : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                  ? 'bg-white text-primary font-black shadow-xs border border-slate-200/60' 
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
               }`}
             >
-              <div className="flex items-center gap-3">
-                <Clock size={16} />
-                <span>Orders Dashboard</span>
-              </div>
+              <Clock size={15} />
+              <span>Orders Dashboard</span>
               {virtualCards.length > 0 && (
-                <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-primary text-white">
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary text-white shadow-2xs">
                   {virtualCards.length}
                 </span>
               )}
@@ -449,77 +453,55 @@ export const KitchenDashboard: React.FC<KitchenDashboardProps> = ({ onLogout }) 
 
             <button
               onClick={() => setActiveTab('menu')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 activeTab === 'menu' 
-                  ? 'bg-primary/10 text-primary border-l-4 border-primary font-extrabold shadow-sm' 
-                  : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                  ? 'bg-white text-primary font-black shadow-xs border border-slate-200/60' 
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
               }`}
             >
-              <Settings size={16} />
+              <Settings size={15} />
               <span>Today's Menu</span>
             </button>
 
             <button
               onClick={() => setActiveTab('reviews')}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 activeTab === 'reviews' 
-                  ? 'bg-primary/10 text-primary border-l-4 border-primary font-extrabold shadow-sm' 
-                  : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                  ? 'bg-white text-primary font-black shadow-xs border border-slate-200/60' 
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
               }`}
             >
-              <div className="flex items-center gap-3">
-                <MessageSquare size={16} />
-                <span>Customer Reviews</span>
-              </div>
+              <MessageSquare size={15} />
+              <span>Customer Reviews</span>
               {reviews.filter(r => r.comment && r.comment.trim() && r.kitchen_alert).length > 0 && (
-                <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-red-500 text-white animate-pulse">
+                <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-red-500 text-white animate-pulse">
                   {reviews.filter(r => r.comment && r.comment.trim() && r.kitchen_alert).length} Alerts
                 </span>
               )}
             </button>
           </nav>
-        </div>
 
-        {/* Sidebar Footer Logout */}
-        <div className="p-4 border-t border-slate-100">
-          <button
-            onClick={handleLogoutClick}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold text-red-500 hover:text-white hover:bg-red-500 transition-all text-left cursor-pointer border border-transparent hover:border-red-200"
-          >
-            <LogOut size={16} />
-            <span>Logout</span>
-          </button>
-        </div>
-        </aside>
+          {/* Right Controls: Date, Clock & Logout */}
+          <div className="flex items-center gap-2.5 text-xs">
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl text-slate-700 font-bold shadow-2xs">
+              <Calendar size={13} className="text-primary" />
+              <span>{getFormattedDate()}</span>
+            </div>
+
+            <button
+              onClick={handleLogoutClick}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-red-600 bg-red-50 hover:bg-red-500 hover:text-white border border-red-200/60 transition-all cursor-pointer shadow-2xs"
+              title="Logout from Kitchen Dashboard"
+            >
+              <LogOut size={14} />
+              <span>Logout</span>
+            </button>
+          </div>
+        </header>
       )}
 
       {/* 2. MAIN KDS BOARD WRAPPER */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        
-        {/* Top bar header */}
-        {!isMaximized && (
-          <header className="bg-white border-b border-slate-200 p-5 flex justify-between items-center z-10 flex-shrink-0">
-          <div>
-            <h1 className="text-lg font-black text-slate-800 flex items-center gap-2">
-              <span>{activeTab === 'dashboard' ? 'Orders Dashboard' : activeTab === 'menu' ? 'Daily Menu Availability' : 'Customer Reviews'}</span>
-              {loading && <RefreshCw size={14} className="text-primary animate-spin" />}
-            </h1>
-            <p className="text-[10px] text-slate-400 font-semibold mt-0.5 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
-              <span>Live Synced • Sync Time: {lastRefreshed || 'Just now'}</span>
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2.5 text-xs">
-
-
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl text-slate-600 font-medium">
-              <Calendar size={13} className="text-primary" />
-              <span>{getFormattedDate()}</span>
-            </div>
-          </div>
-          </header>
-        )}
 
         {/* Quick Metrics Statistics Row */}
         {activeTab === 'dashboard' && !isMaximized && (
