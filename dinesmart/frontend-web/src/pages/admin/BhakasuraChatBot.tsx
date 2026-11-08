@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Send, Sparkles, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
+import { X, Send, Sparkles, ChevronDown, ChevronUp, RefreshCw, Volume2, VolumeX, Square, Copy, Check } from 'lucide-react';
 import { askBhakasuraAI } from './groq';
 
 interface Message {
@@ -29,36 +29,30 @@ interface FormattedBotMessageProps {
 
 const renderInline = (str: string): React.ReactNode[] => {
   if (!str) return [];
-  // Tokenize bold, italic, code, and citations
   const tokenRegex = /(\*\*\*[\s\S]+?\*\*\*|\*\*[\s\S]+?\*\*|__[\s\S]+?__|`[^`]+`|\*[\s\S]+?\*|_[\s\S]+?_|\[(?:DS|CATALOG|SUPABASE)-[A-Z0-9-]+\])/g;
   const parts = str.split(tokenRegex);
 
   return parts.map((part, i) => {
     if (!part) return null;
 
-    // Bold italic ***text***
     if (part.startsWith('***') && part.endsWith('***') && part.length >= 6) {
       const inner = part.slice(3, -3);
       return <strong key={i} className="font-extrabold italic text-slate-900">{inner}</strong>;
     }
-    // Bold **text** or __text__
     if ((part.startsWith('**') && part.endsWith('**') && part.length >= 4) ||
         (part.startsWith('__') && part.endsWith('__') && part.length >= 4)) {
       const inner = part.slice(2, -2);
       return <strong key={i} className="font-bold text-slate-900">{inner}</strong>;
     }
-    // Italic *text* or _text_
     if ((part.startsWith('*') && part.endsWith('*') && part.length >= 2) ||
         (part.startsWith('_') && part.endsWith('_') && part.length >= 2)) {
       const inner = part.slice(1, -1);
       return <em key={i} className="italic text-slate-800">{inner}</em>;
     }
-    // Inline code `code`
     if (part.startsWith('`') && part.endsWith('`') && part.length >= 2) {
       const inner = part.slice(1, -1);
       return <code key={i} className="bg-orange-50 text-orange-600 px-1 py-0.5 rounded font-mono text-[11px] border border-orange-100">{inner}</code>;
     }
-    // Citations [DS-ML-...]
     if (part.startsWith('[') && part.endsWith(']')) {
       return (
         <span key={i} className="inline-block bg-orange-50 text-orange-700 font-semibold px-1.5 py-0.5 rounded text-[10px] border border-orange-200 mx-0.5">
@@ -67,7 +61,6 @@ const renderInline = (str: string): React.ReactNode[] => {
       );
     }
 
-    // Clean any remaining unparsed stray symbols
     const cleaned = part.replace(/\*\*/g, '').replace(/^#{1,6}\s*/, '');
     return <span key={i}>{cleaned}</span>;
   }).filter(Boolean);
@@ -76,7 +69,6 @@ const renderInline = (str: string): React.ReactNode[] => {
 export const FormattedBotMessage: React.FC<FormattedBotMessageProps> = ({ text }) => {
   if (!text) return null;
 
-  // Clean ASCII borders and thinking tags if any
   const cleanText = text
     .replace(/<think>[\s\S]*?<\/think>/gi, '')
     .replace(/[┌─│└┐┘├┤┬┴┼]/g, '')
@@ -95,7 +87,7 @@ export const FormattedBotMessage: React.FC<FormattedBotMessageProps> = ({ text }
       continue;
     }
 
-    // 0. Collapsible <details> block handling for Executed SQL & Provenance
+    // 0. Collapsible <details> block handling
     if (trimmed.startsWith('<details>')) {
       const detailsLines: string[] = [];
       while (i < rawLines.length && !rawLines[i].includes('</details>')) {
@@ -132,7 +124,7 @@ export const FormattedBotMessage: React.FC<FormattedBotMessageProps> = ({ text }
       continue;
     }
 
-    // 0b. Fenced Code Block handling (```sql ... ```)
+    // Code blocks
     if (trimmed.startsWith('```')) {
       const codeLines: string[] = [];
       const lang = trimmed.replace(/^```/, '').trim();
@@ -159,83 +151,35 @@ export const FormattedBotMessage: React.FC<FormattedBotMessageProps> = ({ text }
       continue;
     }
 
-    // 1. Markdown Table Handling
-    if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
-      const tableRows: string[] = [];
-      while (i < rawLines.length && rawLines[i].trim().startsWith('|') && rawLines[i].trim().endsWith('|')) {
-        const row = rawLines[i].trim();
-        // Skip table separator line (| :--- | :--- |)
-        if (!/^[|\s:-]+$/.test(row)) {
-          tableRows.push(row);
-        }
-        i++;
-      }
-
-      if (tableRows.length > 0) {
-        const headerCols = tableRows[0]
-          .split('|')
-          .slice(1, -1)
-          .map(c => c.trim());
-        const bodyRows = tableRows.slice(1).map(r =>
-          r.split('|').slice(1, -1).map(c => c.trim())
-        );
-
+    // Headings
+    if (trimmed.startsWith('#')) {
+      const hLevel = trimmed.match(/^#+/)?.[0].length || 1;
+      const hText = trimmed.replace(/^#+\s*/, '');
+      if (hLevel <= 2) {
         elements.push(
-          <div key={`table-${i}`} className="my-2.5 overflow-x-auto rounded-xl border border-slate-200 shadow-xs">
-            <table className="w-full text-[11px] text-left border-collapse">
-              <thead className="bg-orange-50/70 border-b border-slate-200 text-slate-800">
-                <tr>
-                  {headerCols.map((h, colIdx) => (
-                    <th key={colIdx} className="p-2 font-bold text-slate-900 border-r border-slate-200 last:border-r-0">
-                      {renderInline(h)}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {bodyRows.map((row, rowIdx) => (
-                  <tr key={rowIdx} className="border-b border-slate-100 last:border-b-0 even:bg-slate-50/50">
-                    {row.map((cell, cellIdx) => (
-                      <td key={cellIdx} className="p-2 text-slate-700 border-r border-slate-100 last:border-r-0">
-                        {renderInline(cell)}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div key={`h-${i}`} className="font-extrabold text-slate-900 text-xs mt-2 mb-1 border-b border-slate-100 pb-0.5">
+            {renderInline(hText)}
+          </div>
+        );
+      } else {
+        elements.push(
+          <div key={`h-${i}`} className="font-bold text-slate-900 text-xs mt-1.5 mb-0.5">
+            {renderInline(hText)}
           </div>
         );
       }
-      continue;
-    }
-
-    // 2. Title detection: either Markdown heading (# Title) or the very first standalone title line
-    const headingMatch = trimmed.match(/^(#{1,6})\s+(.*)$/);
-    const isFirstLineTitle = i === 0 && trimmed.length < 80 && !trimmed.startsWith('-') && !trimmed.startsWith('*') && !trimmed.startsWith('•') && !/^\d+\./.test(trimmed) && !trimmed.includes(':');
-
-    if (headingMatch || isFirstLineTitle) {
-      const headingContent = (headingMatch ? headingMatch[2] : trimmed).replace(/\*\*/g, '').trim();
-
-      elements.push(
-        <div key={`h-${i}`} className="font-extrabold text-[13px] text-slate-900 mt-1 mb-1.5 pb-1 border-b border-orange-100 tracking-tight flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-orange-500 shrink-0"></span>
-          <span>{headingContent}</span>
-        </div>
-      );
       i++;
       continue;
     }
 
-    // 3. Bullet points (-, *, or •)
-    const bulletMatch = trimmed.match(/^[-*•]\s+(.*)$/);
-    if (bulletMatch) {
-      const content = bulletMatch[1];
+    // Bullet points
+    if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+      const bulletContent = trimmed.replace(/^[-*]\s*/, '');
       elements.push(
-        <div key={`bullet-${i}`} className="flex items-start gap-2 my-0.5 text-slate-700 leading-relaxed pl-0.5">
-          <span className="text-orange-500 font-bold shrink-0 leading-5 text-sm">•</span>
+        <div key={`b-${i}`} className="flex items-start gap-1.5 my-0.5 text-slate-700 leading-relaxed pl-1">
+          <span className="text-orange-500 font-bold shrink-0 mt-0.5">•</span>
           <div className="flex-1 min-w-0">
-            {renderInline(content)}
+            {renderInline(bulletContent)}
           </div>
         </div>
       );
@@ -243,7 +187,7 @@ export const FormattedBotMessage: React.FC<FormattedBotMessageProps> = ({ text }
       continue;
     }
 
-    // 4. Numbered list (1. , 2. )
+    // Numbered lists
     const numberedMatch = trimmed.match(/^(\d+)\.\s+(.*)$/);
     if (numberedMatch) {
       const num = numberedMatch[1];
@@ -260,7 +204,7 @@ export const FormattedBotMessage: React.FC<FormattedBotMessageProps> = ({ text }
       continue;
     }
 
-    // 5. Blockquote (> Note)
+    // Blockquote
     if (trimmed.startsWith('>')) {
       const quoteContent = trimmed.replace(/^>\s*/, '');
       elements.push(
@@ -272,7 +216,7 @@ export const FormattedBotMessage: React.FC<FormattedBotMessageProps> = ({ text }
       continue;
     }
 
-    // 6. Regular Paragraph
+    // Paragraph
     elements.push(
       <p key={`p-${i}`} className="my-1 text-slate-700 leading-relaxed">
         {renderInline(trimmed)}
@@ -291,11 +235,15 @@ export default function BhakasuraChatBot({ contextData }: BhakasuraChatBotProps)
     {
       id: '1',
       sender: 'bot',
-      text: "Hi! I’m your restaurant assistant. I can help with menu items, recommendations, orders, allergens, and general questions. What would you like to know?"
+      text: "Hi! I’m TableTap AI Copilot. I can query real-time orders, calculate table turnover, check ingredient allergens, and analyze revenue trends. What would you like to ask?"
     }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [speakingMsgId, setSpeakingMsgId] = useState<string | null>(null);
+  const [speechMuted, setSpeechMuted] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -306,11 +254,66 @@ export default function BhakasuraChatBot({ contextData }: BhakasuraChatBotProps)
     scrollToBottom();
   }, [messages, isOpen]);
 
-  const handleSend = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!input.trim() || isLoading) return;
+  // Clean text for speech synthesis
+  const cleanForSpeech = (rawText: string) => {
+    return rawText
+      .replace(/<details>[\s\S]*?<\/details>/gi, '')
+      .replace(/<think>[\s\S]*?<\/think>/gi, '')
+      .replace(/```[\s\S]*?```/gi, 'Code snippet omitted.')
+      .replace(/[*_#`>-]/g, ' ')
+      .replace(/\[(?:DS|CATALOG|SUPABASE)-[A-Z0-9-]+\]/gi, '')
+      .trim();
+  };
 
-    const userMessage: Message = { id: Date.now().toString(), sender: 'user', text: input };
+  const handleSpeakToggle = (msgId: string, text: string) => {
+    if (!('speechSynthesis' in window)) {
+      alert('Speech synthesis is not supported on this browser.');
+      return;
+    }
+
+    if (speakingMsgId === msgId) {
+      window.speechSynthesis.cancel();
+      setSpeakingMsgId(null);
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    const spokenText = cleanForSpeech(text);
+    if (!spokenText) return;
+
+    const utterance = new SpeechSynthesisUtterance(spokenText);
+    utterance.rate = 1.05;
+    utterance.pitch = 1.0;
+
+    // Pick best English voice if available
+    const voices = window.speechSynthesis.getVoices();
+    const naturalVoice = voices.find(v => (v.name.includes('Natural') || v.name.includes('Google') || v.lang.startsWith('en')) && !v.name.includes('Bad'));
+    if (naturalVoice) {
+      utterance.voice = naturalVoice;
+    }
+
+    utterance.onend = () => {
+      setSpeakingMsgId(null);
+    };
+    utterance.onerror = () => {
+      setSpeakingMsgId(null);
+    };
+
+    setSpeakingMsgId(msgId);
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const handleCopyText = (id: string, text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleSend = async (customPrompt?: string) => {
+    const promptToSend = (customPrompt || input).trim();
+    if (!promptToSend || isLoading) return;
+
+    const userMessage: Message = { id: Date.now().toString(), sender: 'user', text: promptToSend };
     const newMessages = [...messages, userMessage];
     setMessages(newMessages);
     setInput('');
@@ -322,7 +325,13 @@ export default function BhakasuraChatBot({ contextData }: BhakasuraChatBotProps)
         content: m.text
       }));
       const response = await askBhakasuraAI(history, contextData);
-      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), sender: 'bot', text: response }]);
+      const newBotId = (Date.now() + 1).toString();
+      setMessages(prev => [...prev, { id: newBotId, sender: 'bot', text: response }]);
+
+      // Auto-narrate if speech is not muted
+      if (!speechMuted && 'speechSynthesis' in window) {
+        handleSpeakToggle(newBotId, response);
+      }
     } catch (error) {
       setMessages(prev => [
         ...prev,
@@ -337,12 +346,19 @@ export default function BhakasuraChatBot({ contextData }: BhakasuraChatBotProps)
     }
   };
 
+  const quickPrompts = [
+    "🔥 What are today's top sellers?",
+    "⚡ Active orders in kitchen?",
+    "💰 Summary of today's revenue",
+    "🥜 Any nut allergy warnings in curries?"
+  ];
+
   if (!isOpen) {
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 w-14 h-14 rounded-full shadow-2xl flex items-center justify-center bg-slate-900 hover:bg-slate-800 transition-transform hover:scale-110 z-50 group p-1 border-2 border-orange-500/50 cursor-pointer"
-        title="Open Restaurant AI Assistant"
+        className="fixed bottom-6 right-6 w-14 h-14 rounded-full shadow-[0_10px_35px_rgba(249,115,22,0.35)] flex items-center justify-center bg-slate-900 hover:bg-slate-800 transition-all hover:scale-105 z-50 group p-1 border-2 border-orange-500/50 cursor-pointer"
+        title="Open TableTap AI Assistant"
       >
         <SimpleAIAvatar size={48} />
         <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-slate-900 animate-pulse"></div>
@@ -351,76 +367,162 @@ export default function BhakasuraChatBot({ contextData }: BhakasuraChatBotProps)
   }
 
   return (
-    <div className={`fixed bottom-6 right-6 flex flex-col bg-white rounded-3xl shadow-2xl border border-orange-100 z-50 overflow-hidden transition-all duration-300 font-sans ${isExpanded ? 'w-[480px] h-[660px]' : 'w-[390px] h-[520px]'}`}>
+    <div className={`fixed bottom-6 right-6 flex flex-col bg-white rounded-3xl shadow-[0_20px_50px_rgba(15,23,42,0.16)] border border-slate-200/80 z-50 overflow-hidden transition-all duration-300 font-sans ${isExpanded ? 'w-[520px] h-[680px]' : 'w-[400px] h-[550px]'}`}>
       {/* Header */}
-      <div className="bg-slate-950 p-4 flex items-center justify-between text-white shadow-md relative z-10 border-b border-orange-500/30">
+      <div className="bg-slate-900 p-4 flex items-center justify-between text-white shadow-sm relative z-10 border-b border-slate-800">
         <div className="flex items-center gap-3">
           <SimpleAIAvatar size={36} />
           <div>
-            <h3 className="font-black text-sm leading-tight flex items-center gap-1.5 text-slate-100">
+            <h3 className="font-black text-sm leading-tight flex items-center gap-1.5 text-white">
               <span>TableTap AI</span>
-              <span className="text-[10px] font-bold bg-orange-500/30 text-orange-400 px-1.5 py-0.5 rounded-full">Groq 160B / 120B</span>
+              <span className="text-[10px] font-bold bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded-full border border-orange-500/30">Llama 3.3 70B</span>
             </h3>
-            <p className="text-[10px] font-semibold text-emerald-400 flex items-center gap-1 mt-0.5">
+            <p className="text-[10px] font-semibold text-emerald-400 flex items-center gap-1.5 mt-0.5">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span>Live Knowledge & Database Connected</span>
+              <span>Live Database & Voice Active</span>
             </p>
           </div>
         </div>
         <div className="flex items-center gap-1 text-slate-400">
-          <button onClick={() => setIsExpanded(!isExpanded)} className="p-1.5 hover:text-white rounded-lg transition-colors cursor-pointer" title={isExpanded ? "Collapse" : "Expand"}>
-            {isExpanded ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
+          <button 
+            onClick={() => {
+              if (speakingMsgId) {
+                window.speechSynthesis?.cancel();
+                setSpeakingMsgId(null);
+              }
+              setSpeechMuted(!speechMuted);
+            }} 
+            className={`p-1.5 rounded-lg transition-colors cursor-pointer ${speechMuted ? 'text-slate-500 hover:text-slate-400' : 'text-orange-400 hover:text-orange-300'}`} 
+            title={speechMuted ? "Voice Narration Muted (Click to Unmute)" : "Voice Narration Active"}
+          >
+            {speechMuted ? <VolumeX size={17} /> : <Volume2 size={17} />}
           </button>
-          <button onClick={() => setIsOpen(false)} className="p-1.5 hover:text-white rounded-lg transition-colors cursor-pointer" title="Close">
-            <X size={18} />
+          <button onClick={() => setIsExpanded(!isExpanded)} className="p-1.5 hover:text-white rounded-lg transition-colors cursor-pointer" title={isExpanded ? "Collapse" : "Expand"}>
+            {isExpanded ? <ChevronDown size={17} /> : <ChevronUp size={17} />}
+          </button>
+          <button 
+            onClick={() => {
+              if (speakingMsgId) {
+                window.speechSynthesis?.cancel();
+                setSpeakingMsgId(null);
+              }
+              setIsOpen(false);
+            }} 
+            className="p-1.5 hover:text-white rounded-lg transition-colors cursor-pointer" 
+            title="Close"
+          >
+            <X size={17} />
           </button>
         </div>
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#FCFAF7] scroll-smooth text-xs">
+      {/* Messages Feed */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/70 scroll-smooth text-xs">
         {messages.map((msg) => (
-          <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`}>
+          <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in group`}>
             {msg.sender === 'bot' && (
-              <div className="mr-2 self-end shrink-0 mb-1">
+              <div className="mr-2 self-start shrink-0 mt-1">
                 <SimpleAIAvatar size={24} />
               </div>
             )}
-            <div className={`max-w-[90%] p-3.5 rounded-2xl leading-relaxed ${
-              msg.sender === 'user'
-                ? 'bg-[#FF6B00] text-white font-sans font-semibold rounded-br-xs shadow-md shadow-orange-500/20 whitespace-pre-wrap'
-                : 'bg-white border border-orange-100 text-slate-800 font-sans text-xs rounded-bl-xs shadow-xs overflow-x-auto leading-relaxed'
-            }`}>
-              {msg.sender === 'user' ? (
-                msg.text
-              ) : (
-                <FormattedBotMessage text={msg.text} />
+            <div className="max-w-[88%] space-y-1">
+              <div className={`p-3.5 rounded-2xl leading-relaxed ${
+                msg.sender === 'user'
+                  ? 'bg-slate-900 text-white font-medium rounded-br-xs shadow-sm'
+                  : 'bg-white border border-slate-200/70 text-slate-800 rounded-bl-xs shadow-sm'
+              }`}>
+                {msg.sender === 'user' ? (
+                  <span className="whitespace-pre-wrap">{msg.text}</span>
+                ) : (
+                  <FormattedBotMessage text={msg.text} />
+                )}
+              </div>
+
+              {/* Bot Message Micro Actions: Listen & Copy */}
+              {msg.sender === 'bot' && (
+                <div className="flex items-center gap-2 pl-1 pt-0.5 text-[10px] text-slate-400">
+                  <button
+                    onClick={() => handleSpeakToggle(msg.id, msg.text)}
+                    className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md hover:bg-slate-200/60 transition-colors cursor-pointer ${speakingMsgId === msg.id ? 'text-orange-600 font-bold bg-orange-50' : ''}`}
+                    title={speakingMsgId === msg.id ? "Stop voice narration" : "Listen aloud"}
+                  >
+                    {speakingMsgId === msg.id ? (
+                      <>
+                        <Square size={10} className="fill-current text-orange-600" />
+                        <span>Stop Voice</span>
+                      </>
+                    ) : (
+                      <>
+                        <Volume2 size={11} />
+                        <span>Listen</span>
+                      </>
+                    )}
+                  </button>
+                  <span>&bull;</span>
+                  <button
+                    onClick={() => handleCopyText(msg.id, msg.text)}
+                    className="flex items-center gap-1 px-1.5 py-0.5 rounded-md hover:bg-slate-200/60 transition-colors cursor-pointer"
+                  >
+                    {copiedId === msg.id ? (
+                      <>
+                        <Check size={11} className="text-emerald-500" />
+                        <span className="text-emerald-600 font-semibold">Copied</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy size={11} />
+                        <span>Copy</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               )}
             </div>
           </div>
         ))}
+
         {isLoading && (
-          <div className="flex items-center gap-2 text-slate-400 text-xs py-2 pl-8">
+          <div className="flex items-center gap-2.5 text-slate-500 text-xs py-2 pl-8">
             <RefreshCw size={13} className="animate-spin text-orange-500" />
-            <span>Consulting restaurant intelligence...</span>
+            <span>Consulting restaurant live database...</span>
           </div>
         )}
+
+        {/* Quick Suggestion Pills (Shown when conversation is fresh) */}
+        {messages.length <= 2 && !isLoading && (
+          <div className="pt-2 pl-8 space-y-1.5">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Suggested Inquiries</p>
+            <div className="flex flex-wrap gap-1.5">
+              {quickPrompts.map((prompt, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => handleSend(prompt)}
+                  className="px-2.5 py-1 rounded-full bg-white border border-slate-200 hover:border-orange-400 hover:text-orange-600 text-slate-600 text-[11px] font-medium transition-all shadow-xs text-left"
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
-      <form onSubmit={handleSend} className="p-3 bg-white border-t border-slate-100 flex items-center gap-2">
+      {/* Input Form */}
+      <form onSubmit={(e) => { e.preventDefault(); handleSend(); }} className="p-3 bg-white border-t border-slate-100 flex items-center gap-2">
         <input
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask about dishes, allergens, prices, orders..."
+          placeholder="Ask dishes, kitchen orders, revenue, allergens..."
           className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 placeholder-slate-400 outline-none focus:border-orange-500 transition-all font-medium"
         />
         <button
           type="submit"
           disabled={!input.trim() || isLoading}
-          className="w-9 h-9 rounded-xl bg-[#FF6B00] hover:bg-orange-600 disabled:opacity-40 text-white flex items-center justify-center transition-all cursor-pointer shadow-sm shadow-orange-500/25"
+          className="w-9 h-9 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:opacity-40 text-white flex items-center justify-center transition-all cursor-pointer shadow-sm shadow-orange-500/25"
+          title="Send message"
         >
           <Send size={15} />
         </button>

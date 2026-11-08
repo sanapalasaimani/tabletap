@@ -13,7 +13,7 @@ import {
   TrendingDown, ArrowUpRight, ArrowDownRight, Clock, Star, Eye, EyeOff, Phone, Copy, FileSpreadsheet, ChevronDown, ExternalLink,
   Upload, Smartphone, Share2, CheckCircle2, AlertCircle, Receipt,
   Bell, LogOut, Activity, BookOpen, Smile, Meh, Frown, PanelLeftClose, PanelLeftOpen,
-  Table, List, LayoutGrid
+  Table, List, LayoutGrid, Tag
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, CartesianGrid, AreaChart, Area } from 'recharts';
 import {
@@ -1368,17 +1368,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
               <button
                 type="button"
                 onClick={() => setShowCalendarDropdown(prev => !prev)}
-                className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-bold rounded-xl shadow-2xs border transition-all cursor-pointer select-none ${
+                className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-xl border transition-all cursor-pointer select-none shadow-xs ${
                   !isAllDatesMode && selectedOrderDate !== getOrderLocalDateStr(new Date())
-                    ? 'bg-orange-50 border-orange-300 text-orange-950 hover:bg-orange-100 ring-2 ring-orange-400/20'
-                    : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+                    ? 'bg-orange-50 border-orange-200 text-orange-950 hover:bg-orange-100 ring-2 ring-orange-500/20'
+                    : 'bg-white border-slate-200/80 text-slate-700 hover:border-slate-300 hover:bg-slate-50'
                 }`}
-                title="Click to check date-wise orders or select a calendar date"
+                title="Filter orders by date or pick a custom date"
               >
-                <Calendar size={14} className={!isAllDatesMode && selectedOrderDate !== getOrderLocalDateStr(new Date()) ? 'text-[#FF6B00]' : 'text-slate-400'} />
+                <Calendar size={14} className={!isAllDatesMode && selectedOrderDate !== getOrderLocalDateStr(new Date()) ? 'text-orange-500' : 'text-slate-400'} />
                 <span>{formatFriendlyDate(selectedOrderDate)}</span>
-                <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600">
-                  {dateWiseOrders.length} {dateWiseOrders.length === 1 ? 'order' : 'orders'}
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                  {dateWiseOrders.length}
                 </span>
                 <ChevronDown size={12} className={`text-slate-400 transition-transform ${showCalendarDropdown ? 'rotate-180' : ''}`} />
               </button>
@@ -1390,32 +1390,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                     className="fixed inset-0 z-40 bg-transparent" 
                     onClick={() => setShowCalendarDropdown(false)} 
                   />
-                  <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-slate-200 p-4 z-50 animate-in fade-in zoom-in-95 duration-100">
+                  <div className="absolute right-0 mt-2 w-84 bg-white/95 backdrop-blur-xl rounded-2xl shadow-[0_20px_50px_rgba(15,23,42,0.15)] ring-1 ring-black/5 border border-slate-100 p-4 z-50 animate-in fade-in zoom-in-95 duration-100">
                     <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
                       <div className="flex items-center gap-2">
-                        <Calendar size={15} className="text-[#FF6B00]" />
-                        <span className="font-extrabold text-xs text-slate-900">Check Date-wise Orders</span>
+                        <Calendar size={15} className="text-orange-500" />
+                        <span className="font-bold text-xs text-slate-900">Filter by Order Date</span>
                       </div>
                       <button
                         onClick={() => setShowCalendarDropdown(false)}
-                        className="text-slate-400 hover:text-slate-600 p-1 rounded-lg cursor-pointer"
+                        className="text-slate-400 hover:text-slate-600 p-1 rounded-lg cursor-pointer transition-colors"
                       >
                         <X size={14} />
                       </button>
                     </div>
 
-                    {/* Quick Presets */}
-                    <div className="flex items-center gap-1.5 mb-3">
+                    {/* Quick Presets Segmented Pills */}
+                    <div className="bg-slate-100/80 p-1 rounded-xl flex items-center gap-1 mb-3">
                       <button
                         onClick={() => {
                           setSelectedOrderDate(getOrderLocalDateStr(new Date()));
                           setIsAllDatesMode(false);
                           setShowCalendarDropdown(false);
                         }}
-                        className={`flex-1 py-1.5 px-2 text-[11px] font-bold rounded-lg border text-center transition-colors cursor-pointer ${
+                        className={`flex-1 py-1.5 px-2 text-[11px] font-semibold rounded-lg text-center transition-all cursor-pointer ${
                           !isAllDatesMode && selectedOrderDate === getOrderLocalDateStr(new Date())
-                            ? 'bg-[#FF6B00] text-white border-[#FF6B00]'
-                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                            ? 'bg-white text-slate-900 font-bold shadow-xs'
+                            : 'text-slate-600 hover:text-slate-900'
                         }`}
                       >
                         Today
@@ -1428,10 +1428,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                           setIsAllDatesMode(false);
                           setShowCalendarDropdown(false);
                         }}
-                        className={`flex-1 py-1.5 px-2 text-[11px] font-bold rounded-lg border text-center transition-colors cursor-pointer ${
+                        className={`flex-1 py-1.5 px-2 text-[11px] font-semibold rounded-lg text-center transition-all cursor-pointer ${
                           !isAllDatesMode && selectedOrderDate === getOrderLocalDateStr(new Date(Date.now() - 86400000))
-                            ? 'bg-[#FF6B00] text-white border-[#FF6B00]'
-                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                            ? 'bg-white text-slate-900 font-bold shadow-xs'
+                            : 'text-slate-600 hover:text-slate-900'
                         }`}
                       >
                         Yesterday
@@ -1441,20 +1441,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                           setIsAllDatesMode(true);
                           setShowCalendarDropdown(false);
                         }}
-                        className={`flex-1 py-1.5 px-2 text-[11px] font-bold rounded-lg border text-center transition-colors cursor-pointer ${
+                        className={`flex-1 py-1.5 px-2 text-[11px] font-semibold rounded-lg text-center transition-all cursor-pointer ${
                           isAllDatesMode
-                            ? 'bg-[#FF6B00] text-white border-[#FF6B00]'
-                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                            ? 'bg-white text-slate-900 font-bold shadow-xs'
+                            : 'text-slate-600 hover:text-slate-900'
                         }`}
                       >
                         All Dates
                       </button>
                     </div>
 
-                    {/* Specific Calendar Date Picker */}
-                    <div className="mb-3 p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                        Select Custom Calendar Date:
+                    {/* Custom Calendar Date Input */}
+                    <div className="mb-3 p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                      <label className="text-[10px] font-bold text-slate-500 block mb-1">
+                        Pick a custom date
                       </label>
                       <div className="flex items-center gap-2">
                         <input
@@ -1466,15 +1466,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                               setIsAllDatesMode(false);
                             }
                           }}
-                          className="flex-1 text-xs font-bold bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-slate-800 outline-none focus:border-[#FF6B00] focus:ring-1 focus:ring-[#FF6B00]"
+                          className="flex-1 text-xs font-semibold bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-800 outline-none focus:border-slate-400 transition-colors cursor-pointer"
                         />
                       </div>
                     </div>
 
                     {/* Recorded Dates with Orders */}
                     <div className="mb-3">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
-                        Dates with Orders Activity ({recordedDatesSummary.length})
+                      <span className="text-[10px] font-bold text-slate-400 block mb-1.5">
+                        Recent Activity ({recordedDatesSummary.length} days recorded)
                       </span>
                       <div className="max-h-36 overflow-y-auto space-y-1 pr-1 text-xs no-scrollbar">
                         {recordedDatesSummary.map(item => {
@@ -1489,22 +1489,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                               }}
                               className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-all cursor-pointer ${
                                 isSelected
-                                  ? 'bg-orange-50 text-orange-900 font-extrabold border border-orange-200'
+                                  ? 'bg-orange-50/80 text-orange-950 font-bold border border-orange-200/80'
                                   : 'hover:bg-slate-50 text-slate-700 font-medium'
                               }`}
                             >
                               <div className="flex items-center gap-2">
                                 <span className="font-mono text-[11px]">{item.dateStr}</span>
                                 {item.dateStr === getOrderLocalDateStr(new Date()) && (
-                                  <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded-full">
+                                  <span className="text-[9px] bg-emerald-50 text-emerald-700 font-semibold px-1.5 py-0.2 rounded-full border border-emerald-200/60">
                                     Today
                                   </span>
                                 )}
                               </div>
                               <div className="flex items-center gap-1.5 text-[11px]">
-                                <span className="font-bold text-slate-900">{item.count} {item.count === 1 ? 'order' : 'orders'}</span>
-                                <span className="text-slate-400">•</span>
-                                <span className="font-bold text-[#FF6B00]">₹{item.revenue.toLocaleString('en-IN')}</span>
+                                <span className="font-semibold text-slate-700">{item.count} orders</span>
+                                <span className="text-slate-300">&bull;</span>
+                                <span className="font-bold text-slate-900">₹{item.revenue.toLocaleString('en-IN')}</span>
                               </div>
                             </button>
                           );
@@ -1518,10 +1518,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                         setShowCalendarDropdown(false);
                         setShowDateOrdersModal(true);
                       }}
-                      className="w-full py-2.5 px-3 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-extrabold text-xs rounded-xl shadow-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                      className="w-full py-2.5 px-3 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                     >
                       <Eye size={13} />
-                      <span>Explore Orders ({dateWiseOrders.length})</span>
+                      <span>Open Date Explorer ({dateWiseOrders.length} orders)</span>
                     </button>
                   </div>
                 </>
@@ -3424,14 +3424,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
               ---------------------------------------------------- */}
           {activeTab === 'promotions' && (
             <div className="space-y-6 animate-fade-in">
-              <div className="flex justify-between items-center border-b pb-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
                 <div>
-                  <h3 className="font-extrabold text-sm">Active promotions & Coupons</h3>
-                  <p className="text-[10px] text-gray-400">Create discount coupon codes for customer checkout overlays.</p>
+                  <h3 className="font-black text-slate-900 text-base">Campaign Promotions & Coupons</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">Configure promotional codes and instant discounts for customer digital checkout.</p>
                 </div>
                 <button
                   onClick={() => setNewPromotionModal(true)}
-                  className="bg-primary text-white font-bold py-2.5 px-4 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer"
+                  className="bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2 px-4 rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
                 >
                   <Plus size={14} />
                   <span>Create Campaign Coupon</span>
@@ -3440,73 +3440,125 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
 
               {/* Modal form */}
               {newPromotionModal && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                  <div className={`w-full max-w-sm rounded-3xl p-6 shadow-2xl bg-white`}>
-                    <div className="flex justify-between items-center mb-4 pb-2 border-b">
-                      <h4 className="font-extrabold text-sm">New Promotion Coupon</h4>
-                      <button onClick={() => setNewPromotionModal(false)}><X size={18} /></button>
-                    </div>
-                    <form onSubmit={handleCreateCouponCode} className="space-y-4 text-xs font-semibold">
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in">
+                  <div className="w-full max-w-md rounded-2xl p-6 shadow-2xl bg-white border border-slate-100 relative">
+                    <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
                       <div>
-                        <label className="block text-gray-400 mb-1">Coupon Code (e.g. WELCOME20)</label>
+                        <h4 className="font-black text-sm text-slate-900">New Campaign Coupon</h4>
+                        <p className="text-[11px] text-slate-400">Set discount amount and eligibility threshold</p>
+                      </div>
+                      <button 
+                        onClick={() => setNewPromotionModal(false)}
+                        className="text-slate-400 hover:text-slate-700 p-1 rounded-lg transition-colors cursor-pointer"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                    <form onSubmit={handleCreateCouponCode} className="space-y-4 text-xs font-medium">
+                      <div>
+                        <label className="block text-slate-600 font-semibold mb-1">Coupon Code (e.g. WELCOME20, FESTIVE100)</label>
                         <input
                           type="text"
                           value={couponFormState.code}
-                          onChange={(e) => setCouponFormState({ ...couponFormState, code: e.target.value })}
+                          onChange={(e) => setCouponFormState({ ...couponFormState, code: e.target.value.toUpperCase() })}
                           required
-                          className="w-full p-2.5 border rounded-xl"
+                          placeholder="FESTIVE50"
+                          className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono uppercase tracking-wider text-slate-900 outline-none focus:border-slate-400 focus:bg-white transition-colors"
                         />
                       </div>
-                      <div>
-                        <label className="block text-gray-400 mb-1">Discount Amount (₹)</label>
-                        <input
-                          type="number"
-                          value={couponFormState.discount}
-                          onChange={(e) => setCouponFormState({ ...couponFormState, discount: parseInt(e.target.value) })}
-                          required
-                          className="w-full p-2.5 border rounded-xl"
-                        />
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-slate-600 font-semibold mb-1">Discount Amount (₹)</label>
+                          <input
+                            type="number"
+                            value={couponFormState.discount}
+                            onChange={(e) => setCouponFormState({ ...couponFormState, discount: parseInt(e.target.value) })}
+                            required
+                            min="1"
+                            placeholder="50"
+                            className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 outline-none focus:border-slate-400 focus:bg-white transition-colors"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-slate-600 font-semibold mb-1">Min Bill Target (₹)</label>
+                          <input
+                            type="number"
+                            value={couponFormState.minBill}
+                            onChange={(e) => setCouponFormState({ ...couponFormState, minBill: parseInt(e.target.value) })}
+                            required
+                            min="0"
+                            placeholder="300"
+                            className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 outline-none focus:border-slate-400 focus:bg-white transition-colors"
+                          />
+                        </div>
                       </div>
-                      <div>
-                        <label className="block text-gray-400 mb-1">Min Bill Target (₹)</label>
-                        <input
-                          type="number"
-                          value={couponFormState.minBill}
-                          onChange={(e) => setCouponFormState({ ...couponFormState, minBill: parseInt(e.target.value) })}
-                          required
-                          className="w-full p-2.5 border rounded-xl"
-                        />
+                      <div className="pt-2 flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setNewPromotionModal(false)}
+                          className="px-4 py-2.5 text-xs text-slate-600 hover:text-slate-900 font-semibold rounded-xl transition-colors cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button 
+                          type="submit" 
+                          className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
+                        >
+                          Publish Coupon
+                        </button>
                       </div>
-                      <button type="submit" className="w-full bg-primary text-white font-bold py-3 rounded-xl cursor-pointer">Publish Coupon</button>
                     </form>
                   </div>
                 </div>
               )}
 
               {/* Coupon list */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
-                {coupons.map(cp => (
-                  <div
-                    key={cp.id}
-                    className={`p-4 rounded-3xl border shadow-sm flex flex-col justify-between bg-white border-gray-50`}
-                  >
-                    <div>
-                      <h4 className="font-black text-sm text-primary">{cp.code}</h4>
-                      <p className="text-xs mt-1.5">Discount: <strong className="text-brand-text font-black">₹{cp.discount} Off</strong></p>
-                      <p className="text-[10px] text-gray-400 mt-0.5">Min Order value: ₹{cp.min_bill}</p>
+              {coupons.length === 0 ? (
+                <div className="bg-slate-50/60 rounded-2xl border border-dashed border-slate-200 py-12 px-4 text-center">
+                  <Tag size={32} className="mx-auto text-slate-300 mb-2" />
+                  <p className="text-sm font-bold text-slate-700">No Active Promotional Coupons</p>
+                  <p className="text-xs text-slate-400 mt-0.5">Click "Create Campaign Coupon" to launch a discount code for diners.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                  {coupons.map(cp => (
+                    <div
+                      key={cp.id}
+                      className="p-5 rounded-2xl border border-slate-200/80 bg-white shadow-xs hover:border-slate-300 transition-all flex flex-col justify-between group"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono text-xs font-bold tracking-wider px-2.5 py-1 rounded-lg bg-slate-100 text-slate-900 border border-dashed border-slate-300">
+                            {cp.code}
+                          </span>
+                          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                            Active
+                          </span>
+                        </div>
+                        <div className="mt-3">
+                          <div className="text-xl font-black text-slate-900">
+                            ₹{cp.discount} <span className="text-xs font-bold text-slate-400">FLAT OFF</span>
+                          </div>
+                          <p className="text-xs text-slate-500 font-medium mt-1">
+                            Min order check: <span className="text-slate-800 font-bold">₹{cp.min_bill}</span>
+                          </p>
+                        </div>
+                      </div>
+                      <div className="border-t border-slate-100 pt-3 mt-4 flex justify-between items-center text-[11px]">
+                        <span className="text-slate-400">Valid on Table QR orders</span>
+                        <button
+                          onClick={() => handleDeletePromotion(cp.id, cp.code)}
+                          className="text-slate-400 hover:text-red-600 transition-colors cursor-pointer font-medium"
+                          title="Delete Coupon"
+                        >
+                          Remove
+                        </button>
+                      </div>
                     </div>
-                    <div className="border-t pt-3 mt-3 flex justify-between items-center text-[10px] font-bold">
-                      <span className="text-green-500">● Active Campaign</span>
-                      <button
-                        onClick={() => handleDeletePromotion(cp.id, cp.code)}
-                        className="text-red-500 hover:text-red-700"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -5245,18 +5297,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
             className="relative my-auto w-full max-w-5xl rounded-3xl bg-white border border-slate-200 shadow-2xl flex flex-col max-h-[92vh] overflow-hidden"
           >
             {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-50/70">
-              <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-2xl bg-orange-100 text-[#FF6B00] flex items-center justify-center font-black">
+            <div className="px-6 py-4 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center font-bold">
                   <CalendarDays size={20} />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-base text-slate-900 leading-tight">
+                  <h3 className="font-black text-base text-slate-900 leading-tight">
                     Date-wise Orders Explorer
                   </h3>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-slate-500 mt-0.5">
                     {isAllDatesMode 
-                      ? 'Viewing all historical orders' 
+                      ? 'Inspecting all historical orders' 
                       : `Inspecting orders for ${formatFriendlyDate(selectedOrderDate)}`}
                   </p>
                 </div>
@@ -5264,17 +5316,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
 
               {/* Date Navigation Controls */}
               <div className="flex items-center gap-1.5 flex-wrap">
-                <button
-                  type="button"
-                  onClick={() => handleStepDay(-1)}
-                  className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
-                  title="Previous Day"
-                >
-                  <ChevronLeft size={14} />
-                  <span>Prev</span>
-                </button>
+                <div className="flex items-center bg-slate-100/80 p-0.5 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => handleStepDay(-1)}
+                    className="p-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-white transition-all cursor-pointer"
+                    title="Previous Day"
+                  >
+                    <ChevronLeft size={15} />
+                  </button>
 
-                <div className="relative">
                   <input
                     type="date"
                     value={selectedOrderDate}
@@ -5284,53 +5335,54 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                         setIsAllDatesMode(false);
                       }
                     }}
-                    className="text-xs font-extrabold bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-slate-800 outline-none focus:border-[#FF6B00] focus:ring-1 focus:ring-[#FF6B00] cursor-pointer shadow-2xs"
+                    className="text-xs font-semibold bg-transparent px-2.5 py-1 text-slate-800 outline-none cursor-pointer"
                   />
+
+                  <button
+                    type="button"
+                    onClick={() => handleStepDay(1)}
+                    className="p-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-white transition-all cursor-pointer"
+                    title="Next Day"
+                  >
+                    <ChevronRight size={15} />
+                  </button>
+                </div>
+
+                <div className="flex items-center bg-slate-100/80 p-0.5 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedOrderDate(getOrderLocalDateStr(new Date()));
+                      setIsAllDatesMode(false);
+                    }}
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                      !isAllDatesMode && selectedOrderDate === getOrderLocalDateStr(new Date())
+                        ? 'bg-white text-slate-900 font-bold shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Today
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsAllDatesMode(!isAllDatesMode)}
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                      isAllDatesMode
+                        ? 'bg-white text-slate-900 font-bold shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    {isAllDatesMode ? 'Specific Date' : 'All Dates'}
+                  </button>
                 </div>
 
                 <button
                   type="button"
-                  onClick={() => handleStepDay(1)}
-                  className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
-                  title="Next Day"
-                >
-                  <span>Next</span>
-                  <ChevronRight size={14} />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedOrderDate(getOrderLocalDateStr(new Date()));
-                    setIsAllDatesMode(false);
-                  }}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
-                    !isAllDatesMode && selectedOrderDate === getOrderLocalDateStr(new Date())
-                      ? 'bg-[#FF6B00] text-white border-[#FF6B00]'
-                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  Today
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setIsAllDatesMode(!isAllDatesMode)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
-                    isAllDatesMode
-                      ? 'bg-slate-900 text-white border-slate-900'
-                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  {isAllDatesMode ? 'Specific Date' : 'All Dates'}
-                </button>
-
-                <button
-                  type="button"
                   onClick={() => setShowDateOrdersModal(false)}
-                  className="w-8 h-8 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 flex items-center justify-center transition-colors cursor-pointer ml-1"
+                  className="w-8 h-8 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer ml-1"
                 >
-                  <X size={18} />
+                  <X size={17} />
                 </button>
               </div>
             </div>
@@ -5371,32 +5423,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
               return (
                 <div className="flex-1 flex flex-col overflow-hidden">
                   {/* KPI Bar */}
-                  <div className="p-4 bg-slate-50/50 border-b border-slate-100 grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-2xs">
+                  <div className="p-4 bg-slate-50/70 border-b border-slate-100 grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="bg-white p-3.5 rounded-xl border border-slate-200/70 shadow-xs">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Orders on Date</span>
                       <strong className="text-xl font-black text-slate-900 mt-0.5 block">{currentOrders.length}</strong>
-                      <span className="text-[10px] text-slate-500 font-semibold">{delivered} delivered • {kitchen} active</span>
+                      <span className="text-[11px] text-slate-500 font-medium">{delivered} delivered &bull; {kitchen} active</span>
                     </div>
 
-                    <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-2xs">
+                    <div className="bg-white p-3.5 rounded-xl border border-slate-200/70 shadow-xs">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Date Revenue</span>
-                      <strong className="text-xl font-black text-[#FF6B00] mt-0.5 block">₹{revenue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
-                      <span className="text-[10px] text-slate-500 font-semibold">{paidCount} paid • {unpaidCount} unpaid</span>
+                      <strong className="text-xl font-black text-slate-900 mt-0.5 block">₹{revenue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                      <span className="text-[11px] text-slate-500 font-medium">{paidCount} paid &bull; {unpaidCount} unpaid</span>
                     </div>
 
-                    <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-2xs">
+                    <div className="bg-white p-3.5 rounded-xl border border-slate-200/70 shadow-xs">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Average Order</span>
                       <strong className="text-xl font-black text-slate-900 mt-0.5 block">₹{aov.toFixed(2)}</strong>
-                      <span className="text-[10px] text-slate-500 font-semibold">Per delivered check</span>
+                      <span className="text-[11px] text-slate-500 font-medium">Per completed check</span>
                     </div>
 
-                    <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col justify-between">
+                    <div className="bg-white p-3.5 rounded-xl border border-slate-200/70 shadow-xs flex flex-col justify-between">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Export Date Data</span>
                       <div className="flex items-center gap-2 mt-1">
                         <button
                           type="button"
                           onClick={handleExportDateOrdersExcel}
-                          className="flex-1 py-1.5 px-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold flex items-center justify-center gap-1 shadow-2xs transition-colors cursor-pointer"
+                          className="flex-1 py-1.5 px-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer"
                           title="Export to Excel"
                         >
                           <FileSpreadsheet size={12} />
@@ -5405,7 +5457,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                         <button
                           type="button"
                           onClick={handleExportDateOrdersPDF}
-                          className="flex-1 py-1.5 px-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-[11px] font-bold flex items-center justify-center gap-1 shadow-2xs transition-colors cursor-pointer"
+                          className="flex-1 py-1.5 px-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer"
                           title="Export to PDF"
                         >
                           <FileText size={12} />
