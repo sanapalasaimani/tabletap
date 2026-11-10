@@ -286,7 +286,7 @@ export const ScanQrLanding: React.FC = () => {
 
         {/* Hero Content Layer */}
         <div className="w hg hero-content">
-          <div>
+          <div className="hero-text-card">
             {/* Sliding Dish Indicator Pill */}
             <div className="hero-food-badge">
               <span className="hero-food-pulse"></span>

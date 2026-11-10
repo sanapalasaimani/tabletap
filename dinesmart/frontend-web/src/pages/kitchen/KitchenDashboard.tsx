@@ -331,7 +331,76 @@ export const KitchenDashboard: React.FC<KitchenDashboardProps> = ({ onLogout }) 
     });
   };
 
-  // Card component for split virtual orders in White Mode (frosted white glass appearance)
+// Verified real food photography map for kitchen KDS dish thumbnails
+const DISH_IMAGE_MAP: { keywords: string[]; url: string }[] = [
+  {
+    keywords: ['biryani', 'mutton', 'dum', 'pulao', 'handi'],
+    url: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=160&q=80'
+  },
+  {
+    keywords: ['paneer', 'butter masala', 'shahi paneer', 'cottage', 'kadai paneer', 'palak paneer', 'tikka masala'],
+    url: 'https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=160&q=80'
+  },
+  {
+    keywords: ['naan', 'roti', 'paratha', 'kulcha', 'bread', 'tandoori roti', 'garlic naan'],
+    url: 'https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=160&q=80'
+  },
+  {
+    keywords: ['chilli chicken', 'manchurian', 'szechuan', 'fried rice', 'noodles', 'dragon', 'crispy chicken'],
+    url: 'https://images.unsplash.com/photo-1525755662778-989d0524087e?auto=format&fit=crop&w=160&q=80'
+  },
+  {
+    keywords: ['chicken', 'tandoori chicken', 'murgh', 'wings', 'kebab'],
+    url: 'https://images.unsplash.com/photo-1603894584373-5ac82b2ae398?auto=format&fit=crop&w=160&q=80'
+  },
+  {
+    keywords: ['dosa', 'masala dosa', 'ghee roast', 'uttapam'],
+    url: 'https://images.unsplash.com/photo-1668236543090-82eba5ee5976?auto=format&fit=crop&w=160&q=80'
+  },
+  {
+    keywords: ['idli', 'vada', 'sambar', 'medu vada'],
+    url: 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=160&q=80'
+  },
+  {
+    keywords: ['dal', 'dal makhani', 'tadka', 'lentil'],
+    url: 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=160&q=80'
+  },
+  {
+    keywords: ['gulab', 'jamun', 'dessert', 'ice cream', 'sweet', 'halwa', 'brownie', 'kulfi', 'rasgulla'],
+    url: 'https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=160&q=80'
+  },
+  {
+    keywords: ['water', 'bottle', 'mineral'],
+    url: 'https://images.unsplash.com/photo-1559839914-17aae19cec71?auto=format&fit=crop&w=160&q=80'
+  },
+  {
+    keywords: ['coffee', 'tea', 'chai', 'filter coffee', 'latte'],
+    url: 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?auto=format&fit=crop&w=160&q=80'
+  },
+  {
+    keywords: ['coke', 'cola', 'sprite', 'soda', 'cool drink', 'soft drink', 'mojito', 'juice', 'beverage', 'drink'],
+    url: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=160&q=80'
+  },
+  {
+    keywords: ['samosa', 'chaat', 'pakora', 'fries', 'snack', 'starter'],
+    url: 'https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=160&q=80'
+  }
+];
+
+const DEFAULT_DISH_THUMBNAIL = 'https://images.unsplash.com/photo-1585937421612-70a008356fbe?auto=format&fit=crop&w=160&q=80';
+
+const getDishThumbnail = (name: string): string => {
+  if (!name) return DEFAULT_DISH_THUMBNAIL;
+  const lower = name.toLowerCase();
+  for (const entry of DISH_IMAGE_MAP) {
+    if (entry.keywords.some(k => lower.includes(k))) {
+      return entry.url;
+    }
+  }
+  return DEFAULT_DISH_THUMBNAIL;
+};
+
+// Card component for split virtual orders in White Mode (frosted white glass appearance)
   const LightVirtualCard: React.FC<{ card: VirtualCard; actions: React.ReactNode }> = ({ card, actions }) => {
     const timeDiff = currentTime.getTime() - new Date(card.createdAt).getTime();
     const minutesElapsed = Math.floor(timeDiff / 60000);
@@ -341,34 +410,34 @@ export const KitchenDashboard: React.FC<KitchenDashboardProps> = ({ onLogout }) 
     const isOverdue = card.status === 'Preparing' && minutesElapsed >= 15;
 
     return (
-      <div className={`backdrop-blur-md rounded-2xl border transition-all duration-300 flex flex-col justify-between p-4 shadow-sm ${
+      <div className={`backdrop-blur-md rounded-xl border transition-all duration-300 flex flex-col justify-between p-3.5 shadow-2xs ${
         isOverdue 
           ? 'bg-red-50/90 border-red-200 hover:border-red-300' 
-          : 'bg-white/80 border-slate-200/80 hover:border-slate-300 hover:bg-white'
+          : 'bg-white/95 border-slate-200/80 hover:border-slate-300 hover:bg-white shadow-xs'
       }`}>
         <div>
-          <div className="flex justify-between items-start border-b border-slate-100 pb-2.5 mb-3.5">
+          <div className="flex justify-between items-start border-b border-slate-100 pb-2 mb-2.5">
             <div>
               <div className="flex items-center gap-1.5 mb-0.5">
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Table {card.tableId}</span>
-                <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full ${
+                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Table {card.tableId}</span>
+                <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-full ${
                   card.status === 'Confirmed' 
-                    ? 'bg-amber-100 text-amber-700' 
+                    ? 'bg-slate-100 text-slate-700 border border-slate-200/80' 
                     : card.status === 'Preparing' 
-                      ? 'bg-blue-100 text-blue-700' 
-                      : 'bg-emerald-100 text-emerald-700'
+                      ? 'bg-blue-50 text-blue-700 border border-blue-200/80' 
+                      : 'bg-amber-50 text-amber-800 border border-amber-200/80'
                 }`}>
                   {card.status === 'Confirmed' ? 'New' : card.status === 'Preparing' ? 'Preparing' : 'Waiting Waiter'}
                 </span>
               </div>
               <h4 className="font-extrabold text-slate-800 text-sm">Order #{card.orderId}</h4>
             </div>
-            <div className="flex flex-col items-end gap-1.5">
-              <span className="text-[10px] bg-slate-100 text-slate-600 font-semibold px-2 py-0.5 rounded-full flex items-center gap-1">
+            <div className="flex flex-col items-end gap-1">
+              <span className="text-[10px] bg-slate-100/90 text-slate-600 font-semibold px-2 py-0.5 rounded-md flex items-center gap-1">
                 <Clock size={10} />
                 {orderPlacingTime}
               </span>
-              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+              <span className={`text-[9px] font-bold px-1 py-0.5 rounded ${
                 minutesElapsed >= 15 ? 'text-red-600 animate-pulse' : 'text-slate-400'
               }`}>
                 {minutesElapsed <= 0 ? 'Just now' : `${minutesElapsed}m ago`}
@@ -376,31 +445,45 @@ export const KitchenDashboard: React.FC<KitchenDashboardProps> = ({ onLogout }) 
             </div>
           </div>
 
-          {/* Ordered items */}
-          <div className="space-y-3 mb-4">
-            {card.items.map((item, idx) => (
-              <div key={idx} className="text-xs">
-                <div className="flex justify-between">
-                  <span className="font-bold text-slate-700">{item.name}</span>
-                  <span className="font-extrabold text-primary text-sm">× {item.quantity}</span>
+          {/* Ordered items with high-res food thumbnail previews */}
+          <div className="divide-y divide-slate-100 mb-2.5">
+            {card.items.map((item, idx) => {
+              const thumbUrl = getDishThumbnail(item.name);
+              const instructionsText = item.instructions && item.instructions.length > 0 ? item.instructions.join(', ') : null;
+
+              return (
+                <div key={idx} className="flex items-center justify-between py-2 first:pt-0 last:pb-0">
+                  <div className="flex items-center space-x-2.5 min-w-0 pr-2">
+                    <img
+                      src={thumbUrl}
+                      alt={item.name}
+                      className="w-10 h-10 rounded-lg object-cover flex-shrink-0 shadow-2xs border border-slate-200/60"
+                      loading="lazy"
+                    />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-semibold text-slate-900 text-xs truncate">{item.name}</span>
+                      </div>
+                      {(instructionsText || item.customNotes) && (
+                        <span className="block text-[10.5px] text-slate-500 truncate mt-0.5">
+                          {instructionsText}
+                          {instructionsText && item.customNotes ? ' · ' : ''}
+                          {item.customNotes ? `"${item.customNotes}"` : ''}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <span className="font-extrabold text-xs text-primary bg-primary/10 px-2 py-0.5 rounded-md flex-shrink-0">
+                    ×{item.quantity}
+                  </span>
                 </div>
-                {item.instructions && item.instructions.length > 0 && (
-                  <p className="text-[10px] text-primary font-semibold ml-1.5 mt-0.5">
-                    ↳ {item.instructions.join(', ')}
-                  </p>
-                )}
-                {item.customNotes && (
-                  <p className="text-[10px] text-orange-600 italic ml-1.5 mt-0.5">
-                    Note: "{item.customNotes}"
-                  </p>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
         {/* Action Button */}
-        <div className="border-t border-slate-100 pt-3 mt-2 flex flex-col gap-2">
+        <div className="border-t border-slate-100 pt-2.5 mt-1 flex flex-col gap-2">
           {actions}
         </div>
       </div>
@@ -503,38 +586,44 @@ export const KitchenDashboard: React.FC<KitchenDashboardProps> = ({ onLogout }) 
       {/* 2. MAIN KDS BOARD WRAPPER */}
       <div className="flex-1 flex flex-col overflow-hidden">
 
-        {/* Quick Metrics Statistics Row */}
+        {/* Compact Inline Stats Bar for Laptop Screen Fit */}
         {activeTab === 'dashboard' && !isMaximized && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-5 pb-0 flex-shrink-0">
-            {/* Stat 1: Active Cards */}
-            <div className="bg-white rounded-2xl border border-slate-200/80 p-3 flex flex-col justify-between shadow-sm">
-              <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block">Active Cards</span>
-              <strong className="text-xl text-slate-800 font-black mt-1 block">{virtualCards.length}</strong>
-            </div>
-
-            {/* Stat 2: Preparing Food */}
-            <div className="bg-white rounded-2xl border border-slate-200/80 p-3 flex flex-col justify-between shadow-sm">
-              <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block">Preparing Food</span>
-              <strong className="text-xl text-blue-600 font-black mt-1 block">{preparingFoodCount}</strong>
-            </div>
-
-            {/* Stat 3: Waiting for Waiter */}
-            <div className="bg-white rounded-2xl border border-slate-200/80 p-3 flex flex-col justify-between shadow-sm">
-              <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block">Waiting for Waiter</span>
-              <strong className="text-xl text-emerald-600 font-black mt-1 block">{waitingForWaiterCount}</strong>
+          <div className="px-5 pt-3 pb-0 flex-shrink-0">
+            <div className="bg-white rounded-xl border border-slate-200/80 px-4 py-2 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
+              <div className="flex items-center gap-6 divide-x divide-slate-100">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-slate-400"></span>
+                  <span className="text-xs font-medium text-slate-500">Active Cards:</span>
+                  <span className="text-sm font-extrabold text-slate-900">{virtualCards.length}</span>
+                </div>
+                <div className="flex items-center gap-2 pl-6">
+                  <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                  <span className="text-xs font-medium text-slate-500">Preparing Food:</span>
+                  <span className="text-sm font-extrabold text-blue-600">{preparingFoodCount}</span>
+                </div>
+                <div className="flex items-center gap-2 pl-6">
+                  <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                  <span className="text-xs font-medium text-slate-500">Waiting for Waiter:</span>
+                  <span className="text-sm font-extrabold text-amber-600">{waitingForWaiterCount}</span>
+                </div>
+              </div>
+              <div className="text-[11px] font-medium text-slate-400 hidden md:flex items-center gap-1.5">
+                <Clock size={12} className="text-slate-400" />
+                <span>FIFO Queue: Oldest orders processed first</span>
+              </div>
             </div>
           </div>
         )}
 
         {/* Scrollable Column Boards / Workspace Views */}
-        <div className="flex-1 overflow-y-auto p-5 min-h-0">
+        <div className="flex-1 overflow-y-auto p-4 pt-3 min-h-0">
           
           {/* TAB A: KDS MAIN WORKSPACE */}
           {activeTab === 'dashboard' && (
             <div className="h-full flex flex-col">
               <div className="flex-1 flex flex-col min-h-0">
                 {/* Sub-tabs & Maximize Row */}
-                <div className="flex justify-between items-center mb-4 flex-shrink-0 w-full">
+                <div className="flex justify-between items-center mb-3 flex-shrink-0 w-full">
                   <div className="flex bg-slate-200/60 p-1 rounded-xl border border-slate-200 gap-1">
                     <button
                       onClick={() => setChefSubTab('food')}
@@ -576,24 +665,24 @@ export const KitchenDashboard: React.FC<KitchenDashboardProps> = ({ onLogout }) 
                     /* FOOD PREPARATION VIEW */
                     <div>
                       {virtualCards.filter(vc => vc.type === 'food').length > 0 ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                           {virtualCards.filter(vc => vc.type === 'food').map(card => {
                             let buttonText = 'Accept';
-                            let buttonColor = 'bg-amber-500 hover:bg-amber-600 text-white';
+                            let buttonColor = 'bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-bold py-2 rounded-lg text-xs transition-all shadow-xs';
                             let nextStatus: VirtualStatus = 'Preparing';
                             const isWaiting = card.status === 'Ready to Serve';
 
                             if (card.status === 'Confirmed') {
                               buttonText = 'Accept';
-                              buttonColor = 'bg-amber-500 hover:bg-amber-600 text-white';
+                              buttonColor = 'bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-bold py-2 rounded-lg text-xs transition-all shadow-xs';
                               nextStatus = 'Preparing';
                             } else if (card.status === 'Preparing') {
                               buttonText = 'Prepared';
-                              buttonColor = 'bg-blue-500 hover:bg-blue-600 text-white';
+                              buttonColor = 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold py-2 rounded-lg text-xs transition-all shadow-xs';
                               nextStatus = 'Ready to Serve';
                             } else if (card.status === 'Ready to Serve') {
                               buttonText = 'Waiting for Waiter';
-                              buttonColor = 'bg-emerald-50 border border-emerald-200 text-emerald-700 font-extrabold animate-pulse cursor-not-allowed';
+                              buttonColor = 'bg-amber-50 border border-amber-200/80 text-amber-800 font-bold py-2 rounded-lg text-xs cursor-default flex items-center justify-center gap-1.5';
                               nextStatus = 'Delivered';
                             }
 
@@ -605,7 +694,7 @@ export const KitchenDashboard: React.FC<KitchenDashboardProps> = ({ onLogout }) 
                                   <button
                                     onClick={isWaiting ? undefined : () => handleUpdateVirtualStatus(card.id, nextStatus)}
                                     disabled={isWaiting}
-                                    className={`w-full font-extrabold py-2.5 rounded-xl text-xs transition-all shadow-sm text-center ${
+                                    className={`w-full font-bold py-2 rounded-lg text-xs transition-all text-center ${
                                       isWaiting ? buttonColor : `${buttonColor} cursor-pointer`
                                     }`}
                                   >
@@ -624,20 +713,20 @@ export const KitchenDashboard: React.FC<KitchenDashboardProps> = ({ onLogout }) 
                     /* READY-MADE / NON-FOOD VIEW */
                     <div>
                       {virtualCards.filter(vc => vc.type === 'ready-made').length > 0 ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                           {virtualCards.filter(vc => vc.type === 'ready-made').map(card => {
                             let buttonText = 'Accept';
-                            let buttonColor = 'bg-amber-500 hover:bg-amber-600 text-white';
+                            let buttonColor = 'bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-bold py-2 rounded-lg text-xs transition-all shadow-xs';
                             let nextStatus: VirtualStatus = 'Ready to Serve';
                             const isWaiting = card.status === 'Ready to Serve';
 
                             if (card.status === 'Confirmed') {
                               buttonText = 'Accept';
-                              buttonColor = 'bg-amber-500 hover:bg-amber-600 text-white';
+                              buttonColor = 'bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-bold py-2 rounded-lg text-xs transition-all shadow-xs';
                               nextStatus = 'Ready to Serve';
                             } else if (card.status === 'Ready to Serve') {
                               buttonText = 'Waiting for Waiter';
-                              buttonColor = 'bg-emerald-50 border border-emerald-200 text-emerald-700 font-extrabold animate-pulse cursor-not-allowed';
+                              buttonColor = 'bg-amber-50 border border-amber-200/80 text-amber-800 font-bold py-2 rounded-lg text-xs cursor-default flex items-center justify-center gap-1.5';
                               nextStatus = 'Delivered';
                             }
 
