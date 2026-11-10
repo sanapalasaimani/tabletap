@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, X, RefreshCw, AlertCircle, Upload, Sparkles, ChefHat, Clock, Award, Star } from 'lucide-react';
+import { Camera, X, RefreshCw, AlertCircle, Upload } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { db } from '../../supabase';
 import './ScanQrLanding.css';
@@ -12,6 +12,35 @@ interface DishSlide {
   imageUrl: string;
   alt: string;
 }
+
+// Background slider Indian dishes
+const BG_SLIDES = [
+  {
+    name: "Paneer Butter Masala",
+    tagline: "Slow-simmered rich tomato-cashew makhani with fresh cottage cheese",
+    url: "https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=2000&q=85"
+  },
+  {
+    name: "Tandoori Garlic Naan",
+    tagline: "Blistered, butter-brushed clay oven flatbread with garlic & herbs",
+    url: "https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=2000&q=85"
+  },
+  {
+    name: "Hyderabadi Dum Biryani",
+    tagline: "Aged long-grain basmati layered with saffron, mint, and whole spices",
+    url: "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=2000&q=85"
+  },
+  {
+    name: "Royal Mutton Biryani",
+    tagline: "Slow-cooked earthenware handi lamb with browned onions and aromatics",
+    url: "https://images.unsplash.com/photo-1589302168068-964664d93dc0?auto=format&fit=crop&w=2000&q=85"
+  },
+  {
+    name: "Crispy Szechuan Chilli Chicken",
+    tagline: "Wok-tossed spicy chicken with slit chillies, bell peppers and dark glaze",
+    url: "https://images.unsplash.com/photo-1525755662778-989d0524087e?auto=format&fit=crop&w=2000&q=85"
+  }
+];
 
 const DISH_SLIDES: DishSlide[] = [
   {
@@ -62,6 +91,9 @@ export const ScanQrLanding: React.FC = () => {
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [scannerLoading, setScannerLoading] = useState(false);
 
+  // Sliding full-width background state
+  const [bgSlideIndex, setBgSlideIndex] = useState(0);
+
   // Carousel & Live Demo state
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
@@ -89,7 +121,15 @@ export const ScanQrLanding: React.FC = () => {
     };
   }, []);
 
-  // Carousel auto-rotation timer (4500ms)
+  // Continuous Full-Width Background Slider (5000ms)
+  useEffect(() => {
+    const bgTimer = setInterval(() => {
+      setBgSlideIndex(prev => (prev + 1) % BG_SLIDES.length);
+    }, 5000);
+    return () => clearInterval(bgTimer);
+  }, []);
+
+  // Dish Carousel auto-rotation timer (4500ms)
   useEffect(() => {
     if (isHovered) return;
     const interval = setInterval(() => {
@@ -229,10 +269,30 @@ export const ScanQrLanding: React.FC = () => {
         </div>
       </nav>
 
-      {/* Hero Section */}
+      {/* Hero Section with Full-Width Sliding Background of Popular Indian Dishes */}
       <header className="hero" id="top">
-        <div className="w hg">
+        {/* Full-width continuous background slider */}
+        <div className="hero-bg-slider" aria-hidden="true">
+          {BG_SLIDES.map((slide, idx) => (
+            <div
+              key={slide.name}
+              className={`hero-bg-slide ${bgSlideIndex === idx ? 'active' : ''}`}
+              style={{ backgroundImage: `url(${slide.url})` }}
+            />
+          ))}
+          {/* Readability Overlay Ensuring Crystal Clear Contrast for Text & Cards */}
+          <div className="hero-bg-overlay" />
+        </div>
+
+        {/* Hero Content Layer */}
+        <div className="w hg hero-content">
           <div>
+            {/* Sliding Dish Indicator Pill */}
+            <div className="hero-food-badge">
+              <span className="hero-food-pulse"></span>
+              <span>Kitchen Highlight: <strong>{BG_SLIDES[bgSlideIndex].name}</strong></span>
+            </div>
+
             <h1>Let guests order from their table</h1>
             <p className="lead">
               With TableTap, guests scan a QR code, read the menu and order from their own phone. 
@@ -292,10 +352,20 @@ export const ScanQrLanding: React.FC = () => {
                 <b>₹70</b>
               </div>
 
+              {/* Static, Non-Interactive Visual Mock Element (No click handlers or actions) */}
               <div 
                 className="dish" 
-                style={{ background: 'var(--ac)', color: '#ffffff', justifyContent: 'center', border: 0, cursor: 'pointer', marginTop: '12px' }}
-                onClick={startCameraScanner}
+                style={{ 
+                  background: 'var(--ac)', 
+                  color: '#ffffff', 
+                  justifyContent: 'center', 
+                  border: 0, 
+                  marginTop: '12px',
+                  cursor: 'default',
+                  pointerEvents: 'none',
+                  userSelect: 'none',
+                  opacity: 0.95
+                }}
               >
                 <b>Send to kitchen</b>
               </div>
@@ -323,7 +393,7 @@ export const ScanQrLanding: React.FC = () => {
         </div>
       </header>
 
-      {/* Stats Bar */}
+      {/* Stats Bar (Full Width Edge-to-Edge) */}
       <div className="stats">
         <div className="w sg">
           <div><b>0</b><span>app downloads for guests</span></div>
@@ -333,7 +403,7 @@ export const ScanQrLanding: React.FC = () => {
         </div>
       </div>
 
-      {/* "Served fresh, loved by guests" Real Food Photography Carousel */}
+      {/* "Served fresh, loved by guests" Carousel */}
       <section style={{ padding: '64px 0 0' }}>
         <div className="w">
           <h2>Served fresh, loved by guests</h2>
@@ -389,7 +459,7 @@ export const ScanQrLanding: React.FC = () => {
         </div>
       </section>
 
-      {/* Platform Tabs Section */}
+      {/* Platform Tabs Section (Full Width Edge-to-Edge) */}
       <section id="platform">
         <div className="w">
           <h2>One platform from table to kitchen to back office</h2>
@@ -486,7 +556,7 @@ export const ScanQrLanding: React.FC = () => {
         </div>
       </section>
 
-      {/* Intelligence & Operational Analytics Section */}
+      {/* Intelligence & Operational Analytics Section (Full Width Edge-to-Edge) */}
       <section className="ai" id="intelligence">
         <div className="w">
           <h2>Built-in hospitality intelligence</h2>
@@ -534,7 +604,7 @@ export const ScanQrLanding: React.FC = () => {
         </div>
       </section>
 
-      {/* Comparison Table */}
+      {/* Comparison Table (Full Width Edge-to-Edge) */}
       <section id="compare">
         <div className="w">
           <h2>The old way and the TableTap way</h2>
@@ -610,7 +680,7 @@ export const ScanQrLanding: React.FC = () => {
       <section id="faq" style={{ paddingTop: 0 }}>
         <div className="w">
           <h2>Questions owners ask</h2>
-          <div style={{ marginTop: '28px', maxWidth: '820px' }}>
+          <div style={{ marginTop: '28px', maxWidth: '100%' }}>
             <details>
               <summary>Do guests need to download an app?</summary>
               <p>No. They scan the QR code and the menu opens instantly in their phone browser. Only your waiters use the Android waiter app.</p>
@@ -635,7 +705,7 @@ export const ScanQrLanding: React.FC = () => {
         </div>
       </section>
 
-      {/* Bottom CTA Banner */}
+      {/* Bottom CTA Banner (Full Width Edge-to-Edge) */}
       <section id="cta" style={{ paddingTop: 0 }}>
         <div className="w">
           <div className="cta">
@@ -653,7 +723,7 @@ export const ScanQrLanding: React.FC = () => {
         </div>
       </section>
 
-      {/* Footer */}
+      {/* Footer (Full Width Edge-to-Edge) */}
       <footer className="f">
         <div className="w">
           © 2026 TableTap, powered by DineSmart AI. Enterprise contactless dining and restaurant management.
