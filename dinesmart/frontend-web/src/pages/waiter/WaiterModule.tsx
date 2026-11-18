@@ -434,9 +434,34 @@ export const WaiterModule: React.FC = () => {
   };
 
   // Actions on Tasks
-  const handleAcceptTask = (id: string) => {
-    if (!acceptedTaskIds.includes(id)) {
-      setAcceptedTaskIds(prev => [...prev, id]);
+  const handleAcceptTask = async (task: { id: string; type: string; tableId: string; amount?: number; rawReq?: WaiterRequest }) => {
+    if (!acceptedTaskIds.includes(task.id)) {
+      setAcceptedTaskIds(prev => [...prev, task.id]);
+    }
+
+    // Persist acceptance to Supabase for waiter requests (especially payment / Request Bill)
+    if (task.rawReq) {
+      await db.updateWaiterRequestStatus(task.rawReq.id, 'Accepted');
+      setWaiterRequests(prev => prev.map(r => r.id === task.rawReq!.id ? { ...r, status: 'Accepted' } : r));
+    }
+
+    if (task.type === 'cash_collection') {
+      // Also mark any pending Request Bill for this table as Accepted
+      const pendingBillReqs = waiterRequests.filter(
+        r => String(r.tableId) === String(task.tableId) && r.requestType === 'Request Bill' && r.status === 'Pending'
+      );
+      for (const req of pendingBillReqs) {
+        await db.updateWaiterRequestStatus(req.id, 'Accepted');
+      }
+      if (pendingBillReqs.length > 0) {
+        setWaiterRequests(prev => prev.map(r =>
+          String(r.tableId) === String(task.tableId) && r.requestType === 'Request Bill' && r.status === 'Pending'
+            ? { ...r, status: 'Accepted' }
+            : r
+        ));
+      }
+      setFeedbackMessage(`✓ Payment request accepted for Table #${task.tableId}${task.amount ? ` — Collect ₹${task.amount}` : ''}`);
+      setTimeout(() => setFeedbackMessage(null), 3500);
     }
   };
 
@@ -496,9 +521,11 @@ export const WaiterModule: React.FC = () => {
         await db.payOrder(ord.id, 'Cash');
       }
 
-      // Complete any pending Bill request for this table
+      // Complete any Pending or Accepted Bill requests for this table so it cannot be requested/collected again
       const billReqs = waiterRequests.filter(
-        r => String(r.tableId) === String(tblId) && r.requestType === 'Request Bill' && r.status === 'Pending'
+        r => String(r.tableId) === String(tblId) &&
+             r.requestType === 'Request Bill' &&
+             (r.status === 'Pending' || r.status === 'Accepted')
       );
       for (const req of billReqs) {
         await db.updateWaiterRequestStatus(req.id, 'Completed');
@@ -510,22 +537,32 @@ export const WaiterModule: React.FC = () => {
       // Remove from accepted tasks
       const idsToRemove = [
         ...(orderId ? [orderId, `cash_${orderId}`] : []),
+        ...targetList.flatMap(o => [o.id, `cash_${o.id}`]),
         ...(reqId ? [reqId] : []),
         ...billReqs.map(r => r.id)
       ];
       setAcceptedTaskIds(prev => prev.filter(id => !idsToRemove.includes(id)));
 
-      // Update local state
-      setOrders(prev => prev.map(o => String(o.tableId) === String(tblId) ? { ...o, paymentStatus: 'Paid', paymentMethod: 'Cash' } : o));
-      setWaiterRequests(prev => prev.map(r => String(r.tableId) === String(tblId) && r.requestType === 'Request Bill' ? { ...r, status: 'Completed' } : r));
+      // Update local state to match paid orders in DB
+      const paidIds = new Set(targetList.map(o => o.id));
+      setOrders(prev => prev.map(o =>
+        paidIds.has(o.id)
+          ? { ...o, paymentStatus: 'Paid', paymentMethod: 'Cash' }
+          : o
+      ));
+      setWaiterRequests(prev => prev.map(r =>
+        String(r.tableId) === String(tblId) && r.requestType === 'Request Bill'
+          ? { ...r, status: 'Completed' }
+          : r
+      ));
 
-      // Broadcast event so customer view immediately transitions to Payment Success
+      // Broadcast event so customer view immediately transitions to Payment Collected
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('dinesmart_order_paid', { detail: { tableId: tblId, orderId } }));
       }
 
       const collectedAmount = targetList.reduce((sum, o) => sum + o.total, 0);
-      setFeedbackMessage(`✓ Received ₹${collectedAmount} cash from Table #${tblId}. Payment confirmed!`);
+      setFeedbackMessage(`✓ Collected ₹${collectedAmount} cash from Table #${tblId}. Bill permanently settled!`);
       setTimeout(() => setFeedbackMessage(null), 3500);
     } catch (err) {
       console.warn('Failed to process cash collection:', err);
@@ -546,7 +583,24 @@ export const WaiterModule: React.FC = () => {
 
   // Filter Tasks by table assignment routing
   const readyOrders = orders.filter(o => o.status === 'Ready to Serve' && isTableAssigned(o.tableId));
-  const pendingRequests = waiterRequests.filter(r => r.status === 'Pending' && isTableAssigned(r.tableId));
+  const rawActiveRequests = waiterRequests.filter(
+    r => (r.status === 'Pending' || r.status === 'Accepted') && isTableAssigned(r.tableId)
+  );
+
+  // Deduplicate active Request Bill per table and ignore stale bill requests where all table orders are already paid
+  const seenBillTables = new Set<string>();
+  const pendingRequests = rawActiveRequests.filter(r => {
+    if (r.requestType !== 'Request Bill') return true;
+    const unpaidForTable = orders.filter(
+      o => String(o.tableId) === String(r.tableId) && o.paymentStatus !== 'Paid' && o.status !== 'Cancelled'
+    );
+    if (unpaidForTable.length === 0) return false;
+    const key = String(r.tableId);
+    if (seenBillTables.has(key)) return false;
+    seenBillTables.add(key);
+    return true;
+  });
+
   const pendingCashOrders = orders.filter(
     o => o.paymentStatus !== 'Paid' && 
          o.paymentMethod === 'Cash' && 
@@ -599,12 +653,14 @@ export const WaiterModule: React.FC = () => {
           ? [
               `Customer at Table #${r.tableId} requested bill payment`,
               totalDue > 0 ? `Total Cash to Collect: ₹${totalDue}` : `Bill settlement required`,
-              `Collect physical cash, then tap Received Money below`
+              r.status === 'Accepted'
+                ? `Accepted • Collect ₹${totalDue} cash and tap Collect Payment`
+                : `Accept payment request first, then collect cash`
             ]
           : [`Request: ${r.requestType}`, `Table ${r.tableId} assistance required`],
         amount: totalDue,
         rawReq: r,
-        isAccepted: acceptedTaskIds.includes(r.id)
+        isAccepted: r.status === 'Accepted' || acceptedTaskIds.includes(r.id)
       };
     }),
     ...pendingCashOrders
@@ -1026,10 +1082,16 @@ export const WaiterModule: React.FC = () => {
                       <div className="flex gap-2">
                         {!task.isAccepted ? (
                           <button
-                            onClick={() => handleAcceptTask(task.id)}
-                            className="w-full bg-slate-900 hover:bg-black text-white font-bold py-2.5 rounded-xl text-xs transition-all cursor-pointer"
+                            onClick={() => handleAcceptTask(task)}
+                            className={`w-full font-bold py-2.5 rounded-xl text-xs transition-all cursor-pointer ${
+                              task.type === 'cash_collection'
+                                ? 'bg-[#FF6B00] hover:bg-orange-600 text-white shadow-sm shadow-orange-500/20'
+                                : 'bg-slate-900 hover:bg-black text-white'
+                            }`}
                           >
-                            Accept Task
+                            {task.type === 'cash_collection'
+                              ? `Accept Payment Request${task.amount ? ` (₹${task.amount})` : ''}`
+                              : 'Accept Task'}
                           </button>
                         ) : task.type === 'cash_collection' || (task.type === 'service_call' && task.rawReq?.requestType === 'Request Bill') ? (
                           <div className="space-y-1.5 w-full">
@@ -1037,7 +1099,7 @@ export const WaiterModule: React.FC = () => {
                               onClick={() => handleReceiveCashPayment(task.tableId, task.rawOrder?.id, task.rawReq?.id)}
                               className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-2.5 rounded-xl text-xs transition-all shadow-sm cursor-pointer flex items-center justify-center gap-1.5 active:scale-98"
                             >
-                              <span>💵 Received Money (Mark Paid)</span>
+                              <span>💵 Collect Payment{task.amount ? ` • ₹${task.amount}` : ''} (Mark Paid)</span>
                             </button>
                             <button
                               onClick={() => handleRemoveSessionBlock(Number(task.tableId))}

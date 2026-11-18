@@ -8,11 +8,11 @@ interface CallWaiterModalProps {
 }
 
 export const CallWaiterModal: React.FC<CallWaiterModalProps> = ({ onClose }) => {
-  const { callWaiter, tableId } = useApp();
+  const { callWaiter, tableId, hasUnpaidTableOrders, isBillSettled, activeBillRequest } = useApp();
   const [submitted, setSubmitted] = useState(false);
   const [selectedType, setSelectedType] = useState<WaiterRequest['requestType'] | null>(null);
 
-  const requestOptions: { type: WaiterRequest['requestType']; label: string; icon: React.ReactNode; desc: string }[] = [
+  const baseOptions: { type: WaiterRequest['requestType']; label: string; icon: React.ReactNode; desc: string; disabled?: boolean }[] = [
     { 
       type: 'Water', 
       label: 'Need Water', 
@@ -37,15 +37,32 @@ export const CallWaiterModal: React.FC<CallWaiterModalProps> = ({ onClose }) => 
       icon: <UserCheck className="text-emerald-500" size={24} />,
       desc: 'Paging a waiter to your table' 
     },
-    { 
-      type: 'Request Bill', 
-      label: 'Request Bill', 
-      icon: <ConciergeBell className="text-rose-500" size={24} />,
-      desc: 'Check out and get printed receipt' 
-    },
   ];
 
+  // Only show "Request Bill" if there are unpaid orders; never allow requesting bill again once paid/collected
+  const requestOptions = hasUnpaidTableOrders
+    ? [
+        ...baseOptions,
+        {
+          type: 'Request Bill' as const,
+          label: activeBillRequest
+            ? activeBillRequest.status === 'Accepted'
+              ? 'Waiter Accepted Bill'
+              : 'Bill Already Requested'
+            : 'Request Bill',
+          icon: <ConciergeBell className="text-rose-500" size={24} />,
+          desc: activeBillRequest
+            ? activeBillRequest.status === 'Accepted'
+              ? 'Waiter is coming to your table to collect payment'
+              : 'Waiting for waiter to accept your bill request'
+            : 'Request waiter to accept and collect cash bill',
+          disabled: !!activeBillRequest,
+        },
+      ]
+    : baseOptions;
+
   const handleRequest = async (type: WaiterRequest['requestType']) => {
+    if (type === 'Request Bill' && (!hasUnpaidTableOrders || activeBillRequest)) return;
     setSelectedType(type);
     await callWaiter(type);
     setSubmitted(true);
@@ -78,8 +95,13 @@ export const CallWaiterModal: React.FC<CallWaiterModalProps> = ({ onClose }) => 
               {requestOptions.map((opt) => (
                 <button
                   key={opt.type}
+                  disabled={opt.disabled}
                   onClick={() => handleRequest(opt.type)}
-                  className="w-full flex items-center gap-4 p-4 border border-gray-100 bg-gray-50 hover:bg-white hover:border-primary/20 rounded-2xl text-left transition-all active:scale-[0.98]"
+                  className={`w-full flex items-center gap-4 p-4 border rounded-2xl text-left transition-all ${
+                    opt.disabled
+                      ? 'border-amber-200 bg-amber-50/70 opacity-80 cursor-not-allowed'
+                      : 'border-gray-100 bg-gray-50 hover:bg-white hover:border-primary/20 active:scale-[0.98] cursor-pointer'
+                  }`}
                 >
                   <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm">
                     {opt.icon}
@@ -90,6 +112,12 @@ export const CallWaiterModal: React.FC<CallWaiterModalProps> = ({ onClose }) => 
                   </div>
                 </button>
               ))}
+              {isBillSettled && (
+                <div className="w-full flex items-center gap-3 p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold">
+                  <CheckCircle size={18} className="text-emerald-600 shrink-0" />
+                  <span>Bill Paid & Collected • No further payment needed</span>
+                </div>
+              )}
             </div>
           </div>
         ) : (

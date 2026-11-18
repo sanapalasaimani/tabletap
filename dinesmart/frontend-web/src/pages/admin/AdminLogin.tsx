@@ -1,58 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { ChefHat, User, Eye, EyeOff, ArrowRight, Star, CheckCircle2 } from 'lucide-react';
+import { ChefHat, User, Eye, EyeOff, ArrowRight } from 'lucide-react';
 
 interface AdminLoginProps {
   onLoginSuccess: (role: string) => void;
   sessionExpiredNotice?: string;
 }
 
-interface SouthIndianDish {
-  id: string;
-  name: string;
-  category: string;
-  rating: number;
-  image: string;
-  description: string;
-  highlights: string[];
-}
-
-const SOUTH_INDIAN_DISHES: SouthIndianDish[] = [
-  {
-    id: 'dosa',
-    name: 'Crispy Ghee Roast Masala Dosa',
-    category: 'Breakfast & All-Day Classic',
-    rating: 4.9,
-    image: 'https://images.unsplash.com/photo-1668236543090-82eba5ee5976?auto=format&fit=crop&w=1400&q=85',
-    description: 'Golden, paper-thin fermented rice crepe roasted with pure desi ghee, served with coconut chutney & piping hot vegetable sambar.',
-    highlights: ['Pure Desi Ghee', 'Fresh Chutneys', 'Golden Roast']
-  },
-  {
-    id: 'idli',
-    name: 'Steamed Idli Sambar Platter',
-    category: 'Breakfast Specialty',
-    rating: 4.8,
-    image: 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=1400&q=85',
-    description: 'Pillow-soft fermented rice cakes freshly steamed, accompanied by hot lentil vegetable sambar and freshly ground chutneys.',
-    highlights: ['100% Steamed', 'Low Calorie', 'Podi Ghee Toss']
-  },
-  {
-    id: 'biryani',
-    name: 'Hyderabadi Dum Biryani',
-    category: 'Chef Special Main Course',
-    rating: 4.9,
-    image: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=1400&q=85',
-    description: 'Long-grain basmati layered with rich spices, slow-cooked in a sealed handi with saffron and caramelized onions.',
-    highlights: ['Slow Dum Cooked', 'Saffron Fragrance', 'Mirchi Ka Salan']
-  },
-  {
-    id: 'thali',
-    name: 'South Indian Banana Leaf Feast',
-    category: 'Traditional Grand Thali',
-    rating: 4.9,
-    image: 'https://images.unsplash.com/photo-1610057099443-fde8c4d50f91?auto=format&fit=crop&w=1400&q=85',
-    description: 'A lavish multi-course meal on green banana leaf with steamed rice, drumstick sambar, rasam, avial, poriyal & payasam.',
-    highlights: ['Banana Leaf Serve', '12+ Authentic Items', 'Traditional Flavors']
-  }
+const SLIDE_IMAGES: string[] = [
+  'https://images.unsplash.com/photo-1668236543090-82eba5ee5976?auto=format&fit=crop&w=1400&q=85',
+  'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=1400&q=85',
+  'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=1400&q=85',
+  'https://images.unsplash.com/photo-1610057099443-fde8c4d50f91?auto=format&fit=crop&w=1400&q=85',
 ];
 
 export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, sessionExpiredNotice }) => {
@@ -62,20 +20,18 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, sessionE
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Active South Indian dish for showcase
-  const [activeDishIndex, setActiveDishIndex] = useState(0);
+  // Active slide index for left-side image slider
+  const [activeSlideIndex, setActiveSlideIndex] = useState(0);
   const [isAutoCyclePaused, setIsAutoCyclePaused] = useState(false);
 
-  // Auto-cycle through dishes every 5 seconds
+  // Auto-slide through images every 4 seconds
   useEffect(() => {
     if (isAutoCyclePaused) return;
     const interval = setInterval(() => {
-      setActiveDishIndex(prev => (prev + 1) % SOUTH_INDIAN_DISHES.length);
-    }, 5000);
+      setActiveSlideIndex(prev => (prev + 1) % SLIDE_IMAGES.length);
+    }, 4000);
     return () => clearInterval(interval);
   }, [isAutoCyclePaused]);
-
-  const activeDish = SOUTH_INDIAN_DISHES[activeDishIndex];
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -108,76 +64,43 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, sessionE
     <div className="w-screen h-screen min-h-screen overflow-hidden flex flex-col md:flex-row bg-white font-sans select-none">
       
       {/* ========================================================= */}
-      {/* 1. LEFT SIDE: FULL-WINDOW SOUTH INDIAN DISHES PHOTO */}
+      {/* 1. LEFT SIDE: PURE FULL-BLEED SLIDING FOOD IMAGES         */}
       {/* ========================================================= */}
       <div 
         className="w-full md:w-1/2 lg:w-7/12 h-64 sm:h-80 md:h-full relative overflow-hidden flex-shrink-0 bg-slate-900"
         onMouseEnter={() => setIsAutoCyclePaused(true)}
         onMouseLeave={() => setIsAutoCyclePaused(false)}
       >
-        {/* Full-bleed South Indian Dish Image */}
-        <img
-          src={activeDish.image}
-          alt={activeDish.name}
-          className="w-full h-full object-cover object-center transition-all duration-700 ease-out scale-100 hover:scale-105"
-        />
-
-        {/* Ambient Dark Gradient Overlays for Readability */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-black/60 pointer-events-none"></div>
-
-        {/* Bottom Dish Details & Selector */}
-        <div className="absolute bottom-6 left-6 right-6 z-10 space-y-3">
-          <div className="max-w-xl">
-            <div className="flex items-center gap-2 mb-1.5">
-              <span className="px-2.5 py-0.5 rounded-md bg-amber-400 text-slate-950 font-black text-[10px] flex items-center gap-1 shadow-xs">
-                <Star size={10} className="fill-slate-950 text-slate-950" />
-                <span>{activeDish.rating} Rating</span>
-              </span>
-              <span className="text-[10px] uppercase tracking-wider text-orange-300 font-extrabold">
-                {activeDish.category}
-              </span>
+        <div
+          className="flex w-full h-full transition-transform duration-700 ease-in-out"
+          style={{ transform: `translateX(-${activeSlideIndex * 100}%)` }}
+        >
+          {SLIDE_IMAGES.map((src, idx) => (
+            <div key={idx} className="w-full h-full flex-shrink-0">
+              <img
+                src={src}
+                alt={`Restaurant dish ${idx + 1}`}
+                className="w-full h-full object-cover object-center"
+              />
             </div>
+          ))}
+        </div>
 
-            <h3 className="text-xl sm:text-2xl md:text-3xl font-black text-white tracking-tight leading-snug drop-shadow-lg">
-              {activeDish.name}
-            </h3>
-
-            <p className="text-xs sm:text-sm text-slate-200 font-medium line-clamp-2 mt-1 leading-relaxed drop-shadow">
-              {activeDish.description}
-            </p>
-
-            <div className="hidden md:flex items-center gap-2 mt-2.5">
-              {activeDish.highlights.map((h, i) => (
-                <span key={i} className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-200 bg-black/40 backdrop-blur-md px-2.5 py-0.5 rounded-full border border-white/10">
-                  <CheckCircle2 size={11} className="text-emerald-400" />
-                  <span>{h}</span>
-                </span>
-              ))}
-            </div>
-          </div>
-
-          {/* Interactive Dish Switcher Pills */}
-          <div className="grid grid-cols-4 gap-2 pt-2 border-t border-white/15">
-            {SOUTH_INDIAN_DISHES.map((dish, idx) => (
-              <button
-                key={dish.id}
-                type="button"
-                onClick={() => setActiveDishIndex(idx)}
-                className={`py-1.5 px-2 rounded-xl text-left transition-all border cursor-pointer ${
-                  activeDishIndex === idx
-                    ? 'bg-orange-500/30 border-orange-400 text-white shadow-md shadow-orange-500/20'
-                    : 'bg-black/40 backdrop-blur-xs border-white/10 text-slate-300 hover:bg-black/60 hover:text-white'
-                }`}
-              >
-                <p className="text-[10px] font-extrabold truncate">
-                  {dish.id === 'dosa' ? 'Masala Dosa' : dish.id === 'idli' ? 'Idli Sambar' : dish.id === 'biryani' ? 'Dum Biryani' : 'Banana Thali'}
-                </p>
-                <p className="text-[9px] text-amber-300 font-bold truncate">
-                  ★ {dish.rating}
-                </p>
-              </button>
-            ))}
-          </div>
+        {/* Minimal Slide Dots */}
+        <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2">
+          {SLIDE_IMAGES.map((_, idx) => (
+            <button
+              key={idx}
+              type="button"
+              onClick={() => setActiveSlideIndex(idx)}
+              aria-label={`Slide ${idx + 1}`}
+              className={`h-2 rounded-full transition-all cursor-pointer ${
+                activeSlideIndex === idx
+                  ? 'w-7 bg-white shadow-sm'
+                  : 'w-2 bg-white/50 hover:bg-white/80'
+              }`}
+            />
+          ))}
         </div>
       </div>
 

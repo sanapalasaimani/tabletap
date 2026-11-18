@@ -16,13 +16,15 @@ interface CheckoutOverlayProps {
 type CheckoutStep = 'summary' | 'awaiting_cash' | 'success';
 
 export const CheckoutOverlay: React.FC<CheckoutOverlayProps> = ({ onClose, onPaymentSuccess, specificOrder }) => {
-  const { activeOrder, setActiveOrder, orderHistory, refreshOrderHistory, profile, tableId } = useApp();
-  const [step, setStep] = useState<CheckoutStep>('summary');
+  const { activeOrder, setActiveOrder, orderHistory, refreshOrderHistory, profile, tableId, activeBillRequest, refreshBillStatus } = useApp();
+  const [step, setStep] = useState<CheckoutStep>(() => (activeBillRequest ? 'awaiting_cash' : 'summary'));
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Compute unpaid table orders to prevent mismatch (e.g., only unpaid orders are billed)
+  // Compute unpaid table orders to prevent mismatch (only unpaid orders can ever be billed)
   const unpaidOrders = useMemo(() => {
-    if (specificOrder) return [specificOrder];
+    if (specificOrder) {
+      return specificOrder.paymentStatus !== 'Paid' && specificOrder.status !== 'Cancelled' ? [specificOrder] : [];
+    }
     const list = (orderHistory || []).filter(
       o => {
         const isSameTable = String(o.tableId) === String(tableId);
@@ -30,13 +32,13 @@ export const CheckoutOverlay: React.FC<CheckoutOverlayProps> = ({ onClose, onPay
         return isSameTable && o.paymentStatus !== 'Paid' && o.status !== 'Cancelled' && (isNaN(orderAgeHours) || orderAgeHours < 12);
       }
     );
-    if (activeOrder && activeOrder.paymentStatus !== 'Paid' && !list.some(o => o.id === activeOrder.id)) {
+    if (activeOrder && String(activeOrder.tableId) === String(tableId) && activeOrder.paymentStatus !== 'Paid' && activeOrder.status !== 'Cancelled' && !list.some(o => o.id === activeOrder.id)) {
       list.unshift(activeOrder);
     }
     return list;
   }, [orderHistory, activeOrder, tableId, specificOrder]);
 
-  const targetOrders = specificOrder ? [specificOrder] : (unpaidOrders.length > 0 ? unpaidOrders : (activeOrder ? [activeOrder] : []));
+  const targetOrders = unpaidOrders;
   const totalAmount = targetOrders.reduce((sum, o) => sum + o.total, 0);
   const totalSubtotal = targetOrders.reduce((sum, o) => sum + o.subtotal, 0);
   const totalGst = targetOrders.reduce((sum, o) => sum + o.gst, 0);
@@ -45,22 +47,40 @@ export const CheckoutOverlay: React.FC<CheckoutOverlayProps> = ({ onClose, onPay
   const allItems = targetOrders.flatMap(o => o.items);
   const pointsEarned = Math.floor(totalAmount * 0.1);
 
-  // Polling for waiter cash payment receipt confirmation
+  // Preserve receipt total when transitioning to success after unpaidOrders drops to 0
+  const [paidAmountSnapshot, setPaidAmountSnapshot] = useState<number>(totalAmount);
+  useEffect(() => {
+    if (totalAmount > 0 && step !== 'success') {
+      setPaidAmountSnapshot(totalAmount);
+    }
+  }, [totalAmount, step]);
+
+  // If a bill request is already active, ensure overlay shows awaiting_cash instead of allowing duplicate request
+  useEffect(() => {
+    if (activeBillRequest && step === 'summary') {
+      setStep('awaiting_cash');
+    }
+  }, [activeBillRequest, step]);
+
+  // Polling for waiter acceptance & cash payment collection confirmation
   useEffect(() => {
     if (step !== 'awaiting_cash') return;
 
     const checkPaymentSettled = async () => {
       if (targetOrders.length === 0) return;
       try {
+        await refreshBillStatus();
         const orderIds = targetOrders.map(o => o.id);
         const allLive = await Promise.all(orderIds.map(id => db.getOrder(id)));
         const allPaid = allLive.length > 0 && allLive.every(o => o && o.paymentStatus === 'Paid');
 
         if (allPaid) {
           if (activeOrder && allLive[0]) {
-            setActiveOrder(allLive[0]);
+            const matchedActive = allLive.find(o => o && o.id === activeOrder.id);
+            if (matchedActive) setActiveOrder(matchedActive);
           }
           await refreshOrderHistory();
+          await refreshBillStatus();
           setStep('success');
         }
       } catch (err) {
@@ -77,7 +97,7 @@ export const CheckoutOverlay: React.FC<CheckoutOverlayProps> = ({ onClose, onPay
         (orderId && targetOrders.some(o => o.id === orderId)) ||
         (orderTableId && String(orderTableId) === String(tableId))
       ) {
-        refreshOrderHistory().then(() => setStep('success'));
+        Promise.all([refreshOrderHistory(), refreshBillStatus()]).then(() => setStep('success'));
       }
     };
 
@@ -87,18 +107,18 @@ export const CheckoutOverlay: React.FC<CheckoutOverlayProps> = ({ onClose, onPay
       clearInterval(interval);
       window.removeEventListener('dinesmart_order_paid', handleOrderPaidEvent);
     };
-  }, [step, targetOrders, tableId, activeOrder, refreshOrderHistory, setActiveOrder]);
+  }, [step, targetOrders, tableId, activeOrder, refreshOrderHistory, refreshBillStatus, setActiveOrder]);
 
-  if (targetOrders.length === 0) {
+  if (targetOrders.length === 0 && step !== 'success') {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 animate-fade-in font-sans">
         <div className="bg-white rounded-3xl p-6 max-w-sm w-full text-center space-y-4 shadow-2xl border border-gray-100">
           <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
             <CheckCircle2 size={32} />
           </div>
-          <h3 className="font-black text-lg text-slate-800">Bill Settled</h3>
+          <h3 className="font-black text-lg text-slate-800">Bill Paid & Settled</h3>
           <p className="text-xs text-gray-500">
-            All orders for Table #{tableId} are already paid.
+            All orders for Table #{tableId} have already been collected and paid. No further payment is required.
           </p>
           <button
             onClick={onClose}
@@ -111,22 +131,19 @@ export const CheckoutOverlay: React.FC<CheckoutOverlayProps> = ({ onClose, onPay
     );
   }
 
-  // Cash Payment Request (Alerts waiter; waiter must click "Received Money")
+  // Cash Payment Request (Alerts waiter; waiter must accept & collect payment)
   const handleRequestCashPayment = async () => {
+    if (targetOrders.length === 0) return;
     setIsProcessing(true);
     try {
-      // Notify waiter of bill payment request
-      await db.requestWaiter(tableId, 'Request Bill');
-
-      // Update paymentMethod to Cash so waiter sees exact amount and method
+      // Persist Cash payment method on each unpaid order in Supabase + local cache
       for (const ord of targetOrders) {
-        const orders = (await db.getAllOrders()) || [];
-        const idx = orders.findIndex(o => o.id === ord.id);
-        if (idx !== -1) {
-          orders[idx].paymentMethod = 'Cash';
-          localStorage.setItem('dinesmart_orders', JSON.stringify(orders));
-        }
+        await db.markOrderPaymentRequested(ord.id, 'Cash');
       }
+
+      // Notify waiter of bill payment request (deduplicated per table)
+      await db.requestWaiter(tableId, 'Request Bill');
+      await refreshBillStatus();
 
       setStep('awaiting_cash');
     } catch (err) {
@@ -135,6 +152,10 @@ export const CheckoutOverlay: React.FC<CheckoutOverlayProps> = ({ onClose, onPay
       setIsProcessing(false);
     }
   };
+
+  const isWaiterAccepted = activeBillRequest?.status === 'Accepted';
+  const displayPaidAmount = step === 'success' ? (paidAmountSnapshot || totalAmount) : totalAmount;
+  const displayPointsEarned = Math.floor(displayPaidAmount * 0.1);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 animate-fade-in font-sans">
@@ -264,12 +285,16 @@ export const CheckoutOverlay: React.FC<CheckoutOverlayProps> = ({ onClose, onPay
             </div>
           )}
 
-          {/* STEP 2: AWAITING WAITER CASH CONFIRMATION */}
+          {/* STEP 2: AWAITING WAITER ACCEPTANCE & CASH COLLECTION */}
           {step === 'awaiting_cash' && (
             <div className="text-center py-6 space-y-5 animate-fade-in">
               <div className="relative w-20 h-20 mx-auto">
-                <div className="w-20 h-20 bg-amber-50 text-amber-500 rounded-full flex items-center justify-center shadow-lg shadow-amber-500/10 border-2 border-amber-200">
-                  <Clock size={38} className="animate-pulse" />
+                <div className={`w-20 h-20 rounded-full flex items-center justify-center shadow-lg border-2 ${
+                  isWaiterAccepted
+                    ? 'bg-emerald-50 text-emerald-600 shadow-emerald-500/10 border-emerald-200'
+                    : 'bg-amber-50 text-amber-500 shadow-amber-500/10 border-amber-200'
+                }`}>
+                  {isWaiterAccepted ? <CheckCircle2 size={38} /> : <Clock size={38} className="animate-pulse" />}
                 </div>
                 <span className="absolute bottom-0 right-0 w-6 h-6 bg-emerald-500 border-2 border-white rounded-full flex items-center justify-center text-white text-[10px] font-bold">
                   ₹
@@ -277,19 +302,29 @@ export const CheckoutOverlay: React.FC<CheckoutOverlayProps> = ({ onClose, onPay
               </div>
 
               <div className="space-y-1.5">
-                <h3 className="text-xl font-black text-brand-text">Awaiting Waiter Confirmation</h3>
+                <h3 className="text-xl font-black text-brand-text">
+                  {isWaiterAccepted ? 'Waiter Accepted Your Request!' : 'Waiting for Waiter to Accept'}
+                </h3>
                 <p className="text-gray-500 text-xs leading-relaxed max-w-[280px] mx-auto">
-                  A waiter has been notified to collect <strong className="text-slate-900 font-black">₹{totalAmount}</strong> in cash at <strong>Table #{tableId}</strong>.
+                  {isWaiterAccepted ? (
+                    <>Your waiter has accepted the payment request and is coming to <strong>Table #{tableId}</strong> to collect <strong className="text-slate-900 font-black">₹{totalAmount}</strong>.</>
+                  ) : (
+                    <>A waiter has been notified to accept and collect <strong className="text-slate-900 font-black">₹{totalAmount}</strong> in cash at <strong>Table #{tableId}</strong>.</>
+                  )}
                 </p>
               </div>
 
-              <div className="bg-amber-50/80 rounded-2xl p-4 border border-amber-200 text-left space-y-2 text-xs max-w-[340px] mx-auto">
-                <div className="flex items-center gap-2 text-amber-900 font-bold">
-                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span>
-                  <span>Hand cash to your waiter</span>
+              <div className={`rounded-2xl p-4 border text-left space-y-2 text-xs max-w-[340px] mx-auto ${
+                isWaiterAccepted
+                  ? 'bg-emerald-50/80 border-emerald-200'
+                  : 'bg-amber-50/80 border-amber-200'
+              }`}>
+                <div className={`flex items-center gap-2 font-bold ${isWaiterAccepted ? 'text-emerald-900' : 'text-amber-900'}`}>
+                  <span className={`w-2 h-2 rounded-full animate-ping ${isWaiterAccepted ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
+                  <span>{isWaiterAccepted ? 'Waiter is on the way to collect cash' : 'Hand cash once waiter arrives'}</span>
                 </div>
-                <p className="text-[11px] text-amber-800 leading-relaxed">
-                  As soon as your waiter clicks <strong>"Received Money"</strong> on their device, your bill will immediately be marked Paid here.
+                <p className={`text-[11px] leading-relaxed ${isWaiterAccepted ? 'text-emerald-800' : 'text-amber-800'}`}>
+                  As soon as your waiter collects the money and taps <strong>"Collect Payment"</strong>, your bill will be permanently settled.
                 </p>
               </div>
 
@@ -307,9 +342,9 @@ export const CheckoutOverlay: React.FC<CheckoutOverlayProps> = ({ onClose, onPay
               </div>
 
               <div className="space-y-1.5">
-                <h2 className="text-2xl font-black text-brand-text">Payment Successful</h2>
+                <h2 className="text-2xl font-black text-brand-text">Payment Collected!</h2>
                 <p className="text-gray-500 text-xs leading-relaxed max-w-[260px] mx-auto">
-                  Your cash payment of <strong className="text-emerald-600 font-bold text-sm">₹{totalAmount}</strong> has been received and confirmed by your waiter.
+                  Your cash payment of <strong className="text-emerald-600 font-bold text-sm">₹{displayPaidAmount}</strong> has been collected and confirmed by your waiter.
                 </p>
               </div>
 
@@ -322,12 +357,12 @@ export const CheckoutOverlay: React.FC<CheckoutOverlayProps> = ({ onClose, onPay
                 <div className="flex justify-between">
                   <span className="text-gray-400 font-medium">Payment Method</span>
                   <span className="font-bold text-brand-text">
-                    Cash (Received by Waiter)
+                    Cash (Collected by Waiter)
                   </span>
                 </div>
                 <div className="flex justify-between border-t border-gray-200/50 pt-2 text-emerald-700 font-bold">
                   <span>Reward Points Earned</span>
-                  <span>+{pointsEarned} Points</span>
+                  <span>+{displayPointsEarned} Points</span>
                 </div>
               </div>
 
@@ -335,9 +370,9 @@ export const CheckoutOverlay: React.FC<CheckoutOverlayProps> = ({ onClose, onPay
               <div className="bg-primary/5 rounded-2xl p-4 border border-primary/10 max-w-[340px] mx-auto text-center flex flex-col items-center">
                 <span className="text-2xl mb-1">🎁</span>
                 <span className="text-[10px] text-primary uppercase font-bold tracking-wider">Loyalty Points</span>
-                <h4 className="font-bold text-brand-text text-sm mt-1">+{pointsEarned} Points Added!</h4>
+                <h4 className="font-bold text-brand-text text-sm mt-1">+{displayPointsEarned} Points Added!</h4>
                 <p className="text-[10px] text-gray-400 mt-0.5 leading-relaxed max-w-[240px]">
-                  Points credited to your account. Current balance: <strong className="font-semibold text-brand-text">{profile ? profile.points + pointsEarned : pointsEarned} pts</strong>.
+                  Points credited to your account. Current balance: <strong className="font-semibold text-brand-text">{profile ? profile.points + displayPointsEarned : displayPointsEarned} pts</strong>.
                 </p>
               </div>
             </div>

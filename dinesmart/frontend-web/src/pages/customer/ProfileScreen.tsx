@@ -44,7 +44,7 @@ interface ProfileScreenProps {
 type ProfileSubView = 'main' | 'favorites' | 'help' | 'coupons';
 
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigateToTab, onSelectDish }) => {
-  const { profile, logoutCustomer, favorites, toggleFavorite, callWaiter, tableId } = useApp();
+  const { profile, logoutCustomer, favorites, toggleFavorite, callWaiter, tableId, hasUnpaidTableOrders, activeBillRequest } = useApp();
   const [subView, setSubView] = useState<ProfileSubView>('main');
   const [waiterRequested, setWaiterRequested] = useState(false);
   const [waiterRequestType, setWaiterRequestType] = useState('');
@@ -185,13 +185,16 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigateToTab, o
   }
 
   if (subView === 'help') {
-    const helpOptions: { type: 'Water' | 'Cutlery' | 'Tissue' | 'Call Waiter' | 'Request Bill'; label: string; icon: React.ReactNode }[] = [
+    const baseHelpOptions: { type: 'Water' | 'Cutlery' | 'Tissue' | 'Call Waiter' | 'Request Bill'; label: string; icon: React.ReactNode }[] = [
       { type: 'Water', label: 'Need Water', icon: <Droplet className="text-blue-500" size={18} /> },
       { type: 'Cutlery', label: 'Need Cutlery', icon: <Inbox className="text-orange-500" size={18} /> },
       { type: 'Tissue', label: 'Need Tissue', icon: <FileText className="text-purple-500" size={18} /> },
       { type: 'Call Waiter', label: 'Call Waiter', icon: <ConciergeBell className="text-emerald-500" size={18} /> },
-      { type: 'Request Bill', label: 'Request Bill', icon: <ChevronRight className="text-rose-500" size={18} /> },
     ];
+    // Only allow Request Bill when there are unpaid orders and no bill request is already active
+    const helpOptions = hasUnpaidTableOrders && !activeBillRequest
+      ? [...baseHelpOptions, { type: 'Request Bill' as const, label: 'Request Bill', icon: <ChevronRight className="text-rose-500" size={18} /> }]
+      : baseHelpOptions;
 
     return (
       <div className="flex-1 pb-24 overflow-y-auto no-scrollbar">

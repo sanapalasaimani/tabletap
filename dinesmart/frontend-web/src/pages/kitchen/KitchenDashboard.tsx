@@ -3,15 +3,11 @@ import { db } from '../../supabase';
 import { Order, MenuItem } from '../../types';
 import { MENU_ITEMS } from '../../data/menu';
 import { 
-  Clock, PlayCircle, CheckCircle, RefreshCw, LogOut,
+  Clock, PlayCircle, CheckCircle, RefreshCw,
   ChefHat, Calendar, Check, X, ShieldAlert, ShoppingBag, 
   Settings, Flame, Search, Plus, Maximize2, Minimize2, ClipboardList,
   Download, ExternalLink, MessageSquare, AlertTriangle, ThumbsUp, ThumbsDown
 } from 'lucide-react';
-
-interface KitchenDashboardProps {
-  onLogout: () => void;
-}
 
 type SidebarTab = 'dashboard' | 'menu' | 'reviews';
 type ChefSubTab = 'food' | 'ready-made';
@@ -27,7 +23,7 @@ interface VirtualCard {
   status: VirtualStatus;
 }
 
-export const KitchenDashboard: React.FC<KitchenDashboardProps> = ({ onLogout }) => {
+export const KitchenDashboard: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [reviews, setReviews] = useState<any[]>([]);
@@ -261,11 +257,6 @@ export const KitchenDashboard: React.FC<KitchenDashboardProps> = ({ onLogout }) 
       // Update local state for snappy response
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: aggregateStatus } : o));
     }
-  };
-
-  const handleLogoutClick = () => {
-    localStorage.removeItem('tabletap_kitchen_token');
-    onLogout();
   };
 
   // Availability setup updates
@@ -564,21 +555,12 @@ const getDishThumbnail = (name: string): string => {
             </button>
           </nav>
 
-          {/* Right Controls: Date, Clock & Logout */}
+          {/* Right Controls: Date */}
           <div className="flex items-center gap-2.5 text-xs">
             <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl text-slate-700 font-bold shadow-2xs">
               <Calendar size={13} className="text-primary" />
               <span>{getFormattedDate()}</span>
             </div>
-
-            <button
-              onClick={handleLogoutClick}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-red-600 bg-red-50 hover:bg-red-500 hover:text-white border border-red-200/60 transition-all cursor-pointer shadow-2xs"
-              title="Logout from Kitchen Dashboard"
-            >
-              <LogOut size={14} />
-              <span>Logout</span>
-            </button>
           </div>
         </header>
       )}

@@ -10,7 +10,7 @@ interface OrdersScreenProps {
 }
 
 export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onAddMoreItems, onPayBill }) => {
-  const { activeOrder, orderHistory, refreshOrderHistory, tableId } = useApp();
+  const { activeOrder, orderHistory, refreshOrderHistory, tableId, activeBillRequest } = useApp();
   const [historyTab, setHistoryTab] = useState<'All' | 'Completed'>('All');
   const [selectedFeedbackOrderId, setSelectedFeedbackOrderId] = useState<string | null>(null);
   const [showItemTrackingBreakdown, setShowItemTrackingBreakdown] = useState(true);
@@ -291,17 +291,27 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onAddMoreItems, onPa
                         ) : null}
 
                         {order.paymentStatus === 'Paid' ? (
-                          <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-md">
-                            Paid
+                          <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-md">
+                            ✓ Paid
                           </span>
                         ) : order.status !== 'Cancelled' ? (
-                          <button
-                            onClick={() => onPayBill(order)}
-                            className="flex items-center gap-1 text-[11px] bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-3 py-1 rounded-xl transition-all shadow-xs active:scale-95 cursor-pointer"
-                          >
-                            <CreditCard size={11} />
-                            <span>Pay ₹{order.total}</span>
-                          </button>
+                          activeBillRequest ? (
+                            <span className={`text-[10px] font-bold px-2.5 py-1 rounded-xl border ${
+                              activeBillRequest.status === 'Accepted'
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                : 'bg-amber-50 text-amber-700 border-amber-200'
+                            }`}>
+                              {activeBillRequest.status === 'Accepted' ? 'Waiter Collecting...' : 'Payment Requested'}
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => onPayBill(order)}
+                              className="flex items-center gap-1 text-[11px] bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-3 py-1 rounded-xl transition-all shadow-xs active:scale-95 cursor-pointer"
+                            >
+                              <CreditCard size={11} />
+                              <span>Pay ₹{order.total}</span>
+                            </button>
+                          )
                         ) : (
                           <span className="text-[10px] text-gray-400 font-medium italic">
                             Cancelled
@@ -323,37 +333,55 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onAddMoreItems, onPa
         </div>
       </div>
 
-      {/* Note 19 & Note 7: Single Prominent ("Pedda") Button at the Bottom */}
+      {/* Single Prominent Bottom Action Bar */}
       <div className="sticky bottom-0 left-0 right-0 p-4 bg-white/95 backdrop-blur-md border-t border-gray-100 z-20 shadow-lg">
         {hasUnpaidOrders ? (
-          <div>
-            {unpaidOrders.length > 1 && (
-              <div className="mb-2.5 px-3 py-2 bg-orange-50 border border-orange-200/80 rounded-xl flex items-center justify-between text-xs text-orange-950">
-                <div className="flex items-center gap-1.5 font-bold">
-                  <AlertCircle size={14} className="text-orange-500 shrink-0" />
-                  <span>Table #{tableId} has {unpaidOrders.length} unpaid orders:</span>
-                </div>
-                <div className="text-[11px] font-semibold text-orange-800">
-                  {unpaidOrders.map(o => `#${o.id.replace('ord_', '')} (₹${o.total})`).join(' + ')}
-                </div>
-              </div>
-            )}
+          activeBillRequest ? (
             <button
               onClick={() => onPayBill()}
-              className="w-full py-4 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black text-sm rounded-2xl shadow-xl shadow-orange-500/25 flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-98"
+              className={`w-full py-3.5 px-4 font-extrabold text-xs rounded-2xl border flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                activeBillRequest.status === 'Accepted'
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
+                  : 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
+              }`}
             >
-              <CreditCard size={18} />
+              <Clock size={16} className={activeBillRequest.status === 'Accepted' ? 'text-emerald-600' : 'text-amber-600 animate-pulse'} />
               <span>
-                {unpaidOrders.length > 1
-                  ? `Request Table Bill (${unpaidOrders.length} Orders) • ₹${currentTableTotal}`
-                  : `Request Table Bill • ₹${currentTableTotal}`}
+                {activeBillRequest.status === 'Accepted'
+                  ? `Waiter Accepted • Coming to Collect ₹${currentTableTotal}`
+                  : `Payment Requested • Waiting for Waiter to Accept (₹${currentTableTotal})`}
               </span>
             </button>
-          </div>
+          ) : (
+            <div>
+              {unpaidOrders.length > 1 && (
+                <div className="mb-2.5 px-3 py-2 bg-orange-50 border border-orange-200/80 rounded-xl flex items-center justify-between text-xs text-orange-950">
+                  <div className="flex items-center gap-1.5 font-bold">
+                    <AlertCircle size={14} className="text-orange-500 shrink-0" />
+                    <span>Table #{tableId} has {unpaidOrders.length} unpaid orders:</span>
+                  </div>
+                  <div className="text-[11px] font-semibold text-orange-800">
+                    {unpaidOrders.map(o => `#${o.id.replace('ord_', '')} (₹${o.total})`).join(' + ')}
+                  </div>
+                </div>
+              )}
+              <button
+                onClick={() => onPayBill()}
+                className="w-full py-4 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black text-sm rounded-2xl shadow-xl shadow-orange-500/25 flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-98"
+              >
+                <CreditCard size={18} />
+                <span>
+                  {unpaidOrders.length > 1
+                    ? `Request Table Bill (${unpaidOrders.length} Orders) • ₹${currentTableTotal}`
+                    : `Request Table Bill • ₹${currentTableTotal}`}
+                </span>
+              </button>
+            </div>
+          )
         ) : hasPlacedOrders ? (
           <div className="w-full py-3.5 bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold text-xs rounded-2xl flex items-center justify-center gap-2">
             <CheckCircle2 size={16} className="text-emerald-600" />
-            <span>Bill Settled • All Orders for Table #{tableId} are Paid</span>
+            <span>Payment Collected • Table #{tableId} Bill Settled</span>
           </div>
         ) : (
           <button

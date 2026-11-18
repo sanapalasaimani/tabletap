@@ -459,25 +459,79 @@ export const db = {
     return result;
   },
 
-  payOrder: async (orderId: string, method: string): Promise<Order | null> => {
+  markOrderPaymentRequested: async (orderId: string, method: string = 'Cash'): Promise<Order | null> => {
+    let result: Order | null = null;
     if (isRealSupabase) {
-      const { data, error } = await supabaseClient
-        .from('orders')
-        .update({ payment_status: 'Paid', payment_method: method })
-        .eq('id', orderId)
-        .select()
-        .single();
-      if (!error && data) return mapSupabaseToOrder(data);
+      try {
+        const { data, error } = await supabaseClient
+          .from('orders')
+          .update({ payment_method: method })
+          .eq('id', orderId)
+          .select()
+          .single();
+        if (!error && data) {
+          result = mapSupabaseToOrder(data);
+        }
+      } catch (err) {
+        console.warn('Supabase markOrderPaymentRequested failed:', err);
+      }
+    }
+    const orders = getMockData<Order[]>('orders', []);
+    const idx = orders.findIndex(o => o.id === orderId);
+    if (idx !== -1) {
+      orders[idx].paymentMethod = method;
+      if (!result) result = orders[idx];
+      saveMockData('orders', orders);
+    } else if (result) {
+      orders.unshift(result);
+      saveMockData('orders', orders);
+    }
+    return result;
+  },
+
+  payOrder: async (orderId: string, method: string): Promise<Order | null> => {
+    let result: Order | null = null;
+    if (isRealSupabase) {
+      try {
+        const { data, error } = await supabaseClient
+          .from('orders')
+          .update({ payment_status: 'Paid', payment_method: method })
+          .eq('id', orderId)
+          .select()
+          .single();
+        if (!error && data) {
+          result = mapSupabaseToOrder(data);
+        }
+      } catch (err) {
+        console.warn('Supabase payOrder failed:', err);
+      }
     }
     const orders = getMockData<Order[]>('orders', []);
     const idx = orders.findIndex(o => o.id === orderId);
     if (idx !== -1) {
       orders[idx].paymentStatus = 'Paid';
       orders[idx].paymentMethod = method;
+      if (!result) result = orders[idx];
       saveMockData('orders', orders);
-      return orders[idx];
+    } else if (result) {
+      orders.unshift(result);
+      saveMockData('orders', orders);
     }
-    return null;
+
+    // Keep cached active order in sync if it matches
+    try {
+      const savedActive = localStorage.getItem('dinesmart_active_order');
+      if (savedActive) {
+        const parsed = JSON.parse(savedActive);
+        if (parsed && parsed.id === orderId) {
+          parsed.paymentStatus = 'Paid';
+          parsed.paymentMethod = method;
+          localStorage.setItem('dinesmart_active_order', JSON.stringify(parsed));
+        }
+      }
+    } catch { /* ignore */ }
+
+    return result;
   },
 
   clearAllOrders: async (): Promise<boolean> => {
@@ -497,6 +551,19 @@ export const db = {
 
   // 4. WAITER REQUESTS
   requestWaiter: async (tableId: string, type: WaiterRequest['requestType']): Promise<WaiterRequest> => {
+    // Prevent duplicate active 'Request Bill' requests for the same table
+    if (type === 'Request Bill') {
+      const existingReqs = await db.getWaiterRequests();
+      const activeBillReq = existingReqs.find(
+        r => String(r.tableId) === String(tableId) &&
+             r.requestType === 'Request Bill' &&
+             (r.status === 'Pending' || r.status === 'Accepted')
+      );
+      if (activeBillReq) {
+        return activeBillReq;
+      }
+    }
+
     const request: WaiterRequest = {
       id: `req_${Math.floor(1000 + Math.random() * 9000)}`,
       tableId,

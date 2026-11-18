@@ -65,7 +65,7 @@ export interface WaiterRequest {
   id: string;
   tableId: string;
   requestType: 'Water' | 'Cutlery' | 'Tissue' | 'Call Waiter' | 'Request Bill';
-  status: 'Pending' | 'Completed';
+  status: 'Pending' | 'Accepted' | 'Completed';
   createdAt: string;
 }
 

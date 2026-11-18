@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { MenuItem, CartItem, Order, UserProfile, WaiterRequest } from '../types';
 import { db } from '../supabase';
 
@@ -20,6 +20,12 @@ interface AppContextProps {
   setActiveOrder: (order: Order | null) => void;
   orderHistory: Order[];
   refreshOrderHistory: () => Promise<void>;
+  unpaidTableOrders: Order[];
+  hasUnpaidTableOrders: boolean;
+  hasPlacedTableOrders: boolean;
+  isBillSettled: boolean;
+  activeBillRequest: WaiterRequest | null;
+  refreshBillStatus: () => Promise<void>;
   callWaiter: (type: WaiterRequest['requestType']) => Promise<void>;
   loginCustomer: (phone: string, name: string) => Promise<UserProfile>;
   logoutCustomer: () => void;
@@ -51,6 +57,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? JSON.parse(saved) : null;
   });
   const [orderHistory, setOrderHistory] = useState<Order[]>([]);
+  const [activeBillRequest, setActiveBillRequest] = useState<WaiterRequest | null>(null);
   const [favorites, setFavorites] = useState<MenuItem[]>(() => {
     const saved = localStorage.getItem('dinesmart_favorites');
     return saved ? JSON.parse(saved) : [];
@@ -96,31 +103,101 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     loadProfile();
   }, [phone]);
 
-  // Load order history
+  const refreshOrderHistory = useCallback(async () => {
+    if (phone) {
+      const history = await db.getOrderHistory(phone);
+      setOrderHistory(history);
+    }
+  }, [phone]);
+
+  const refreshBillStatus = useCallback(async () => {
+    if (!tableId) return;
+    try {
+      const allReqs = await db.getWaiterRequests();
+      const billReq = allReqs.find(
+        r => String(r.tableId) === String(tableId) &&
+             r.requestType === 'Request Bill' &&
+             (r.status === 'Pending' || r.status === 'Accepted')
+      ) || null;
+      setActiveBillRequest(billReq);
+    } catch (err) {
+      console.warn('AppContext: Failed to refresh bill status:', err);
+    }
+  }, [tableId]);
+
+  // Compute current table session orders & bill settlement state
+  const { unpaidTableOrders, hasUnpaidTableOrders, hasPlacedTableOrders, isBillSettled } = useMemo(() => {
+    const map = new Map<string, Order>();
+    if (activeOrder && String(activeOrder.tableId) === String(tableId)) {
+      map.set(activeOrder.id, activeOrder);
+    }
+    orderHistory.forEach(order => {
+      const isSameTable = String(order.tableId) === String(tableId);
+      const orderAgeHours = (Date.now() - new Date(order.createdAt).getTime()) / (1000 * 60 * 60);
+      if (isSameTable && (isNaN(orderAgeHours) || orderAgeHours < 12)) {
+        map.set(order.id, order);
+      }
+    });
+    const allTable = Array.from(map.values());
+    const unpaid = allTable.filter(o => o.paymentStatus !== 'Paid' && o.status !== 'Cancelled');
+    const paid = allTable.filter(o => o.paymentStatus === 'Paid' && o.status !== 'Cancelled');
+    return {
+      unpaidTableOrders: unpaid,
+      hasUnpaidTableOrders: unpaid.length > 0,
+      hasPlacedTableOrders: allTable.length > 0,
+      isBillSettled: paid.length > 0 && unpaid.length === 0,
+    };
+  }, [activeOrder, orderHistory, tableId]);
+
+  // Load order history and bill status
   useEffect(() => {
     if (phone) {
       refreshOrderHistory();
     }
-  }, [phone]);
+    refreshBillStatus();
+  }, [phone, tableId, refreshOrderHistory, refreshBillStatus]);
 
-  // Live polling: synchronize active order status directly from Kitchen & Waiter actions
+  // Live polling: synchronize order status, payment status & waiter bill acceptance in real time
   useEffect(() => {
-    if (!activeOrder || activeOrder.status === 'Delivered') return;
+    const needsOrderStatusPoll = !!activeOrder && (activeOrder.status !== 'Delivered' || activeOrder.paymentStatus !== 'Paid');
+    const needsPaymentPoll = hasUnpaidTableOrders || activeBillRequest !== null;
 
-    const interval = setInterval(async () => {
+    if (!needsOrderStatusPoll && !needsPaymentPoll) return;
+
+    const syncLive = async () => {
       try {
-        const liveOrder = await db.getOrder(activeOrder.id);
-        if (liveOrder && liveOrder.status !== activeOrder.status) {
-          setActiveOrder(liveOrder);
-          refreshOrderHistory();
+        if (activeOrder) {
+          const liveOrder = await db.getOrder(activeOrder.id);
+          if (
+            liveOrder &&
+            (liveOrder.status !== activeOrder.status ||
+              liveOrder.paymentStatus !== activeOrder.paymentStatus ||
+              liveOrder.paymentMethod !== activeOrder.paymentMethod)
+          ) {
+            setActiveOrder(liveOrder);
+          }
         }
+        if (phone) {
+          await refreshOrderHistory();
+        }
+        await refreshBillStatus();
       } catch (err) {
-        console.warn('AppContext: Failed to poll order status:', err);
+        console.warn('AppContext: Failed to poll live order/payment status:', err);
       }
-    }, 2000);
+    };
 
-    return () => clearInterval(interval);
-  }, [activeOrder?.id, activeOrder?.status]);
+    const interval = setInterval(syncLive, 2500);
+
+    const handlePaidEvent = () => {
+      syncLive();
+    };
+    window.addEventListener('dinesmart_order_paid', handlePaidEvent);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('dinesmart_order_paid', handlePaidEvent);
+    };
+  }, [activeOrder?.id, activeOrder?.status, activeOrder?.paymentStatus, hasUnpaidTableOrders, activeBillRequest?.id, activeBillRequest?.status, phone, refreshOrderHistory, refreshBillStatus]);
 
   const loginCustomer = async (num: string, name: string) => {
     setCustomerName(name);
@@ -200,13 +277,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return cart.reduce((sum, item) => sum + item.menuItem.price * item.quantity, 0);
   };
 
-  const refreshOrderHistory = async () => {
-    if (phone) {
-      const history = await db.getOrderHistory(phone);
-      setOrderHistory(history);
-    }
-  };
-
   const placeOrder = async (tip: number, discountCoupon?: string) => {
     const subtotal = getCartTotal();
     const gst = Math.round(subtotal * 0.05); // 5% GST
@@ -281,7 +351,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const callWaiter = async (type: WaiterRequest['requestType']) => {
+    if (type === 'Request Bill') {
+      // Do not allow requesting bill again once all orders are paid/collected or if no unpaid orders exist
+      if (!hasUnpaidTableOrders) {
+        return;
+      }
+      // Mark unpaid orders with Cash payment requested so waiter sees exact bill
+      for (const ord of unpaidTableOrders) {
+        await db.markOrderPaymentRequested(ord.id, 'Cash');
+      }
+    }
     await db.requestWaiter(tableId, type);
+    if (type === 'Request Bill') {
+      await refreshBillStatus();
+    }
   };
 
   const toggleFavorite = (item: MenuItem) => {
@@ -319,6 +402,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setActiveOrder,
         orderHistory,
         refreshOrderHistory,
+        unpaidTableOrders,
+        hasUnpaidTableOrders,
+        hasPlacedTableOrders,
+        isBillSettled,
+        activeBillRequest,
+        refreshBillStatus,
         callWaiter,
         loginCustomer,
         logoutCustomer,
