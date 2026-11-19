@@ -467,11 +467,15 @@ export const db = {
 
   markOrderPaymentRequested: async (orderId: string, method: string = 'Cash'): Promise<Order | null> => {
     let result: Order | null = null;
+    const updatePayload: any = { 
+      payment_method: method,
+      bill_state: 'PAYMENT_REQUESTED'
+    };
     if (isRealSupabase) {
       try {
         const { data, error } = await supabaseClient
           .from('orders')
-          .update({ payment_method: method })
+          .update(updatePayload)
           .eq('id', orderId)
           .select()
           .single();
@@ -486,6 +490,44 @@ export const db = {
     const idx = orders.findIndex(o => o.id === orderId);
     if (idx !== -1) {
       orders[idx].paymentMethod = method;
+      orders[idx].billState = 'PAYMENT_REQUESTED';
+      if (!result) result = orders[idx];
+      saveMockData('orders', orders);
+    } else if (result) {
+      orders.unshift(result);
+      saveMockData('orders', orders);
+    }
+    return result;
+  },
+
+  markOrderPaymentAccepted: async (orderId: string, waiterId: string, waiterName: string): Promise<Order | null> => {
+    let result: Order | null = null;
+    const updatePayload: any = {
+      bill_state: 'ACCEPTED',
+      accepted_by_waiter_id: waiterId,
+      accepted_by_waiter_name: waiterName
+    };
+    if (isRealSupabase) {
+      try {
+        const { data, error } = await supabaseClient
+          .from('orders')
+          .update(updatePayload)
+          .eq('id', orderId)
+          .select()
+          .single();
+        if (!error && data) {
+          result = mapSupabaseToOrder(data);
+        }
+      } catch (err) {
+        console.warn('Supabase markOrderPaymentAccepted failed:', err);
+      }
+    }
+    const orders = getMockData<Order[]>('orders', []);
+    const idx = orders.findIndex(o => o.id === orderId);
+    if (idx !== -1) {
+      orders[idx].billState = 'ACCEPTED';
+      orders[idx].acceptedByWaiterId = waiterId;
+      orders[idx].acceptedByWaiterName = waiterName;
       if (!result) result = orders[idx];
       saveMockData('orders', orders);
     } else if (result) {

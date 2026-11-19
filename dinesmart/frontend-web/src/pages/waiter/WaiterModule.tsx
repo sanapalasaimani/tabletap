@@ -448,7 +448,7 @@ export const WaiterModule: React.FC = () => {
       setWaiterRequests(prev => prev.map(r => r.id === task.rawReq!.id ? { ...r, status: 'Accepted' } : r));
     }
 
-    if (task.type === 'cash_collection') {
+    if (task.type === 'cash_collection' || task.rawReq?.requestType === 'Request Bill') {
       // Also mark any pending Request Bill for this table as Accepted
       const pendingBillReqs = waiterRequests.filter(
         r => String(r.tableId) === String(task.tableId) && r.requestType === 'Request Bill' && r.status === 'Pending'
@@ -463,6 +463,15 @@ export const WaiterModule: React.FC = () => {
             : r
         ));
       }
+
+      // Mark all unpaid orders for this table as bill_state = 'ACCEPTED' in Supabase
+      const unpaidOrdersForTable = orders.filter(
+        o => String(o.tableId) === String(task.tableId) && o.paymentStatus !== 'Paid' && o.status !== 'Cancelled'
+      );
+      for (const ord of unpaidOrdersForTable) {
+        await db.markOrderPaymentAccepted(ord.id, staffInfo.empid || 'WTR-01', staffInfo.name || 'Staff Waiter');
+      }
+
       setFeedbackMessage(`✓ Payment request accepted for Table #${task.tableId}${task.amount ? ` — Collect ₹${task.amount}` : ''}`);
       setTimeout(() => setFeedbackMessage(null), 3500);
     }
