@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { MenuItem } from '../../types';
 import { useApp } from '../../context/AppContext';
-import { X, Star, Flame, Clock, Heart, AlertTriangle } from 'lucide-react';
+import { X, Star, Clock, Heart, AlertTriangle } from 'lucide-react';
 import { ImageWithFallback } from '../common/ImageWithFallback';
 
 interface DishDetailModalProps {
@@ -193,8 +193,7 @@ export const DishDetailModal: React.FC<DishDetailModalProps> = ({ item, onClose 
                 {item.isVeg ? 'Veg' : 'Non-Veg'}
               </span>
               {item.spicyLevel && item.spicyLevel > 0 ? (
-                <span className="px-2.5 py-1 text-xs font-bold rounded-full bg-orange-600 text-white flex items-center gap-1 shadow-xs">
-                  <Flame size={12} fill="#fff" />
+                <span className="px-2.5 py-1 text-xs font-bold rounded-full bg-orange-600 text-white flex items-center shadow-xs">
                   {item.spicyLevel === 3 ? 'Spicy' : 'Medium'}
                 </span>
               ) : null}
@@ -253,7 +252,6 @@ export const DishDetailModal: React.FC<DishDetailModalProps> = ({ item, onClose 
                 <span>{item.prepTime}</span>
               </div>
               <div className="flex items-center gap-1.5 border-l border-gray-200 pl-4">
-                <Flame size={14} className="text-orange-500" />
                 <span>{item.calories} kcal</span>
               </div>
               <div className="flex items-center gap-1.5 border-l border-gray-200 pl-4">

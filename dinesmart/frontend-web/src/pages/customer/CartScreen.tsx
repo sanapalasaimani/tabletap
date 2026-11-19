@@ -31,9 +31,6 @@ export const CartScreen: React.FC<CartScreenProps> = ({ onOrderPlaced, onNavigat
   const [couponSuccess, setCouponSuccess] = useState('');
   const [promotions, setPromotions] = useState<any[]>([]);
   const [usedCoupons, setUsedCoupons] = useState<string[]>([]);
-  const [tip, setTip] = useState(0);
-  const [customTip, setCustomTip] = useState('');
-  const [isCustomTipMode, setIsCustomTipMode] = useState(false);
   const [isPlacing, setIsPlacing] = useState(false);
 
   // Load real promotions and used coupons from database
@@ -78,7 +75,7 @@ export const CartScreen: React.FC<CartScreenProps> = ({ onOrderPlaced, onNavigat
   }
   discount = Math.min(discount, subtotal);
 
-  const total = Math.max(0, subtotal + gst + tip - discount);
+  const total = Math.max(0, subtotal + gst - discount);
 
   // Apply coupon with single-use per customer check
   const handleApplyCoupon = (overrideCode?: string) => {
@@ -147,12 +144,6 @@ export const CartScreen: React.FC<CartScreenProps> = ({ onOrderPlaced, onNavigat
     setCouponSuccess('');
   };
 
-  const selectTip = (val: number) => {
-    setTip(val);
-    setCustomTip('');
-    setIsCustomTipMode(false);
-  };
-
   // Automatically re-validate active coupon whenever cart/subtotal changes
   useEffect(() => {
     if (!activeCoupon) return;
@@ -180,17 +171,11 @@ export const CartScreen: React.FC<CartScreenProps> = ({ onOrderPlaced, onNavigat
     }
   }, [subtotal, cart, activeCoupon, promotions, profile]);
 
-  const handleCustomTipChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value.replace(/\D/g, '');
-    setCustomTip(val);
-    setTip(val ? parseInt(val) : 0);
-  };
-
   const handlePlaceOrder = async () => {
     if (cart.length === 0) return;
     setIsPlacing(true);
     try {
-      await placeOrder(tip, activeCoupon || undefined);
+      await placeOrder(0, activeCoupon || undefined);
       onOrderPlaced();
     } catch (err) {
       console.error(err);
@@ -425,70 +410,6 @@ export const CartScreen: React.FC<CartScreenProps> = ({ onOrderPlaced, onNavigat
         )}
       </div>
 
-      {/* Tip for Staff */}
-      <div className="p-4 bg-white border-b border-gray-100">
-        <h4 className="font-extrabold text-xs text-brand-text mb-2 flex items-center gap-1.5">
-          <span>💖</span>
-          <span>Add Waiter & Staff Tip</span>
-        </h4>
-        <div className="flex gap-2 mb-2">
-          {[20, 30, 50, 100].map(amount => (
-            <button
-              key={amount}
-              onClick={() => selectTip(amount)}
-              className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                tip === amount && !isCustomTipMode
-                  ? 'bg-orange-500 border-orange-500 text-white shadow-xs'
-                  : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              ₹{amount}
-            </button>
-          ))}
-          <button
-            onClick={() => {
-              setIsCustomTipMode(true);
-              setTip(customTip ? parseInt(customTip) : 0);
-            }}
-            className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-              isCustomTipMode
-                ? 'bg-orange-500 border-orange-500 text-white shadow-xs'
-                : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
-            }`}
-          >
-            Custom
-          </button>
-        </div>
-
-        {/* Custom Tip Amount Input */}
-        {isCustomTipMode && (
-          <div className="flex items-center gap-2 mt-2 bg-gray-50 p-2 rounded-xl border border-orange-200">
-            <span className="text-xs font-black text-slate-700 pl-2">₹</span>
-            <input
-              type="number"
-              min="0"
-              placeholder="Enter custom tip amount"
-              value={customTip}
-              onChange={handleCustomTipChange}
-              className="flex-1 bg-transparent text-xs font-bold text-slate-800 outline-none"
-              autoFocus
-            />
-            {tip > 0 && (
-              <button
-                onClick={() => {
-                  setTip(0);
-                  setCustomTip('');
-                  setIsCustomTipMode(false);
-                }}
-                className="text-[10px] font-bold text-gray-400 hover:text-red-500 px-2 py-1 cursor-pointer"
-              >
-                Clear
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-
       {/* Bill Breakdown */}
       <div className="p-4 bg-white space-y-2 text-xs">
         <div className="flex justify-between text-gray-500">
@@ -503,12 +424,6 @@ export const CartScreen: React.FC<CartScreenProps> = ({ onOrderPlaced, onNavigat
           <div className="flex justify-between text-emerald-600 font-bold">
             <span>Coupon Discount</span>
             <span>-₹{discount}</span>
-          </div>
-        )}
-        {tip > 0 && (
-          <div className="flex justify-between text-orange-600 font-bold">
-            <span>Staff Tip</span>
-            <span>+₹{tip}</span>
           </div>
         )}
         <div className="flex justify-between text-sm font-black text-slate-900 pt-2 border-t border-gray-100">

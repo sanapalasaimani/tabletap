@@ -9,7 +9,7 @@ import {
   Settings, Shield, QrCode, Image, MessageSquare, Search, Trash2,
   Edit3, Plus, X, ChevronRight, ChevronLeft, Download, Sparkles, Filter, Check,
   AlertTriangle, Moon, Sun, RefreshCw, FileText, Mail, MessageCircle,
-  CornerDownRight, UserPlus, Heart, TrendingUp, DollarSign, Calendar, CalendarDays,
+  UserPlus, Heart, TrendingUp, DollarSign, Calendar, CalendarDays,
   TrendingDown, ArrowUpRight, ArrowDownRight, Clock, Star, Eye, EyeOff, Phone, Copy, FileSpreadsheet, ChevronDown, ExternalLink,
   Upload, Smartphone, Share2, CheckCircle2, AlertCircle, Receipt,
   Bell, LogOut, Activity, BookOpen, Smile, Meh, Frown, PanelLeftClose, PanelLeftOpen,
@@ -17,12 +17,6 @@ import {
 } from 'lucide-react';
 import { AccurateRevenueReport } from '../../components/admin/AccurateRevenueReport';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, CartesianGrid, AreaChart, Area } from 'recharts';
-import {
-  predictSales, getCustomerAIInsights,
-  getAIBusinessSuggestions, getPeakTimePredictions, analyzeReviewSentiment,
-  SalesPrediction, CustomerInsights, BusinessSuggestion,
-  PeakTimePrediction, SentimentResult
-} from './groq';
 import BhakasuraChatBot from './BhakasuraChatBot';
 import { generateComprehensivePDF, generateComprehensiveExcel } from '../../utils/reportGenerator';
 import { mlService } from '../../services/mlService';
@@ -35,7 +29,7 @@ interface AdminDashboardProps {
 
 type TabType =
   | 'overview' | 'menu' | 'staff'
-  | 'loyalty' | 'promotions' | 'customers' | 'ai_analytics'
+  | 'loyalty' | 'promotions' | 'customers'
   | 'reports' | 'revenue' | 'settings' | 'security' | 'qrcodes' | 'gallery' | 'reviews';
 
 interface Employee {
@@ -350,8 +344,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
   const [splitBillModal, setSplitBillModal] = useState<Order | null>(null);
   const [activeInvoice, setActiveInvoice] = useState<Order | null>(null);
   const [newPromotionModal, setNewPromotionModal] = useState(false);
-  const [replyReviewId, setReplyReviewId] = useState<string | null>(null);
-  const [replyText, setReplyText] = useState('');
 
   const [otpModal, setOtpModal] = useState(false);
   const [otpInput, setOtpInput] = useState('');
@@ -402,13 +394,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
     goldDiscountPercent: 10
   });
   const [editLoyaltyModal, setEditLoyaltyModal] = useState(false);
-
-  // AI Insights State
-  const [aiSalesPred, setAiSalesPred] = useState<SalesPrediction | null>(null);
-  const [aiCustomerInsights, setAiCustomerInsights] = useState<CustomerInsights | null>(null);
-  const [aiBusinessSuggestions, setAiBusinessSuggestions] = useState<BusinessSuggestion[] | null>(null);
-  const [aiPeakTimePred, setAiPeakTimePred] = useState<PeakTimePrediction | null>(null);
-  const [aiReviewSentiment, setAiReviewSentiment] = useState<Record<string, SentimentResult>>({});
 
   // Sync Data function from Supabase (Parallelized Promise.all for <400ms speed)
   const fetchData = async () => {
@@ -472,7 +457,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
 
   useEffect(() => {
     fetchData();
-    loadAllGroqAI();
 
     // 12-second gentle polling to prevent network saturation and UI lag
     const interval = setInterval(() => {
@@ -873,95 +857,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
     }
   };
 
-  // Review reply updates
-  const handleReplyReviewSubmit = async (id: string) => {
-    const reviewObj = reviews.find(r => r.id === id);
-    if (reviewObj) {
-      const updated = { ...reviewObj, reply: replyText };
-      await db.saveReview(updated);
-      await fetchData();
-      setReplyReviewId(null);
-      setReplyText('');
-      logActivity('Submitted manager reply comment to customer review');
-    }
-  };
+
 
   // ----------------------------------------------------
   // GROQ AI ANALYTICS TRIGGER CALLS
   // ----------------------------------------------------
-  const fetchAISalesPredictions = async () => {
-    setLoading(true);
-    try {
-      const res = await predictSales(orders);
-      setAiSalesPred(res);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-
-
-  const fetchAICustomerInsights = async () => {
-    setLoading(true);
-    try {
-      const res = await getCustomerAIInsights(staff, reviews);
-      setAiCustomerInsights(res);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchAIBusinessSuggestions = async () => {
-    setLoading(true);
-    try {
-      const res = await getAIBusinessSuggestions(orders, menuItems);
-      setAiBusinessSuggestions(res);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchAIPeakTimes = async () => {
-    setLoading(true);
-    try {
-      const res = await getPeakTimePredictions(orders);
-      setAiPeakTimePred(res);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const analyzeSentimentForReview = async (reviewId: string, comment: string) => {
-    try {
-      const res = await analyzeReviewSentiment(comment);
-      setAiReviewSentiment(prev => ({
-        ...prev,
-        [reviewId]: res
-      }));
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const loadAllGroqAI = async () => {
-    setLoading(true);
-    await Promise.all([
-      fetchAISalesPredictions(),
-      fetchAICustomerInsights(),
-      fetchAIBusinessSuggestions(),
-      fetchAIPeakTimes()
-    ]);
-    setLoading(false);
-  };
-
   // Real Dynamic Chart & Operational Telemetry Calculations
   const liveRevTotal = orders.reduce((sum, o) => sum + (o.total || 0), 0);
   const displayRevenue = liveRevTotal > 0 ? liveRevTotal : 6773;
@@ -2091,8 +1991,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                   </div>
                 </div>
 
-                {/* 6. OPERATIONAL DISPATCH & DISH PERFORMANCE */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-2">
+                {/* 6. DISH PERFORMANCE */}
+                <div className="pt-2">
                   {/* Top Performing Dishes Data List */}
                   <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-2xs">
                     <div className="flex items-center justify-between pb-3.5 border-b border-slate-100">
@@ -2131,117 +2031,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                           </div>
                         </div>
                       ))}
-                    </div>
-                  </div>
-
-                  {/* Smart Dispatch & Operational Insights Feed */}
-                  <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-2xs flex flex-col justify-between">
-                    <div>
-                      <div className="flex items-center justify-between pb-3.5 border-b border-slate-100">
-                        <div>
-                          <h3 className="text-sm font-bold text-slate-900 tracking-tight">Smart Dispatch & Insights</h3>
-                          <p className="text-[11px] text-slate-400 mt-0.5">Live floor suggestions & demand balancing</p>
-                        </div>
-                        <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-md border border-emerald-200/60">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                          <span>Active Advisor</span>
-                        </span>
-                      </div>
-
-                      <div className="divide-y divide-slate-100">
-                        {/* Insight 1: Stock Prep */}
-                        <div className="py-3 flex items-start justify-between gap-4 group">
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-semibold text-slate-800">Stock Prep</span>
-                              <span className="text-[9px] uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200/60 px-1.5 py-0.2 rounded font-semibold">
-                                High Priority
-                              </span>
-                            </div>
-                            <p className="text-xs text-slate-500 leading-relaxed">
-                              Prep 15kg Chicken & Biryani spices before 7 PM rush.
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => alert('Stock Prep alert dispatched to kitchen inventory queue.')}
-                            className="text-xs font-semibold text-orange-600 hover:text-orange-700 hover:bg-orange-50 px-2.5 py-1 rounded-lg transition-colors whitespace-nowrap self-center cursor-pointer"
-                          >
-                            Resolve
-                          </button>
-                        </div>
-
-                        {/* Insight 2: Station 1 Load */}
-                        <div className="py-3 flex items-start justify-between gap-4 group">
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-semibold text-slate-800">Station 1 Load</span>
-                              <span className="text-[9px] uppercase tracking-wider bg-blue-50 text-blue-700 border border-blue-200/60 px-1.5 py-0.2 rounded font-semibold">
-                                85% Capacity
-                              </span>
-                            </div>
-                            <p className="text-xs text-slate-500 leading-relaxed">
-                              Station 1 at 85% capacity — auto-rebalance starters to Station 2.
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => alert('Starter orders automatically rebalanced to Station 2.')}
-                            className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 px-2.5 py-1 rounded-lg transition-colors whitespace-nowrap self-center cursor-pointer"
-                          >
-                            Rebalance
-                          </button>
-                        </div>
-
-                        {/* Insight 3: Beverage Upsell */}
-                        <div className="py-3 flex items-start justify-between gap-4 group">
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-semibold text-slate-800">Beverage Upsell</span>
-                              <span className="text-[9px] uppercase tracking-wider bg-purple-50 text-purple-700 border border-purple-200/60 px-1.5 py-0.2 rounded font-semibold">
-                                +₹65 AOV Lift
-                              </span>
-                            </div>
-                            <p className="text-xs text-slate-500 leading-relaxed">
-                              Bundle Mango Lassi with Spicy Biryani to lift AOV by ₹65.
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => alert('Mango Lassi bundle suggestion active on customer cart.')}
-                            className="text-xs font-semibold text-purple-600 hover:text-purple-700 hover:bg-purple-50 px-2.5 py-1 rounded-lg transition-colors whitespace-nowrap self-center cursor-pointer"
-                          >
-                            Apply Bundle
-                          </button>
-                        </div>
-
-                        {/* Insight 4: SLA Expediting */}
-                        <div className="py-3 flex items-start justify-between gap-4 group">
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-semibold text-slate-800">SLA Expediting</span>
-                              <span className="text-[9px] uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200/60 px-1.5 py-0.2 rounded font-semibold">
-                                14.2m Target
-                              </span>
-                            </div>
-                            <p className="text-xs text-slate-500 leading-relaxed">
-                              Prep time SLA at 14.2m. Shift 1 expediter to Station 3.
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => alert('Station 3 floor expediter re-assigned.')}
-                            className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 px-2.5 py-1 rounded-lg transition-colors whitespace-nowrap self-center cursor-pointer"
-                          >
-                            Acknowledge
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
-                      <span>Forecasted Tomorrow: <strong className="text-slate-800 font-bold">₹53,600</strong></span>
-                      <span className="text-emerald-600 font-semibold">94% forecast accuracy</span>
                     </div>
                   </div>
                 </div>
@@ -2766,7 +2555,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                           <div className="flex items-center gap-2 mb-2 text-[10px] text-slate-500">
                             <span className="bg-slate-100 px-2 py-0.5 rounded-md font-medium text-slate-700">{item.category}</span>
                             {item.prepTime && <span>⏳ {item.prepTime}</span>}
-                            {item.calories && <span>🔥 {item.calories} kcal</span>}
+                            {item.calories && <span>{item.calories} kcal</span>}
                           </div>
 
                           {item.description && (
@@ -3571,71 +3360,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                   ))}
                 </div>
               )}
-            </div>
-          )}
-
-          {/* ----------------------------------------------------
-              VIEW 12: GROQ AI ANALYTICS DASHBOARD
-              ---------------------------------------------------- */}
-          {activeTab === 'ai_analytics' && (
-            <div className="space-y-6 animate-fade-in">
-              <div className="flex justify-between items-center border-b pb-3">
-                <div>
-                  <h3 className="font-extrabold text-sm">Groq AI Analytics Engine</h3>
-                  <p className="text-[10px] text-gray-400">Leverages mixtral/llama models to compute sales growth and optimal pricing.</p>
-                </div>
-                <button
-                  onClick={loadAllGroqAI}
-                  className="bg-primary text-white font-bold py-2.5 px-4 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer"
-                >
-                  <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-                  <span>Refresh AI Metrics</span>
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-
-                {/* 1. SALES INSIGHTS */}
-                <div className={`p-5 rounded-3xl border shadow-sm relative overflow-hidden bg-white border-gray-50`}>
-                  <h4 className="font-extrabold text-xs text-primary uppercase tracking-wider flex items-center gap-1.5 mb-3.5">
-                    <Sparkles size={14} fill="currentColor" />
-                    AI Sales Predictions
-                  </h4>
-                  {aiSalesPred ? (
-                    <div className="space-y-3.5 text-xs font-semibold">
-                      <p className="flex justify-between"><span>Projected Today's Revenue:</span> <strong className="text-brand-text font-black text-sm">{formatPrice(aiSalesPred.todayRevenuePred)}</strong></p>
-                      <p className="flex justify-between"><span>Weekend Sales Projection:</span> <strong>{formatPrice(aiSalesPred.weekendSalesPred)}</strong></p>
-                      <p className="flex justify-between"><span>Projected Monthly Growth:</span> <span className="text-green-500 font-black">+{aiSalesPred.monthlyGrowthPred}%</span></p>
-                      <p className="text-[10px] text-gray-400 italic leading-relaxed border-t pt-2.5 font-medium">{aiSalesPred.explanation}</p>
-                    </div>
-                  ) : (
-                    <p className="text-xs text-gray-400 py-6 text-center font-medium">Click Refresh to run Groq calculations.</p>
-                  )}
-                </div>
-
-                {/* 2. BUSINESS STRATEGY */}
-                <div className={`p-5 rounded-3xl border shadow-sm bg-white border-gray-50`}>
-                  <h4 className="font-extrabold text-xs text-primary uppercase tracking-wider flex items-center gap-1.5 mb-3.5">
-                    <TrendingUp size={14} />
-                    AI Pricing & Strategy Suggestions
-                  </h4>
-                  {aiBusinessSuggestions ? (
-                    <div className="space-y-3">
-                      {aiBusinessSuggestions.map((item, idx) => (
-                        <div key={idx} className="border-b pb-2.5 last:border-0 last:pb-0 text-xs font-semibold">
-                          <div className="flex justify-between items-center mb-1">
-                            <h5 className="font-black">{item.title}</h5>
-                            <span className="text-green-500 font-bold">{item.estimatedProfitIncrease}</span>
-                          </div>
-                          <p className="text-[10px] text-gray-400 leading-relaxed font-medium">{item.recommendation}</p>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-gray-400 py-6 text-center font-medium">Click Refresh to run Groq calculations.</p>
-                  )}
-                </div>
-              </div>
             </div>
           )}
 
@@ -4615,8 +4339,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
 
             // Executive sentiment categorizer based on original data
             const getSentiment = (r: any): { sentiment: 'Positive' | 'Neutral' | 'Critical'; label: string; bg: string; text: string; border: string } => {
-              const ai = aiReviewSentiment[r.id];
-              const rawSentiment = String(ai?.sentiment || r.sentiment || '').toLowerCase();
+              const rawSentiment = String(r.sentiment || '').toLowerCase();
               if (rawSentiment === 'positive') {
                 return { sentiment: 'Positive', label: 'Positive Experience', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' };
               }
@@ -4635,8 +4358,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
             const posCount = textReviews.filter(r => getSentiment(r).sentiment === 'Positive').length;
             const neutCount = textReviews.filter(r => getSentiment(r).sentiment === 'Neutral').length;
             const critCount = textReviews.filter(r => getSentiment(r).sentiment === 'Critical').length;
-            const unrepliedCount = textReviews.filter(r => !r.reply || !r.reply.trim()).length;
-            const repliedCount = textReviews.length - unrepliedCount;
 
             const posPct = textReviews.length > 0 ? Math.round((posCount / textReviews.length) * 100) : (allCustomerRevs.length > 0 ? 100 : 0);
             const neutPct = textReviews.length > 0 ? Math.round((neutCount / textReviews.length) * 100) : 0;
@@ -4646,7 +4367,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
               if (reviewFilter === 'positive') return getSentiment(r).sentiment === 'Positive';
               if (reviewFilter === 'neutral') return getSentiment(r).sentiment === 'Neutral';
               if (reviewFilter === 'critical') return getSentiment(r).sentiment === 'Critical';
-              if (reviewFilter === 'unreplied') return !r.reply || !r.reply.trim();
               return true;
             });
 
@@ -4661,7 +4381,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                         {allRatings.length} Ratings Total
                       </span>
                     </div>
-                    <p className="text-xs text-slate-500 mt-0.5">Administrative sentiment analytics, guest satisfaction scores, and management response console.</p>
+                    <p className="text-xs text-slate-500 mt-0.5">Administrative sentiment analytics and guest satisfaction audit trail.</p>
                   </div>
                 </div>
 
@@ -4709,9 +4429,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                       <div className="text-xs font-semibold text-slate-800 font-mono mt-1">{textReviews.length} Reviews</div>
                     </div>
                     <div>
-                      <div className="text-[10px] uppercase font-semibold text-slate-400 tracking-wider">Management Response</div>
-                      <div className="text-xs font-semibold text-slate-800 font-mono mt-1">
-                        {textReviews.length > 0 ? Math.round((repliedCount / textReviews.length) * 100) : 100}% Replied
+                      <div className="text-[10px] uppercase font-semibold text-slate-400 tracking-wider">Critical Alerts</div>
+                      <div className="text-xs font-semibold text-rose-600 font-mono mt-1">
+                        {critCount} Flagged
                       </div>
                     </div>
                   </div>
@@ -4785,17 +4505,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                     }`}
                   >
                     Action Needed ({critCount})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setReviewFilter('unreplied')}
-                    className={`pb-2.5 px-3.5 transition-all cursor-pointer whitespace-nowrap ${
-                      reviewFilter === 'unreplied'
-                        ? 'text-amber-600 border-b-2 border-amber-600 font-semibold'
-                        : 'text-slate-500 hover:text-slate-800'
-                    }`}
-                  >
-                    Needs Reply ({unrepliedCount})
                   </button>
                 </div>
 
@@ -4877,59 +4586,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                             </div>
                           )}
 
-                          {/* Management Reply Section */}
-                          {item.reply ? (
-                            <div className="p-3 rounded-xl bg-orange-50/40 border border-orange-100 flex items-start gap-2.5 text-xs">
-                              <CornerDownRight size={14} className="text-[#FF6B00] flex-shrink-0 mt-0.5" />
-                              <div className="flex-1">
-                                <div className="flex items-center justify-between">
-                                  <span className="font-extrabold text-[#FF6B00] uppercase text-[10px]">Management Response</span>
-                                  <span className="text-[10px] text-slate-400 font-medium">Saved</span>
-                                </div>
-                                <p className="text-slate-700 font-medium mt-0.5 italic">"{item.reply}"</p>
-                              </div>
-                            </div>
-                          ) : (
-                            replyReviewId === item.id ? (
-                              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                                  Respond as Management
-                                </span>
-                                <textarea
-                                  value={replyText}
-                                  onChange={(e) => setReplyText(e.target.value)}
-                                  placeholder="Type an executive response to this customer..."
-                                  rows={2}
-                                  className="w-full text-xs p-2.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 text-slate-800"
-                                />
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    onClick={() => handleReplyReviewSubmit(item.id)}
-                                    className="px-3.5 py-1.5 rounded-lg text-xs font-bold text-white bg-[#FF6B00] hover:bg-orange-600 cursor-pointer shadow-xs"
-                                  >
-                                    Send Response
-                                  </button>
-                                  <button
-                                    onClick={() => { setReplyReviewId(null); setReplyText(''); }}
-                                    className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-100 cursor-pointer"
-                                  >
-                                    Cancel
-                                  </button>
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="flex items-center justify-between pt-1">
-                                <span className="text-[11px] font-medium text-slate-400">No response sent</span>
-                                <button
-                                  onClick={() => { setReplyReviewId(item.id); setReplyText(''); }}
-                                  className="text-xs font-bold text-[#FF6B00] hover:text-orange-600 flex items-center gap-1.5 cursor-pointer"
-                                >
-                                  <CornerDownRight size={13} />
-                                  <span>Reply to Customer</span>
-                                </button>
-                              </div>
-                            )
-                          )}
                         </div>
                       );
                     })

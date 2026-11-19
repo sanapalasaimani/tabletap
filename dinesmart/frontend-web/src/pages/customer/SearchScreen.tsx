@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { MenuItem } from '../../types';
 import { MENU_ITEMS, COMING_SOON_IMAGE } from '../../data/menu';
 import { db } from '../../supabase';
-import { Search, Star, Flame, Mic, MicOff, Sparkles, X, Clock, AlertTriangle } from 'lucide-react';
+import { Search, Star, Mic, MicOff, Sparkles, X, Clock, AlertTriangle } from 'lucide-react';
 import { ImageWithFallback } from '../../components/common/ImageWithFallback';
 
 interface SearchScreenProps {
@@ -382,9 +382,6 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({ initialCategory, onS
                       <h4 className="font-extrabold text-brand-text text-xs truncate group-hover:text-primary transition-colors">
                         {item.name}
                       </h4>
-                      {item.spicyLevel && item.spicyLevel > 0 ? (
-                        <Flame size={12} className="text-orange-500 flex-shrink-0" fill="currentColor" />
-                      ) : null}
                     </div>
                     
                     <div className="flex items-center gap-2 mt-0.5">

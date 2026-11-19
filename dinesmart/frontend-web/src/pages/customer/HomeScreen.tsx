@@ -3,7 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { db } from '../../supabase';
 import { MENU_ITEMS, COMING_SOON_IMAGE } from '../../data/menu';
 import { MenuItem } from '../../types';
-import { Search, Star, Flame, Sparkles, Bell, X, CheckCheck, Tag, Info, ShoppingBag } from 'lucide-react';
+import { Search, Star, Sparkles, Bell, X, CheckCheck, Tag, Info, ShoppingBag } from 'lucide-react';
 import { mlService } from '../../services/mlService';
 
 interface HomeScreenProps {

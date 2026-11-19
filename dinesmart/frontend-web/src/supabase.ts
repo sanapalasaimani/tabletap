@@ -495,6 +495,37 @@ export const db = {
     return result;
   },
 
+  updateOrderTip: async (orderId: string, tip: number, total: number): Promise<Order | null> => {
+    let result: Order | null = null;
+    if (isRealSupabase) {
+      try {
+        const { data, error } = await supabaseClient
+          .from('orders')
+          .update({ tip, total })
+          .eq('id', orderId)
+          .select()
+          .single();
+        if (!error && data) {
+          result = mapSupabaseToOrder(data);
+        }
+      } catch (err) {
+        console.warn('Supabase updateOrderTip failed:', err);
+      }
+    }
+    const orders = getMockData<Order[]>('orders', []);
+    const idx = orders.findIndex(o => o.id === orderId);
+    if (idx !== -1) {
+      orders[idx].tip = tip;
+      orders[idx].total = total;
+      if (!result) result = orders[idx];
+      saveMockData('orders', orders);
+    } else if (result) {
+      orders.unshift(result);
+      saveMockData('orders', orders);
+    }
+    return result;
+  },
+
   payOrder: async (orderId: string, method: string, waiterInfo?: { id?: string; name?: string }): Promise<Order | null> => {
     let result: Order | null = null;
     const paidAt = new Date().toISOString();

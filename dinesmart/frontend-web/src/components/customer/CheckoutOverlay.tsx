@@ -39,11 +39,17 @@ export const CheckoutOverlay: React.FC<CheckoutOverlayProps> = ({ onClose, onPay
   }, [orderHistory, activeOrder, tableId, specificOrder]);
 
   const targetOrders = unpaidOrders;
-  const totalAmount = targetOrders.reduce((sum, o) => sum + o.total, 0);
   const totalSubtotal = targetOrders.reduce((sum, o) => sum + o.subtotal, 0);
   const totalGst = targetOrders.reduce((sum, o) => sum + o.gst, 0);
-  const totalTip = targetOrders.reduce((sum, o) => sum + o.tip, 0);
   const totalDiscount = targetOrders.reduce((sum, o) => sum + o.discount, 0);
+  const existingOrdersTip = targetOrders.reduce((sum, o) => sum + (o.tip || 0), 0);
+
+  // Waiter tip applied once on the final total bill only
+  const [waiterTip, setWaiterTip] = useState<number>(existingOrdersTip);
+  const [customTipVal, setCustomTipVal] = useState<string>('');
+  const [isCustomMode, setIsCustomMode] = useState<boolean>(false);
+
+  const totalAmount = Math.max(0, totalSubtotal + totalGst - totalDiscount + waiterTip);
   const allItems = targetOrders.flatMap(o => o.items);
   const pointsEarned = Math.floor(totalAmount * 0.1);
 
@@ -136,6 +142,13 @@ export const CheckoutOverlay: React.FC<CheckoutOverlayProps> = ({ onClose, onPay
     if (targetOrders.length === 0) return;
     setIsProcessing(true);
     try {
+      // 1. Assign waiter tip on total bill to primary unpaid order and recalculate total
+      if (targetOrders.length > 0) {
+        const primary = targetOrders[0];
+        const newPrimaryTotal = Math.max(0, primary.subtotal + primary.gst - primary.discount + waiterTip);
+        await db.updateOrderTip(primary.id, waiterTip, newPrimaryTotal);
+      }
+
       // Persist payment requested state on each unpaid order in Supabase + local cache
       for (const ord of targetOrders) {
         await db.markOrderPaymentRequested(ord.id, 'Pending');
@@ -229,6 +242,73 @@ export const CheckoutOverlay: React.FC<CheckoutOverlayProps> = ({ onClose, onPay
                 </div>
               </div>
 
+              {/* Waiter Tip Selection applied on Total Bill Only */}
+              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 space-y-2">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm">💖</span>
+                    <h4 className="font-extrabold text-xs text-brand-text">Waiter & Staff Tip</h4>
+                  </div>
+                  <span className="text-[11px] text-orange-600 font-bold">
+                    {waiterTip > 0 ? `+₹${waiterTip}` : 'Optional'}
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-400">Add a thank-you tip for your waiter, applied once on your total bill.</p>
+
+                <div className="grid grid-cols-5 gap-1.5 pt-1">
+                  {[0, 30, 50, 100].map(amt => (
+                    <button
+                      key={amt}
+                      type="button"
+                      onClick={() => {
+                        setIsCustomMode(false);
+                        setWaiterTip(amt);
+                      }}
+                      className={`py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                        waiterTip === amt && !isCustomMode
+                          ? 'bg-orange-500 border-orange-500 text-white shadow-xs'
+                          : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      {amt === 0 ? 'No Tip' : `₹${amt}`}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCustomMode(true);
+                      if (customTipVal) setWaiterTip(parseInt(customTipVal) || 0);
+                    }}
+                    className={`py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                      isCustomMode
+                        ? 'bg-orange-500 border-orange-500 text-white shadow-xs'
+                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    Custom
+                  </button>
+                </div>
+
+                {isCustomMode && (
+                  <div className="flex items-center gap-2 bg-white p-2 rounded-xl border border-orange-200 mt-2">
+                    <span className="text-xs font-bold text-slate-700 pl-1">₹</span>
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="Enter custom tip amount"
+                      value={customTipVal}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '');
+                        setCustomTipVal(val);
+                        setWaiterTip(val ? parseInt(val) : 0);
+                      }}
+                      className="flex-1 text-xs font-bold text-slate-800 outline-none"
+                      autoFocus
+                    />
+                  </div>
+                )}
+              </div>
+
               {/* Price Breakdown Summary */}
               <div className="border-t border-gray-100 pt-4 space-y-2.5">
                 <div className="flex justify-between text-xs text-gray-500">
@@ -239,10 +319,10 @@ export const CheckoutOverlay: React.FC<CheckoutOverlayProps> = ({ onClose, onPay
                   <span>GST (5%)</span>
                   <span className="font-bold text-brand-text">₹{totalGst}</span>
                 </div>
-                {totalTip > 0 && (
+                {waiterTip > 0 && (
                   <div className="flex justify-between text-xs text-gray-500">
-                    <span>Staff Tip</span>
-                    <span className="font-bold text-orange-600">+₹{totalTip}</span>
+                    <span>Waiter Tip</span>
+                    <span className="font-bold text-orange-600">+₹{waiterTip}</span>
                   </div>
                 )}
                 {totalDiscount > 0 && (

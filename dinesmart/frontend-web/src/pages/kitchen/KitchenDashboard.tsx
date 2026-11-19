@@ -5,8 +5,9 @@ import { MENU_ITEMS } from '../../data/menu';
 import { 
   Clock, PlayCircle, CheckCircle, RefreshCw,
   ChefHat, Calendar, Check, X, ShieldAlert, ShoppingBag, 
-  Settings, Flame, Search, Plus, Maximize2, Minimize2, ClipboardList,
-  Download, ExternalLink, MessageSquare, AlertTriangle, ThumbsUp, ThumbsDown
+  Settings, Search, Plus, Maximize2, Minimize2, ClipboardList,
+  Download, ExternalLink, MessageSquare, AlertTriangle, ThumbsUp, ThumbsDown,
+  ChevronDown, ChevronUp
 } from 'lucide-react';
 
 type SidebarTab = 'dashboard' | 'menu' | 'reviews';
@@ -393,12 +394,18 @@ const getDishThumbnail = (name: string): string => {
 
 // Card component for split virtual orders in White Mode (frosted white glass appearance)
   const LightVirtualCard: React.FC<{ card: VirtualCard; actions: React.ReactNode }> = ({ card, actions }) => {
+    const [isExpanded, setIsExpanded] = useState(false);
     const timeDiff = currentTime.getTime() - new Date(card.createdAt).getTime();
     const minutesElapsed = Math.floor(timeDiff / 60000);
     const orderPlacingTime = new Date(card.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     // Warning highlights if cooking takes too long
     const isOverdue = card.status === 'Preparing' && minutesElapsed >= 15;
+
+    // Check if any items in this card have special instructions or custom notes
+    const hasCustomizations = card.items.some(
+      it => (Array.isArray(it.instructions) && it.instructions.length > 0) || Boolean(it.customNotes && it.customNotes.trim())
+    );
 
     return (
       <div className={`backdrop-blur-md rounded-xl border transition-all duration-300 flex flex-col justify-between p-3.5 shadow-2xs ${
@@ -437,10 +444,9 @@ const getDishThumbnail = (name: string): string => {
           </div>
 
           {/* Ordered items with high-res food thumbnail previews */}
-          <div className="divide-y divide-slate-100 mb-2.5">
+          <div className="divide-y divide-slate-100 mb-2">
             {card.items.map((item, idx) => {
               const thumbUrl = getDishThumbnail(item.name);
-              const instructionsText = item.instructions && item.instructions.length > 0 ? item.instructions.join(', ') : null;
 
               return (
                 <div key={idx} className="flex items-center justify-between py-2 first:pt-0 last:pb-0">
@@ -455,13 +461,6 @@ const getDishThumbnail = (name: string): string => {
                       <div className="flex items-center gap-1.5">
                         <span className="font-semibold text-slate-900 text-xs truncate">{item.name}</span>
                       </div>
-                      {(instructionsText || item.customNotes) && (
-                        <span className="block text-[10.5px] text-slate-500 truncate mt-0.5">
-                          {instructionsText}
-                          {instructionsText && item.customNotes ? ' · ' : ''}
-                          {item.customNotes ? `"${item.customNotes}"` : ''}
-                        </span>
-                      )}
                     </div>
                   </div>
                   <span className="font-extrabold text-xs text-primary bg-primary/10 px-2 py-0.5 rounded-md flex-shrink-0">
@@ -471,6 +470,67 @@ const getDishThumbnail = (name: string): string => {
               );
             })}
           </div>
+
+          {/* Expand/Collapse Customizations Toggle Button */}
+          <button
+            type="button"
+            onClick={() => setIsExpanded(prev => !prev)}
+            className={`w-full py-1.5 px-2.5 rounded-lg text-xs font-semibold flex items-center justify-between transition-all mb-2 border cursor-pointer ${
+              hasCustomizations
+                ? 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100 shadow-2xs'
+                : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200'
+            }`}
+          >
+            <span className="flex items-center gap-1.5">
+              {hasCustomizations && (
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+              )}
+              <span>{isExpanded ? 'Collapse Customizations' : 'View Customizations'}</span>
+              {hasCustomizations && (
+                <span className="text-[10px] bg-amber-200/90 text-amber-950 px-1.5 py-0.2 rounded font-bold">
+                  Special Notes
+                </span>
+              )}
+            </span>
+            {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </button>
+
+          {/* Expanded View: All item customizations, modifiers, & instructions */}
+          {isExpanded && (
+            <div className="bg-slate-50/90 border border-slate-200 rounded-xl p-2.5 mb-2.5 space-y-2 text-xs">
+              {card.items.map((item, idx) => {
+                const itemHasCustom = (Array.isArray(item.instructions) && item.instructions.length > 0) || Boolean(item.customNotes && item.customNotes.trim());
+                return (
+                  <div key={idx} className="border-b border-slate-200/60 last:border-0 pb-1.5 last:pb-0">
+                    <div className="flex justify-between items-center font-medium text-slate-800">
+                      <span className="font-bold text-[11px] truncate">{item.name}</span>
+                      <span className="text-[10px] font-semibold text-slate-500">×{item.quantity}</span>
+                    </div>
+                    {itemHasCustom ? (
+                      <div className="mt-1 space-y-1">
+                        {item.instructions && item.instructions.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {item.instructions.map((inst, iIdx) => (
+                              <span key={iIdx} className="bg-amber-100 text-amber-900 text-[10px] font-bold px-2 py-0.5 rounded border border-amber-200/80">
+                                • {inst}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        {item.customNotes && item.customNotes.trim() && (
+                          <p className="text-[11px] text-amber-950 bg-amber-100/70 border-l-2 border-amber-500 pl-2 py-1 rounded-r italic font-medium">
+                            "{item.customNotes.trim()}"
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-[10px] text-slate-400 italic mt-0.5">Standard preparation (No modifications)</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Action Button */}
