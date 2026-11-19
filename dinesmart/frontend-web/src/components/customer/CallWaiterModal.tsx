@@ -53,9 +53,9 @@ export const CallWaiterModal: React.FC<CallWaiterModalProps> = ({ onClose }) => 
           icon: <ConciergeBell className="text-rose-500" size={24} />,
           desc: activeBillRequest
             ? activeBillRequest.status === 'Accepted'
-              ? 'Waiter is coming to your table to collect payment'
-              : 'Waiting for waiter to accept your bill request'
-            : 'Request waiter to accept and collect cash bill',
+              ? 'Waiter is coming to your table to settle the bill'
+              : 'Waiting for waiter to accept your payment request'
+            : 'Request waiter to settle bill (UPI QR or Cash)',
           disabled: !!activeBillRequest,
         },
       ]
