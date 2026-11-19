@@ -2698,10 +2698,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                       href="/downloads/TableTap_Waiter.apk"
                       download="TableTap_Waiter.apk"
                       className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3.5 py-1.5 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0"
-                      title="Download Waiter Android App APK"
+                      title="Download Updated Waiter Android App APK (Latest Build)"
                     >
                       <Smartphone size={13} />
-                      <span>Waiter APK</span>
+                      <span>Download Waiter APK (Latest)</span>
                       <Download size={11} className="opacity-80" />
                     </a>
 
