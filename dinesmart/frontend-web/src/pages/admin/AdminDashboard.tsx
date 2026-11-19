@@ -13,8 +13,9 @@ import {
   TrendingDown, ArrowUpRight, ArrowDownRight, Clock, Star, Eye, EyeOff, Phone, Copy, FileSpreadsheet, ChevronDown, ExternalLink,
   Upload, Smartphone, Share2, CheckCircle2, AlertCircle, Receipt,
   Bell, LogOut, Activity, BookOpen, Smile, Meh, Frown, PanelLeftClose, PanelLeftOpen,
-  Table, List, LayoutGrid, Tag
+  Table, List, LayoutGrid, Tag, IndianRupee
 } from 'lucide-react';
+import { AccurateRevenueReport } from '../../components/admin/AccurateRevenueReport';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, CartesianGrid, AreaChart, Area } from 'recharts';
 import {
   predictSales, getCustomerAIInsights,
@@ -35,7 +36,7 @@ interface AdminDashboardProps {
 type TabType =
   | 'overview' | 'menu' | 'staff'
   | 'loyalty' | 'promotions' | 'customers' | 'ai_analytics'
-  | 'reports' | 'settings' | 'security' | 'qrcodes' | 'gallery' | 'reviews';
+  | 'reports' | 'revenue' | 'settings' | 'security' | 'qrcodes' | 'gallery' | 'reviews';
 
 interface Employee {
   id: string;
@@ -1243,6 +1244,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
               <div>
                 <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mb-1.5 px-3">AI & Analytics</p>
                 <nav className="space-y-1">
+                  <button
+                    onClick={() => setActiveTab('revenue')}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs transition-all cursor-pointer ${activeTab === 'revenue'
+                      ? 'bg-slate-800/90 text-white font-semibold border border-slate-700/80 shadow-2xs'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 font-medium'
+                      }`}
+                  >
+                    <IndianRupee size={15} className={activeTab === 'revenue' ? 'text-[#FF6B00]' : 'text-slate-400'} />
+                    <span>Revenue Reporting</span>
+                    {activeTab === 'revenue' && <ChevronRight size={13} className="ml-auto text-slate-400" />}
+                  </button>
                   <button
                     onClick={() => setActiveTab('reports')}
                     className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs transition-all cursor-pointer ${activeTab === 'reports'
@@ -3624,6 +3636,27 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ role, onLogout }
                   )}
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* ----------------------------------------------------
+              VIEW: ACCURATE REVENUE REPORTING (Asia/Kolkata)
+              ---------------------------------------------------- */}
+          {activeTab === 'revenue' && (
+            <div className="space-y-6 animate-fade-in font-sans">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-1">
+                <div>
+                  <h3 className="font-black text-xl text-slate-900 tracking-tight flex items-center gap-2">
+                    <IndianRupee className="text-[#FF6B00]" size={22} />
+                    <span>Restaurant Revenue Reporting Console</span>
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Live server-side revenue accounting strictly bounded to Asia/Kolkata (UTC+05:30) timeframes.
+                  </p>
+                </div>
+              </div>
+
+              <AccurateRevenueReport />
             </div>
           )}
 

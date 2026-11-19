@@ -166,3 +166,39 @@ CREATE TABLE IF NOT EXISTS public.pending_staff (
 ALTER TABLE public.pending_staff ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow public access" ON public.pending_staff FOR ALL USING (true) WITH CHECK (true);
 
+-- 13. PAYMENT TRANSACTIONS (UPI & CASH RECONCILIATION)
+CREATE TABLE IF NOT EXISTS public.payment_transactions (
+    transaction_id TEXT PRIMARY KEY,
+    order_id TEXT NOT NULL REFERENCES public.orders(id) ON DELETE CASCADE,
+    gateway_name TEXT NOT NULL DEFAULT 'MANUAL_CASH',
+    gateway_order_id TEXT,
+    gateway_payment_id TEXT,
+    channel TEXT NOT NULL, -- 'UPI' or 'CASH'
+    amount NUMERIC NOT NULL CHECK (amount >= 0),
+    status TEXT NOT NULL DEFAULT 'SUCCESS',
+    cash_tendered NUMERIC,
+    cash_change_returned NUMERIC,
+    collected_by_waiter_id TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+ALTER TABLE public.payment_transactions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow public access" ON public.payment_transactions FOR ALL USING (true) WITH CHECK (true);
+
+-- 14. PAYMENT AUDIT LOGS
+CREATE TABLE IF NOT EXISTS public.payment_audit_logs (
+    log_id BIGSERIAL PRIMARY KEY,
+    order_id TEXT NOT NULL,
+    action TEXT NOT NULL,
+    performed_by_id TEXT NOT NULL,
+    performed_by_role TEXT NOT NULL,
+    payload_snapshot JSONB,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+ALTER TABLE public.payment_audit_logs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow public access" ON public.payment_audit_logs FOR ALL USING (true) WITH CHECK (true);
+
+-- 15. PERFORMANCE INDEXES FOR REVENUE REPORTING (ASIA/KOLKATA BOUNDARIES)
+CREATE INDEX IF NOT EXISTS idx_orders_payment_paid_at ON public.orders (payment_status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_payment_transactions_created ON public.payment_transactions (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_payment_transactions_order ON public.payment_transactions (order_id);
+

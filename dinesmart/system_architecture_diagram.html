@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TableTap - System Architecture & Data Flow</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 p-6 min-h-screen">
+
+  <div class="max-w-7xl mx-auto space-y-8">
+    
+    <!-- Top Selector Tabs -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 flex flex-wrap items-center justify-between gap-4">
+      <div>
+        <h1 class="text-xl font-black text-slate-900 tracking-tight">TableTap Architecture & Flow Reference</h1>
+        <p class="text-xs text-slate-500">Choose between the 4-Tier Structural Architecture (Recommended for Viva) or the 4-Actor Swimlane Data Flow.</p>
+      </div>
+      <div class="flex bg-slate-100 p-1 rounded-xl border border-slate-200 gap-1 text-xs font-bold">
+        <a href="#tiered-architecture" class="px-4 py-2 bg-white text-orange-600 rounded-lg shadow-xs border border-slate-200">
+          Option 1: 4-Tier System Architecture (Viva Recommended)
+        </a>
+        <a href="#swimlane-flow" class="px-4 py-2 text-slate-600 hover:text-slate-900 rounded-lg">
+          Option 2: 4-Actor Swimlane Data Flow
+        </a>
+      </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- OPTION 1: 4-TIER STRUCTURAL SYSTEM ARCHITECTURE (RECOMMENDED FOR VIVA)    -->
+    <!-- ========================================================================= -->
+    <div id="tiered-architecture" class="bg-white rounded-3xl shadow-xl border border-slate-200 p-8 space-y-6">
+      
+      <div class="text-center border-b border-slate-200 pb-5">
+        <span class="inline-block bg-orange-100 text-orange-700 text-[11px] font-bold px-3 py-1 rounded-full uppercase tracking-wider mb-2">Slide 6: System Architecture</span>
+        <h2 class="text-2xl font-black text-slate-900 tracking-tight">TableTap 4-Tier System Architecture</h2>
+        <p class="text-xs text-slate-500 mt-1">Multi-Tier Microservice, Predictive ML, and 2-Pass RAG Orchestration Topology</p>
+      </div>
+
+      <!-- TIER 1 -->
+      <div class="border-2 border-blue-200 bg-blue-50/40 rounded-2xl p-5">
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-xs font-black uppercase tracking-wider text-blue-800 flex items-center gap-2">
+            <span class="w-3 h-3 rounded-full bg-blue-500"></span> Tier 1: Client Presentation Layer (Cross-Platform Frontends)
+          </span>
+          <span class="text-[11px] font-semibold text-blue-700 bg-blue-100 px-2.5 py-0.5 rounded-full">React 19 • TypeScript • Capacitor APK</span>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div class="bg-white p-4 rounded-xl border border-blue-200 shadow-2xs">
+            <div class="text-xs font-extrabold text-blue-700 uppercase tracking-wider mb-1">Diner Interface</div>
+            <strong class="text-slate-900 text-sm block">Customer Web PWA</strong>
+            <p class="text-[11px] text-slate-500 mt-1">Zero-install QR scan, interactive digital menu, dietary & allergen filters, 5% GST cart.</p>
+          </div>
+          <div class="bg-white p-4 rounded-xl border border-blue-200 shadow-2xs">
+            <div class="text-xs font-extrabold text-blue-700 uppercase tracking-wider mb-1">Kitchen Interface</div>
+            <strong class="text-slate-900 text-sm block">Live Kitchen Display (KDS)</strong>
+            <p class="text-[11px] text-slate-500 mt-1">FIFO order queue, split virtual cards (Food vs. Ready-made), overdue timers, dual-tone chimes.</p>
+          </div>
+          <div class="bg-white p-4 rounded-xl border border-blue-200 shadow-2xs">
+            <div class="text-xs font-extrabold text-blue-700 uppercase tracking-wider mb-1">Floor Interface</div>
+            <strong class="text-slate-900 text-sm block">Waitstaff Console</strong>
+            <p class="text-[11px] text-slate-500 mt-1">Real-time table calls (water/bill), KDS order pickup alerts, table occupancy status board.</p>
+          </div>
+          <div class="bg-white p-4 rounded-xl border border-blue-200 shadow-2xs">
+            <div class="text-xs font-extrabold text-blue-700 uppercase tracking-wider mb-1">Management Interface</div>
+            <strong class="text-slate-900 text-sm block">Executive Admin Panel</strong>
+            <p class="text-[11px] text-slate-500 mt-1">Live sales KPIs, Recharts analytics, staff attendance/payroll, inventory audit, Bhakasura AI bot.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- BUS CONNECTOR -->
+      <div class="flex items-center justify-center -my-2">
+        <span class="text-[11px] font-bold text-slate-500 bg-slate-100 px-4 py-1 rounded-full border border-slate-200">
+          ↕ Real-Time WebSockets • Supabase Client SDK • REST API Endpoints
+        </span>
+      </div>
+
+      <!-- TIER 2 -->
+      <div class="border-2 border-orange-200 bg-orange-50/40 rounded-2xl p-5">
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-xs font-black uppercase tracking-wider text-orange-800 flex items-center gap-2">
+            <span class="w-3 h-3 rounded-full bg-orange-500"></span> Tier 2: Application Core Logic & Event Broker Layer
+          </span>
+          <span class="text-[11px] font-semibold text-orange-700 bg-orange-100 px-2.5 py-0.5 rounded-full">React Context • Web Audio API • NLP</span>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div class="bg-white p-3.5 rounded-xl border border-orange-200 shadow-2xs">
+            <strong class="text-slate-900 text-xs block">Order Partitioning Engine</strong>
+            <p class="text-[11px] text-slate-500 mt-1">Splits order into Cooked Food tab vs. Ready-Made drinks/desserts counter.</p>
+          </div>
+          <div class="bg-white p-3.5 rounded-xl border border-orange-200 shadow-2xs">
+            <strong class="text-slate-900 text-xs block">Billing & Tax Calculator</strong>
+            <p class="text-[11px] text-slate-500 mt-1">Itemizes subtotal, statutory 5% GST, loyalty point discounts, and waiter tips.</p>
+          </div>
+          <div class="bg-white p-3.5 rounded-xl border border-orange-200 shadow-2xs">
+            <strong class="text-slate-900 text-xs block">Web Audio API Synthesizer</strong>
+            <p class="text-[11px] text-slate-500 mt-1">Dual 880Hz / 1046.5Hz sine-wave arrival chime for kitchen tickets.</p>
+          </div>
+          <div class="bg-white p-3.5 rounded-xl border border-orange-200 shadow-2xs">
+            <strong class="text-slate-900 text-xs block">Aspect Sentiment (ABSA)</strong>
+            <p class="text-[11px] text-slate-500 mt-1">Extracts Food/Service/Speed sentiments and triggers critical alerts on cold/raw items.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- BUS CONNECTOR -->
+      <div class="flex items-center justify-center -my-2">
+        <span class="text-[11px] font-bold text-slate-500 bg-slate-100 px-4 py-1 rounded-full border border-slate-200">
+          ↕ Model Weights • AST Verification • 2-Pass Tool Invocations
+        </span>
+      </div>
+
+      <!-- TIER 3 -->
+      <div class="border-2 border-purple-200 bg-purple-50/40 rounded-2xl p-5">
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-xs font-black uppercase tracking-wider text-purple-800 flex items-center gap-2">
+            <span class="w-3 h-3 rounded-full bg-purple-500"></span> Tier 3: AI & Predictive Intelligence Tier
+          </span>
+          <span class="text-[11px] font-semibold text-purple-700 bg-purple-100 px-2.5 py-0.5 rounded-full">Scikit-Learn • Groq Cloud 120B • pgsql-ast-parser</span>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="bg-white p-4 rounded-xl border border-purple-200 shadow-2xs">
+            <div class="text-xs font-extrabold text-purple-700 uppercase tracking-wider mb-1">Queue Regression</div>
+            <strong class="text-slate-900 text-sm block">Random Forest Delay Predictor</strong>
+            <p class="text-[11px] text-slate-500 mt-1">Features: Queue Length (42%), Base Prep (28%), Items (14%). Trained on 23,708 records.</p>
+            <div class="mt-2 text-[10px] font-bold text-purple-800 bg-purple-50 p-1.5 rounded border border-purple-100">
+              R² = 0.957 • MAE = 1.27 min (Baseline: 5.45 min)
+            </div>
+          </div>
+          <div class="bg-white p-4 rounded-xl border border-purple-200 shadow-2xs">
+            <div class="text-xs font-extrabold text-purple-700 uppercase tracking-wider mb-1">Cross-Selling Engine</div>
+            <strong class="text-slate-900 text-sm block">Market Basket Association</strong>
+            <p class="text-[11px] text-slate-500 mt-1">Apriori co-occurrence rule mining recommending smart pairings (Biryani → Cold Coffee 68.4%).</p>
+            <div class="mt-2 text-[10px] font-bold text-purple-800 bg-purple-50 p-1.5 rounded border border-purple-100">
+              Formula: Confidence(A→B) = Co-orders / Total Orders
+            </div>
+          </div>
+          <div class="bg-white p-4 rounded-xl border border-purple-200 shadow-2xs">
+            <div class="text-xs font-extrabold text-purple-700 uppercase tracking-wider mb-1">Executive Copilot</div>
+            <strong class="text-slate-900 text-sm block">Bhakasura 2-Pass RAG Engine</strong>
+            <p class="text-[11px] text-slate-500 mt-1">Scope Guard → pgsql-ast-parser Sandbox → execute_readonly_sql RPC → Groq 120B Synthesis.</p>
+            <div class="mt-2 text-[10px] font-bold text-purple-800 bg-purple-50 p-1.5 rounded border border-purple-100">
+              50/50 Tests Passed (100%) • 4.9/5.0 Quality Score
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- BUS CONNECTOR -->
+      <div class="flex items-center justify-center -my-2">
+        <span class="text-[11px] font-bold text-slate-500 bg-slate-100 px-4 py-1 rounded-full border border-slate-200">
+          ↕ execute_readonly_sql RPC • Role chatbot_ro
+        </span>
+      </div>
+
+      <!-- TIER 4 -->
+      <div class="border-2 border-emerald-200 bg-emerald-50/40 rounded-2xl p-5">
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-xs font-black uppercase tracking-wider text-emerald-800 flex items-center gap-2">
+            <span class="w-3 h-3 rounded-full bg-emerald-500"></span> Tier 4: Database & Security Layer (Supabase Cloud PostgreSQL 15)
+          </span>
+          <span class="text-[11px] font-semibold text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-full">Row-Level Security (RLS)</span>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2 text-center text-xs font-bold text-slate-700">
+          <div class="bg-white p-2 rounded-lg border border-emerald-200">orders</div>
+          <div class="bg-white p-2 rounded-lg border border-emerald-200">menu_items</div>
+          <div class="bg-white p-2 rounded-lg border border-emerald-200">tables</div>
+          <div class="bg-white p-2 rounded-lg border border-emerald-200">waiter_requests</div>
+          <div class="bg-white p-2 rounded-lg border border-emerald-200">staff</div>
+          <div class="bg-white p-2 rounded-lg border border-emerald-200">inventory</div>
+          <div class="bg-white p-2 rounded-lg border border-emerald-200">reviews</div>
+          <div class="bg-white p-2 rounded-lg border border-emerald-200">feedback</div>
+          <div class="bg-white p-2 rounded-lg border border-emerald-200">loyalty_profiles</div>
+          <div class="bg-white p-2 rounded-lg border border-emerald-200">promotions</div>
+          <div class="bg-white p-2 rounded-lg border border-emerald-200">activity_logs</div>
+          <div class="bg-emerald-600 text-white p-2 rounded-lg">chatbot_ro Role</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- OPTION 2: 4-ACTOR SWIMLANE DATA FLOW DIAGRAM                              -->
+    <!-- ========================================================================= -->
+    <div id="swimlane-flow" class="bg-white rounded-3xl shadow-xl border border-slate-200 p-8 space-y-6">
+      
+      <div class="text-center border-b border-slate-200 pb-5">
+        <span class="inline-block bg-blue-100 text-blue-700 text-[11px] font-bold px-3 py-1 rounded-full uppercase tracking-wider mb-2">Alternative: Operational Data Flow</span>
+        <h2 class="text-2xl font-black text-slate-900 tracking-tight">TableTap 4-Actor Operational Data Flow</h2>
+        <p class="text-xs text-slate-500 mt-1">Clean, Zero-Gap Vertical Swimlanes (Customer → Kitchen → Waiter → Management)</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+
+        <!-- COLUMN 1: DINER -->
+        <div class="bg-orange-50/50 border-2 border-orange-200 rounded-2xl p-4 flex flex-col space-y-4">
+          <div class="bg-orange-600 text-white font-extrabold text-sm py-2 px-3 rounded-xl text-center shadow-xs">
+            1. DINER (Any Browser)
+          </div>
+          <div class="space-y-3 flex-1">
+            <div class="bg-white p-3 rounded-xl border border-orange-200 shadow-2xs text-xs">
+              <strong class="text-orange-700 block">Step 1: Scan Table QR</strong>
+              <span class="text-slate-500 text-[11px]">Opens digital menu in mobile browser without app install.</span>
+            </div>
+            <div class="bg-white p-3 rounded-xl border border-orange-200 shadow-2xs text-xs">
+              <strong class="text-orange-700 block">Step 2: Browse & Customize</strong>
+              <span class="text-slate-500 text-[11px]">Dietary filters, spice levels, allergens, and ML dish recommendations.</span>
+            </div>
+            <div class="bg-white p-3 rounded-xl border border-orange-200 shadow-2xs text-xs">
+              <strong class="text-orange-700 block">Step 3: Cart & Checkout</strong>
+              <span class="text-slate-500 text-[11px]">Calculates 5% GST, loyalty points redemption, and dispatch.</span>
+            </div>
+            <div class="bg-white p-3 rounded-xl border border-orange-200 shadow-2xs text-xs">
+              <strong class="text-orange-700 block">Step 4: Post-Dining Feedback</strong>
+              <span class="text-slate-500 text-[11px]">Submits ratings; ABSA engine alerts kitchen on issues.</span>
+            </div>
+          </div>
+          <div class="text-center text-[10px] font-bold text-orange-600 bg-orange-100 py-1.5 rounded-lg">
+            Outputs: Orders & Reviews
+          </div>
+        </div>
+
+        <!-- COLUMN 2: KITCHEN -->
+        <div class="bg-amber-50/50 border-2 border-amber-200 rounded-2xl p-4 flex flex-col space-y-4">
+          <div class="bg-amber-600 text-white font-extrabold text-sm py-2 px-3 rounded-xl text-center shadow-xs">
+            2. CHEF (Kitchen KDS)
+          </div>
+          <div class="space-y-3 flex-1">
+            <div class="bg-white p-3 rounded-xl border border-amber-200 shadow-2xs text-xs">
+              <strong class="text-amber-700 block">Step 1: Ticket Arrival Chime</strong>
+              <span class="text-slate-500 text-[11px]">Web Audio API plays dual-frequency chime upon WebSocket order insert.</span>
+            </div>
+            <div class="bg-white p-3 rounded-xl border border-amber-200 shadow-2xs text-xs">
+              <strong class="text-amber-700 block">Step 2: Order Partitioning</strong>
+              <span class="text-slate-500 text-[11px]">Auto-splits items: Cooked Food tab vs. Ready-Made drinks/dessert tab.</span>
+            </div>
+            <div class="bg-white p-3 rounded-xl border border-amber-200 shadow-2xs text-xs">
+              <strong class="text-amber-700 block">Step 3: FIFO Queue Management</strong>
+              <span class="text-slate-500 text-[11px]">Chronological sorting with &gt;15 min overdue pulse alert.</span>
+            </div>
+            <div class="bg-white p-3 rounded-xl border border-amber-200 shadow-2xs text-xs">
+              <strong class="text-amber-700 block">Step 4: Mark "Ready to Serve"</strong>
+              <span class="text-slate-500 text-[11px]">Dispatches pickup event directly to Waitstaff console.</span>
+            </div>
+          </div>
+          <div class="text-center text-[10px] font-bold text-amber-700 bg-amber-100 py-1.5 rounded-lg">
+            Outputs: Preparation Status
+          </div>
+        </div>
+
+        <!-- COLUMN 3: WAITER -->
+        <div class="bg-blue-50/50 border-2 border-blue-200 rounded-2xl p-4 flex flex-col space-y-4">
+          <div class="bg-blue-600 text-white font-extrabold text-sm py-2 px-3 rounded-xl text-center shadow-xs">
+            3. WAITER (Floor Console)
+          </div>
+          <div class="space-y-3 flex-1">
+            <div class="bg-white p-3 rounded-xl border border-blue-200 shadow-2xs text-xs">
+              <strong class="text-blue-700 block">Step 1: Shift Authentication</strong>
+              <span class="text-slate-500 text-[11px]">Morning / Evening / Night shift login with assigned table sections.</span>
+            </div>
+            <div class="bg-white p-3 rounded-xl border border-blue-200 shadow-2xs text-xs">
+              <strong class="text-blue-700 block">Step 2: Table Service Dispatch</strong>
+              <span class="text-slate-500 text-[11px]">Receives live guest requests (Water, Bill, Cutlery, Clean Table).</span>
+            </div>
+            <div class="bg-white p-3 rounded-xl border border-blue-200 shadow-2xs text-xs">
+              <strong class="text-blue-700 block">Step 3: Dish Pickup Alert</strong>
+              <span class="text-slate-500 text-[11px]">Alerted when KDS marks food "Ready to Serve" with exact table number.</span>
+            </div>
+            <div class="bg-white p-3 rounded-xl border border-blue-200 shadow-2xs text-xs">
+              <strong class="text-blue-700 block">Step 4: Mark "Delivered"</strong>
+              <span class="text-slate-500 text-[11px]">Completes ticket lifecycle and updates table turnover metrics.</span>
+            </div>
+          </div>
+          <div class="text-center text-[10px] font-bold text-blue-700 bg-blue-100 py-1.5 rounded-lg">
+            Outputs: Service Resolution
+          </div>
+        </div>
+
+        <!-- COLUMN 4: ADMIN -->
+        <div class="bg-purple-50/50 border-2 border-purple-200 rounded-2xl p-4 flex flex-col space-y-4">
+          <div class="bg-purple-600 text-white font-extrabold text-sm py-2 px-3 rounded-xl text-center shadow-xs">
+            4. ADMIN (Management)
+          </div>
+          <div class="space-y-3 flex-1">
+            <div class="bg-white p-3 rounded-xl border border-purple-200 shadow-2xs text-xs">
+              <strong class="text-purple-700 block">Step 1: Live BI Dashboard</strong>
+              <span class="text-slate-500 text-[11px]">Monitors daily gross sales, AOV, RevPASH, and active table turnover.</span>
+            </div>
+            <div class="bg-white p-3 rounded-xl border border-purple-200 shadow-2xs text-xs">
+              <strong class="text-purple-700 block">Step 2: Menu & Stock Editor</strong>
+              <span class="text-slate-500 text-[11px]">Sets prices, manages inventory par levels, toggles daily availability.</span>
+            </div>
+            <div class="bg-white p-3 rounded-xl border border-purple-200 shadow-2xs text-xs">
+              <strong class="text-purple-700 block">Step 3: Bhakasura AI Copilot</strong>
+              <span class="text-slate-500 text-[11px]">Asks operational queries; RAG answers via AST-sandboxed Supabase SQL.</span>
+            </div>
+            <div class="bg-white p-3 rounded-xl border border-purple-200 shadow-2xs text-xs">
+              <strong class="text-purple-700 block">Step 4: Automated Exports</strong>
+              <span class="text-slate-500 text-[11px]">Generates PDF tax invoices and styled Excel management reports.</span>
+            </div>
+          </div>
+          <div class="text-center text-[10px] font-bold text-purple-700 bg-purple-100 py-1.5 rounded-lg">
+            Outputs: Executive Decisions
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+</body>
+</html>

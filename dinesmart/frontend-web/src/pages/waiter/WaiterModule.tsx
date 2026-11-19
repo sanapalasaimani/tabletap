@@ -5,9 +5,10 @@ import {
   ArrowLeft, User, Lock, Eye, EyeOff, 
   CheckCircle, Wallet, Sparkles, AlertTriangle, AlertCircle,
   Clock, ShieldCheck, Upload, Edit3, X, Check,
-  Smartphone, Download, LogOut, Unlock, RefreshCw, LayoutGrid
+  Smartphone, Download, LogOut, Unlock, RefreshCw, LayoutGrid, QrCode
 } from 'lucide-react';
 import { formatPhotoUrl, getInitials, compressImageFile } from '../../utils/photoHelper';
+import { WaiterPaymentTerminal } from '../../components/waiter/WaiterPaymentTerminal';
 
 export const ClocheIcon = ({ size = 20, className = '' }: { size?: number; className?: string }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}>
@@ -81,6 +82,7 @@ export const WaiterModule: React.FC = () => {
     const saved = localStorage.getItem('tabletap_waiter_accepted_tasks');
     return saved ? JSON.parse(saved) : [];
   });
+  const [activePaymentTerminalTable, setActivePaymentTerminalTable] = useState<string | null>(null);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const [remainingMinutes, setRemainingMinutes] = useState<number>(30);
 
@@ -1096,14 +1098,21 @@ export const WaiterModule: React.FC = () => {
                         ) : task.type === 'cash_collection' || (task.type === 'service_call' && task.rawReq?.requestType === 'Request Bill') ? (
                           <div className="space-y-1.5 w-full">
                             <button
-                              onClick={() => handleReceiveCashPayment(task.tableId, task.rawOrder?.id, task.rawReq?.id)}
-                              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-2.5 rounded-xl text-xs transition-all shadow-sm cursor-pointer flex items-center justify-center gap-1.5 active:scale-98"
+                              onClick={() => setActivePaymentTerminalTable(task.tableId)}
+                              className="w-full bg-gradient-to-r from-indigo-600 via-indigo-700 to-emerald-600 hover:opacity-95 text-white font-black py-2.5 rounded-xl text-xs transition-all shadow-md shadow-indigo-500/20 cursor-pointer flex items-center justify-center gap-1.5 active:scale-98"
                             >
-                              <span>💵 Collect Payment{task.amount ? ` • ₹${task.amount}` : ''} (Mark Paid)</span>
+                              <QrCode size={14} />
+                              <span>Show UPI QR / Settle Bill{task.amount ? ` • ₹${task.amount}` : ''}</span>
+                            </button>
+                            <button
+                              onClick={() => handleReceiveCashPayment(task.tableId, task.rawOrder?.id, task.rawReq?.id)}
+                              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-2 rounded-xl text-[11px] transition-all shadow-sm cursor-pointer flex items-center justify-center gap-1.5 active:scale-98"
+                            >
+                              <span>💵 Quick Collect Cash (Mark Paid)</span>
                             </button>
                             <button
                               onClick={() => handleRemoveSessionBlock(Number(task.tableId))}
-                              className="w-full bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 font-extrabold py-2 rounded-xl text-[11px] transition-all cursor-pointer flex items-center justify-center gap-1 active:scale-98"
+                              className="w-full bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 font-extrabold py-1.5 rounded-xl text-[11px] transition-all cursor-pointer flex items-center justify-center gap-1 active:scale-98"
                             >
                               <Unlock size={12} />
                               <span>Unlock Table #{task.tableId} (Remove Block)</span>
@@ -1648,6 +1657,19 @@ export const WaiterModule: React.FC = () => {
 
       </div>
 
+      {activePaymentTerminalTable && (
+        <WaiterPaymentTerminal
+          waiterId={staffInfo.empid || 'WTR-01'}
+          waiterName={staffInfo.name || 'Staff Waiter'}
+          tableId={activePaymentTerminalTable}
+          orders={orders}
+          onClose={() => setActivePaymentTerminalTable(null)}
+          onPaymentSuccess={() => {
+            setActivePaymentTerminalTable(null);
+            fetchTasks();
+          }}
+        />
+      )}
       
     </div>
   );

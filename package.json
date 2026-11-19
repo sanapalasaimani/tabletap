@@ -5,6 +5,9 @@
   "scripts": {
     "build": "cd dinesmart/frontend-web && npm install && npm run build",
     "start": "cd dinesmart/frontend-web && npm run preview"
+  },
+  "dependencies": {
+    "@types/qrcode": "^1.5.6",
+    "qrcode": "^1.5.4"
   }
 }
-

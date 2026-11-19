@@ -52,6 +52,10 @@ export interface Order {
   paymentMethod?: string;
   feedbackSubmitted?: boolean;
   discountCoupon?: string;
+  paidAt?: string;
+  acceptedByWaiterId?: string;
+  acceptedByWaiterName?: string;
+  billState?: 'OPEN' | 'PAYMENT_REQUESTED' | 'ACCEPTED' | 'PAID' | 'FAILED' | 'EXPIRED' | 'CANCELLED';
 }
 
 export interface UserProfile {
@@ -67,6 +71,22 @@ export interface WaiterRequest {
   requestType: 'Water' | 'Cutlery' | 'Tissue' | 'Call Waiter' | 'Request Bill';
   status: 'Pending' | 'Accepted' | 'Completed';
   createdAt: string;
+  waiterId?: string;
+  waiterName?: string;
+}
+
+export interface PaymentTransaction {
+  id: string;
+  orderId: string;
+  tableId: string;
+  channel: 'UPI' | 'CASH';
+  amount: number;
+  status: 'SUCCESS' | 'PENDING' | 'FAILED';
+  cashTendered?: number;
+  cashChangeReturned?: number;
+  waiterId?: string;
+  waiterName?: string;
+  paidAt: string;
 }
 
 export interface PendingStaff {

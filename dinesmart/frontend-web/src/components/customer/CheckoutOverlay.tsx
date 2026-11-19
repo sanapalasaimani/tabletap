@@ -131,14 +131,14 @@ export const CheckoutOverlay: React.FC<CheckoutOverlayProps> = ({ onClose, onPay
     );
   }
 
-  // Cash Payment Request (Alerts waiter; waiter must accept & collect payment)
+  // Request Bill / Payment (Alerts waiter; waiter must accept & collect payment via UPI QR or Cash)
   const handleRequestCashPayment = async () => {
     if (targetOrders.length === 0) return;
     setIsProcessing(true);
     try {
-      // Persist Cash payment method on each unpaid order in Supabase + local cache
+      // Persist payment requested state on each unpaid order in Supabase + local cache
       for (const ord of targetOrders) {
-        await db.markOrderPaymentRequested(ord.id, 'Cash');
+        await db.markOrderPaymentRequested(ord.id, 'Pending');
       }
 
       // Notify waiter of bill payment request (deduplicated per table)
@@ -147,7 +147,7 @@ export const CheckoutOverlay: React.FC<CheckoutOverlayProps> = ({ onClose, onPay
 
       setStep('awaiting_cash');
     } catch (err) {
-      console.warn('Error requesting cash payment:', err);
+      console.warn('Error requesting bill payment:', err);
     } finally {
       setIsProcessing(false);
     }
@@ -168,10 +168,10 @@ export const CheckoutOverlay: React.FC<CheckoutOverlayProps> = ({ onClose, onPay
           <div>
             <h3 className="font-black text-brand-text text-base">
               {step === 'summary' && (specificOrder ? `Order #${specificOrder.id} Bill` : 'Table Bill Summary')}
-              {step === 'awaiting_cash' && 'Awaiting Waiter Confirmation'}
+              {step === 'awaiting_cash' && (isWaiterAccepted ? 'Waiter Coming to Table' : 'Bill Payment Requested')}
               {step === 'success' && 'Payment Successful'}
             </h3>
-            <span className="text-[11px] text-gray-400 font-semibold">Table #{tableId} • Pay with Cash</span>
+            <span className="text-[11px] text-gray-400 font-semibold">Table #{tableId} • UPI QR / Cash Settlement</span>
           </div>
 
           {step !== 'success' && (
@@ -257,15 +257,15 @@ export const CheckoutOverlay: React.FC<CheckoutOverlayProps> = ({ onClose, onPay
                 </div>
               </div>
 
-              {/* Cash Payment Highlight Banner */}
-              <div className="bg-emerald-50/70 rounded-2xl p-4 border border-emerald-200/80 flex items-start gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 mt-0.5">
+              {/* Payment Highlight Banner */}
+              <div className="bg-gradient-to-br from-indigo-50 to-emerald-50 rounded-2xl p-4 border border-indigo-100/80 flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0 mt-0.5">
                   <Banknote size={22} />
                 </div>
                 <div>
-                  <h4 className="font-extrabold text-xs text-emerald-950">Payment Method: Pay with Cash</h4>
-                  <p className="text-[11px] text-emerald-800 mt-0.5 leading-relaxed">
-                    Please pay <strong>₹{totalAmount}</strong> in physical cash to your waiter or at the billing counter. Your waiter will confirm payment upon receiving the money.
+                  <h4 className="font-extrabold text-xs text-slate-900">Payment Options: UPI QR or Cash</h4>
+                  <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
+                    Tap below to notify your waiter. Your waiter will arrive at Table #{tableId} with your final bill and dynamic <strong>UPI QR code</strong> (GPay, PhonePe, Paytm) or collect physical <strong>Cash</strong>.
                   </p>
                 </div>
               </div>
@@ -285,51 +285,85 @@ export const CheckoutOverlay: React.FC<CheckoutOverlayProps> = ({ onClose, onPay
             </div>
           )}
 
-          {/* STEP 2: AWAITING WAITER ACCEPTANCE & CASH COLLECTION */}
+          {/* STEP 2: LIVE 3-STEP STATUS: Requested -> Waiter Coming -> Paid */}
           {step === 'awaiting_cash' && (
-            <div className="text-center py-6 space-y-5 animate-fade-in">
-              <div className="relative w-20 h-20 mx-auto">
-                <div className={`w-20 h-20 rounded-full flex items-center justify-center shadow-lg border-2 ${
-                  isWaiterAccepted
-                    ? 'bg-emerald-50 text-emerald-600 shadow-emerald-500/10 border-emerald-200'
-                    : 'bg-amber-50 text-amber-500 shadow-amber-500/10 border-amber-200'
-                }`}>
-                  {isWaiterAccepted ? <CheckCircle2 size={38} /> : <Clock size={38} className="animate-pulse" />}
+            <div className="text-center py-5 space-y-4 animate-fade-in">
+              {/* Stepper Progress Bar */}
+              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 max-w-[340px] mx-auto">
+                <div className="flex items-center justify-between relative px-2">
+                  <div className="absolute top-1/2 left-6 right-6 h-0.5 bg-slate-200 -translate-y-1/2 z-0" />
+                  
+                  {/* Step 1: Requested */}
+                  <div className="relative z-10 flex flex-col items-center">
+                    <div className="w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[11px] font-black shadow-xs">
+                      ✓
+                    </div>
+                    <span className="text-[10px] font-black text-slate-800 mt-1">1. Requested</span>
+                  </div>
+
+                  {/* Step 2: Waiter Coming */}
+                  <div className="relative z-10 flex flex-col items-center">
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black transition-all ${
+                      isWaiterAccepted
+                        ? 'bg-blue-600 text-white ring-4 ring-blue-100 shadow-xs'
+                        : 'bg-amber-400 text-amber-950 animate-pulse ring-4 ring-amber-100'
+                    }`}>
+                      {isWaiterAccepted ? '✓' : '2'}
+                    </div>
+                    <span className={`text-[10px] font-black mt-1 ${isWaiterAccepted ? 'text-blue-700' : 'text-amber-800'}`}>
+                      2. Waiter Coming
+                    </span>
+                  </div>
+
+                  {/* Step 3: Paid */}
+                  <div className="relative z-10 flex flex-col items-center">
+                    <div className="w-7 h-7 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center text-[11px] font-black">
+                      3
+                    </div>
+                    <span className="text-[10px] font-bold text-slate-400 mt-1">3. Paid</span>
+                  </div>
                 </div>
-                <span className="absolute bottom-0 right-0 w-6 h-6 bg-emerald-500 border-2 border-white rounded-full flex items-center justify-center text-white text-[10px] font-bold">
-                  ₹
-                </span>
               </div>
 
-              <div className="space-y-1.5">
-                <h3 className="text-xl font-black text-brand-text">
-                  {isWaiterAccepted ? 'Waiter Accepted Your Request!' : 'Waiting for Waiter to Accept'}
+              <div className="relative w-16 h-16 mx-auto">
+                <div className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg border-2 ${
+                  isWaiterAccepted
+                    ? 'bg-blue-50 text-blue-600 shadow-blue-500/10 border-blue-200'
+                    : 'bg-amber-50 text-amber-500 shadow-amber-500/10 border-amber-200'
+                }`}>
+                  {isWaiterAccepted ? <CheckCircle2 size={32} /> : <Clock size={32} className="animate-pulse" />}
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <h3 className="text-lg font-black text-brand-text">
+                  {isWaiterAccepted ? 'Waiter Coming to Table' : 'Bill Requested'}
                 </h3>
                 <p className="text-gray-500 text-xs leading-relaxed max-w-[280px] mx-auto">
                   {isWaiterAccepted ? (
-                    <>Your waiter has accepted the payment request and is coming to <strong>Table #{tableId}</strong> to collect <strong className="text-slate-900 font-black">₹{totalAmount}</strong>.</>
+                    <>Your waiter has accepted and is arriving at <strong>Table #{tableId}</strong> with the UPI QR scanner and cash bill of <strong className="text-slate-900 font-black">₹{totalAmount}</strong>.</>
                   ) : (
-                    <>A waiter has been notified to accept and collect <strong className="text-slate-900 font-black">₹{totalAmount}</strong> in cash at <strong>Table #{tableId}</strong>.</>
+                    <>Your bill request for <strong className="text-slate-900 font-black">₹{totalAmount}</strong> has been sent. A waiter is being dispatched to <strong>Table #{tableId}</strong>.</>
                   )}
                 </p>
               </div>
 
-              <div className={`rounded-2xl p-4 border text-left space-y-2 text-xs max-w-[340px] mx-auto ${
+              <div className={`rounded-2xl p-3.5 border text-left space-y-1.5 text-xs max-w-[340px] mx-auto ${
                 isWaiterAccepted
-                  ? 'bg-emerald-50/80 border-emerald-200'
+                  ? 'bg-blue-50/80 border-blue-200'
                   : 'bg-amber-50/80 border-amber-200'
               }`}>
-                <div className={`flex items-center gap-2 font-bold ${isWaiterAccepted ? 'text-emerald-900' : 'text-amber-900'}`}>
-                  <span className={`w-2 h-2 rounded-full animate-ping ${isWaiterAccepted ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
-                  <span>{isWaiterAccepted ? 'Waiter is on the way to collect cash' : 'Hand cash once waiter arrives'}</span>
+                <div className={`flex items-center gap-2 font-bold ${isWaiterAccepted ? 'text-blue-900' : 'text-amber-900'}`}>
+                  <span className={`w-2 h-2 rounded-full animate-ping ${isWaiterAccepted ? 'bg-blue-500' : 'bg-amber-500'}`}></span>
+                  <span>{isWaiterAccepted ? 'Waiter is en route with UPI QR & Bill' : 'Please keep your UPI App or Cash ready'}</span>
                 </div>
-                <p className={`text-[11px] leading-relaxed ${isWaiterAccepted ? 'text-emerald-800' : 'text-amber-800'}`}>
-                  As soon as your waiter collects the money and taps <strong>"Collect Payment"</strong>, your bill will be permanently settled.
+                <p className={`text-[11px] leading-relaxed ${isWaiterAccepted ? 'text-blue-800' : 'text-amber-800'}`}>
+                  When the waiter arrives, scan the dynamic UPI QR code on their device or hand physical cash.
                 </p>
               </div>
 
               <p className="text-[10px] text-gray-400 font-medium">
-                Listening for live waiter confirmation...
+                Listening for real-time payment confirmation...
               </p>
             </div>
           )}
@@ -386,10 +420,10 @@ export const CheckoutOverlay: React.FC<CheckoutOverlayProps> = ({ onClose, onPay
             <button
               onClick={handleRequestCashPayment}
               disabled={isProcessing}
-              className="w-full bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-extrabold py-3.5 px-6 rounded-2xl shadow-lg shadow-emerald-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:bg-gray-300 active:scale-98"
+              className="w-full bg-gradient-to-r from-slate-900 to-indigo-950 hover:from-black hover:to-slate-900 text-white font-extrabold py-3.5 px-6 rounded-2xl shadow-lg shadow-slate-900/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:bg-gray-300 active:scale-98"
             >
               <Banknote size={18} />
-              <span>{isProcessing ? 'Alerting Waiter...' : `Pay with Cash • ₹${totalAmount}`}</span>
+              <span>{isProcessing ? 'Alerting Waiter...' : `Request Bill / Pay • ₹${totalAmount}`}</span>
             </button>
           )}
 

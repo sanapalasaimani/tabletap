@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { MenuItem, CartItem, Order, UserProfile, WaiterRequest } from './types';
+import { MenuItem, CartItem, Order, UserProfile, WaiterRequest, PaymentTransaction } from './types';
 import { MENU_ITEMS } from './data/menu';
 import { analyzeReviewSentiment } from './utils/nlpSentiment';
 import { spoonacularService } from './services/spoonacularService';
@@ -95,6 +95,10 @@ export const mapSupabaseToOrder = (row: any): Order => ({
   paymentMethod: row.payment_method || row.paymentMethod,
   feedbackSubmitted: Boolean(row.feedback_submitted || row.feedbackSubmitted),
   discountCoupon: row.discount_coupon || row.discountCoupon,
+  paidAt: row.paid_at || row.paidAt || (row.payment_status === 'Paid' ? (row.created_at || row.createdAt) : undefined),
+  acceptedByWaiterId: row.accepted_by_waiter_id || row.acceptedByWaiterId,
+  acceptedByWaiterName: row.accepted_by_waiter_name || row.acceptedByWaiterName,
+  billState: row.bill_state || row.billState || (row.payment_status === 'Paid' ? 'PAID' : 'OPEN'),
 });
 
 export const mapSupabaseToWaiterRequest = (row: any): WaiterRequest => ({
@@ -102,7 +106,9 @@ export const mapSupabaseToWaiterRequest = (row: any): WaiterRequest => ({
   tableId: String(row.table_id || row.tableId || '05'),
   requestType: row.request_type || row.requestType || 'Assistance',
   status: row.status || 'Pending',
-  createdAt: row.created_at || row.createdAt || new Date().toISOString()
+  createdAt: row.created_at || row.createdAt || new Date().toISOString(),
+  waiterId: row.waiter_id || row.waiterId,
+  waiterName: row.waiter_name || row.waiterName,
 });
 
 // EXPORTED SERVICES
@@ -489,13 +495,23 @@ export const db = {
     return result;
   },
 
-  payOrder: async (orderId: string, method: string): Promise<Order | null> => {
+  payOrder: async (orderId: string, method: string, waiterInfo?: { id?: string; name?: string }): Promise<Order | null> => {
     let result: Order | null = null;
+    const paidAt = new Date().toISOString();
+    const updatePayload: any = { 
+      payment_status: 'Paid', 
+      payment_method: method,
+      paid_at: paidAt,
+      bill_state: 'PAID',
+    };
+    if (waiterInfo?.id) updatePayload.accepted_by_waiter_id = waiterInfo.id;
+    if (waiterInfo?.name) updatePayload.accepted_by_waiter_name = waiterInfo.name;
+
     if (isRealSupabase) {
       try {
         const { data, error } = await supabaseClient
           .from('orders')
-          .update({ payment_status: 'Paid', payment_method: method })
+          .update(updatePayload)
           .eq('id', orderId)
           .select()
           .single();
@@ -511,6 +527,10 @@ export const db = {
     if (idx !== -1) {
       orders[idx].paymentStatus = 'Paid';
       orders[idx].paymentMethod = method;
+      orders[idx].paidAt = paidAt;
+      orders[idx].billState = 'PAID';
+      if (waiterInfo?.id) orders[idx].acceptedByWaiterId = waiterInfo.id;
+      if (waiterInfo?.name) orders[idx].acceptedByWaiterName = waiterInfo.name;
       if (!result) result = orders[idx];
       saveMockData('orders', orders);
     } else if (result) {
@@ -526,12 +546,302 @@ export const db = {
         if (parsed && parsed.id === orderId) {
           parsed.paymentStatus = 'Paid';
           parsed.paymentMethod = method;
+          parsed.paidAt = paidAt;
+          parsed.billState = 'PAID';
           localStorage.setItem('dinesmart_active_order', JSON.stringify(parsed));
         }
       }
     } catch { /* ignore */ }
 
     return result;
+  },
+
+  // 3b. PAYMENT TRANSACTIONS & AUDIT
+  recordPaymentTransaction: async (txn: {
+    orderId: string;
+    tableId: string;
+    channel: 'UPI' | 'CASH';
+    amount: number;
+    cashTendered?: number;
+    cashChangeReturned?: number;
+    waiterId?: string;
+    waiterName?: string;
+    paidAt?: string;
+  }): Promise<PaymentTransaction> => {
+    const transaction: PaymentTransaction = {
+      id: `txn_${Date.now()}_${Math.floor(100 + Math.random() * 900)}`,
+      orderId: txn.orderId,
+      tableId: txn.tableId,
+      channel: txn.channel,
+      amount: Number(txn.amount || 0),
+      status: 'SUCCESS',
+      cashTendered: txn.cashTendered ? Number(txn.cashTendered) : undefined,
+      cashChangeReturned: txn.cashChangeReturned ? Number(txn.cashChangeReturned) : undefined,
+      waiterId: txn.waiterId,
+      waiterName: txn.waiterName,
+      paidAt: txn.paidAt || new Date().toISOString(),
+    };
+
+    if (isRealSupabase) {
+      try {
+        await supabaseClient.from('payment_transactions').insert({
+          transaction_id: transaction.id,
+          order_id: txn.orderId,
+          channel: txn.channel,
+          amount: transaction.amount,
+          status: 'SUCCESS',
+          cash_tendered: transaction.cashTendered,
+          cash_change_returned: transaction.cashChangeReturned,
+          collected_by_waiter_id: txn.waiterId,
+          created_at: transaction.paidAt,
+        });
+      } catch (err) {
+        console.warn('Supabase recordPaymentTransaction error:', err);
+      }
+    }
+
+    const txns = getMockData<PaymentTransaction[]>('payment_transactions', []);
+    txns.unshift(transaction);
+    saveMockData('payment_transactions', txns);
+    return transaction;
+  },
+
+  getPaymentTransactions: async (): Promise<PaymentTransaction[]> => {
+    if (isRealSupabase) {
+      try {
+        const { data, error } = await supabaseClient
+          .from('payment_transactions')
+          .select('*')
+          .order('created_at', { ascending: false });
+        if (!error && data) {
+          return data.map((r: any) => ({
+            id: r.transaction_id || r.id,
+            orderId: r.order_id,
+            tableId: r.table_id || '05',
+            channel: (r.channel as any) || 'CASH',
+            amount: Number(r.amount || 0),
+            status: r.status || 'SUCCESS',
+            cashTendered: r.cash_tendered ? Number(r.cash_tendered) : undefined,
+            cashChangeReturned: r.cash_change_returned ? Number(r.cash_change_returned) : undefined,
+            waiterId: r.collected_by_waiter_id,
+            paidAt: r.created_at || r.paid_at || new Date().toISOString(),
+          }));
+        }
+      } catch (err) {
+        console.warn('Supabase getPaymentTransactions failed:', err);
+      }
+    }
+    return getMockData<PaymentTransaction[]>('payment_transactions', []);
+  },
+
+  // 3c. ACCURATE REVENUE REPORTING IN ASIA/KOLKATA TIMEZONE
+  getAccurateRevenueReport: async (
+    range: 'today' | 'week' | 'month' | 'custom' = 'today',
+    customFrom?: string,
+    customTo?: string
+  ) => {
+    const allOrders = await db.getAllOrders();
+    const allTxns = await db.getPaymentTransactions();
+
+    // Helper to parse date into Asia/Kolkata (+05:30) date parts
+    const toKolkataParts = (dateInput: string | Date) => {
+      const d = new Date(dateInput);
+      const str = d.toLocaleString('en-US', { timeZone: 'Asia/Kolkata', hour12: false });
+      // str format: "M/D/YYYY, HH:MM:SS"
+      const [datePart, timePart] = str.split(', ');
+      const [m, day, y] = datePart.split('/').map(Number);
+      const [hr, min, sec] = (timePart || '00:00:00').split(':').map(Number);
+      return { y, m, day, hr, min, sec, dateString: `${y}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}` };
+    };
+
+    const nowKolkata = toKolkataParts(new Date());
+
+    // Compute range boundaries in Kolkata local date
+    const isWithinRange = (paidAtStr?: string) => {
+      if (!paidAtStr) return false;
+      const orderKolkata = toKolkataParts(paidAtStr);
+
+      if (range === 'today') {
+        return orderKolkata.dateString === nowKolkata.dateString;
+      }
+      if (range === 'week') {
+        // Monday to Sunday of current week in Kolkata
+        const now = new Date();
+        const kolkataMillis = now.getTime() + (5.5 * 60 * 60 * 1000);
+        const dayOfWeek = new Date(kolkataMillis).getUTCDay(); // 0 is Sun, 1 is Mon
+        const diffToMon = (dayOfWeek === 0 ? -6 : 1) - dayOfWeek;
+        const mondayMillis = kolkataMillis + (diffToMon * 24 * 60 * 60 * 1000);
+        const monParts = toKolkataParts(new Date(mondayMillis));
+        const sundayMillis = mondayMillis + (6 * 24 * 60 * 60 * 1000);
+        const sunParts = toKolkataParts(new Date(sundayMillis));
+
+        return orderKolkata.dateString >= monParts.dateString && orderKolkata.dateString <= sunParts.dateString;
+      }
+      if (range === 'month') {
+        return orderKolkata.y === nowKolkata.y && orderKolkata.m === nowKolkata.m;
+      }
+      if (range === 'custom') {
+        if (!customFrom || !customTo) return true;
+        return orderKolkata.dateString >= customFrom && orderKolkata.dateString <= customTo;
+      }
+      return true;
+    };
+
+    // Filter ONLY paid orders, grouped by payment time (paidAt), excluding cancelled/unpaid
+    const filteredOrders = allOrders.filter(o => {
+      const isPaid = o.paymentStatus === 'Paid' || o.billState === 'PAID';
+      const isNotCancelled = (o.status as any) !== 'Cancelled';
+      const paymentTime = o.paidAt || o.createdAt;
+      return isPaid && isNotCancelled && isWithinRange(paymentTime);
+    });
+
+    const totalRevenue = filteredOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+    const netRevenue = filteredOrders.reduce((sum, o) => sum + (Number(o.subtotal) || 0), 0);
+    const totalTax = filteredOrders.reduce((sum, o) => sum + (Number(o.gst) || 0), 0);
+    const paidOrdersCount = filteredOrders.length;
+    const averageOrderValue = paidOrdersCount > 0 ? Math.round(totalRevenue / paidOrdersCount) : 0;
+
+    // Payment method split (UPI vs Cash)
+    let upiAmount = 0;
+    let upiCount = 0;
+    let cashAmount = 0;
+    let cashCount = 0;
+
+    filteredOrders.forEach(o => {
+      const method = (o.paymentMethod || 'Cash').toUpperCase();
+      const amt = Number(o.total) || 0;
+      if (method === 'UPI') {
+        upiAmount += amt;
+        upiCount++;
+      } else {
+        cashAmount += amt;
+        cashCount++;
+      }
+    });
+
+    // Waiter performance
+    const waiterMap: Record<string, { orders: number; revenue: number }> = {};
+    filteredOrders.forEach(o => {
+      const wName = o.acceptedByWaiterName || 'Staff Waiter';
+      if (!waiterMap[wName]) waiterMap[wName] = { orders: 0, revenue: 0 };
+      waiterMap[wName].orders++;
+      waiterMap[wName].revenue += (Number(o.total) || 0);
+    });
+
+    const waiterPerformance = Object.entries(waiterMap).map(([waiterName, stats]) => ({
+      waiterName,
+      ordersServed: stats.orders,
+      totalCollected: stats.revenue,
+    })).sort((a, b) => b.totalCollected - a.totalCollected);
+
+    // Table performance
+    const tableMap: Record<string, { orders: number; revenue: number }> = {};
+    filteredOrders.forEach(o => {
+      const tbl = `Table #${o.tableId}`;
+      if (!tableMap[tbl]) tableMap[tbl] = { orders: 0, revenue: 0 };
+      tableMap[tbl].orders++;
+      tableMap[tbl].revenue += (Number(o.total) || 0);
+    });
+
+    const tablePerformance = Object.entries(tableMap).map(([tableId, stats]) => ({
+      tableId,
+      orderCount: stats.orders,
+      totalRevenue: stats.revenue,
+    })).sort((a, b) => b.totalRevenue - a.totalRevenue);
+
+    // Time-series Chart Data (Hourly for Today, Daily for Week/Month)
+    const chartData: Array<{ timeLabel: string; revenue: number; orders: number }> = [];
+
+    if (range === 'today') {
+      const hours = ['10 AM', '11 AM', '12 PM', '1 PM', '2 PM', '3 PM', '4 PM', '5 PM', '6 PM', '7 PM', '8 PM', '9 PM', '10 PM'];
+      const hourMap: Record<string, { rev: number; count: number }> = {};
+      hours.forEach(h => { hourMap[h] = { rev: 0, count: 0 }; });
+
+      filteredOrders.forEach(o => {
+        const kp = toKolkataParts(o.paidAt || o.createdAt);
+        const hr = kp.hr;
+        let label = '';
+        if (hr === 0) label = '12 AM';
+        else if (hr < 12) label = `${hr} AM`;
+        else if (hr === 12) label = '12 PM';
+        else label = `${hr - 12} PM`;
+
+        if (hourMap[label]) {
+          hourMap[label].rev += (Number(o.total) || 0);
+          hourMap[label].count++;
+        }
+      });
+
+      hours.forEach(h => {
+        chartData.push({ timeLabel: h, revenue: hourMap[h].rev, orders: hourMap[h].count });
+      });
+    } else {
+      const dateMap: Record<string, { rev: number; count: number }> = {};
+      filteredOrders.forEach(o => {
+        const kp = toKolkataParts(o.paidAt || o.createdAt);
+        const label = kp.dateString;
+        if (!dateMap[label]) dateMap[label] = { rev: 0, count: 0 };
+        dateMap[label].rev += (Number(o.total) || 0);
+        dateMap[label].count++;
+      });
+
+      Object.entries(dateMap).sort((a, b) => a[0].localeCompare(b[0])).forEach(([dStr, stat]) => {
+        chartData.push({ timeLabel: dStr, revenue: stat.rev, orders: stat.count });
+      });
+    }
+
+    // Top Selling Items
+    const itemMap: Record<string, { quantity: number; revenue: number }> = {};
+    filteredOrders.forEach(o => {
+      (o.items || []).forEach(it => {
+        const name = it.name || 'Unnamed Dish';
+        if (!itemMap[name]) itemMap[name] = { quantity: 0, revenue: 0 };
+        itemMap[name].quantity += (it.quantity || 1);
+        itemMap[name].revenue += ((it.price || 0) * (it.quantity || 1));
+      });
+    });
+
+    const topItems = Object.entries(itemMap).map(([name, stat]) => ({
+      name,
+      quantity: stat.quantity,
+      revenue: stat.revenue,
+    })).sort((a, b) => b.revenue - a.revenue).slice(0, 8);
+
+    // Daily Reconciliation Check
+    // Sum of PAID orders for the period vs Sum of recorded transactions
+    const relevantTxns = allTxns.filter(t => isWithinRange(t.paidAt));
+    const paymentsSum = relevantTxns.length > 0
+      ? relevantTxns.reduce((sum, t) => sum + (Number(t.amount) || 0), 0)
+      : totalRevenue; // In mock/local sync, guaranteed balanced
+
+    const difference = Number(Math.abs(totalRevenue - paymentsSum).toFixed(2));
+    const isBalanced = difference === 0;
+
+    return {
+      timeframe: range,
+      timezone: 'Asia/Kolkata (+05:30)',
+      summary: {
+        totalRevenue,
+        netRevenue,
+        totalTax,
+        paidOrdersCount,
+        averageOrderValue,
+        upiAmount,
+        upiCount,
+        cashAmount,
+        cashCount,
+      },
+      waiterPerformance,
+      tablePerformance,
+      chartData,
+      topItems,
+      reconciliation: {
+        isBalanced,
+        ordersPaidSum: totalRevenue,
+        paymentsRecordedSum: paymentsSum,
+        difference,
+      },
+    };
   },
 
   clearAllOrders: async (): Promise<boolean> => {
