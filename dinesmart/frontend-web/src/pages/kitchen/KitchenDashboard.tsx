@@ -24,6 +24,237 @@ interface VirtualCard {
   status: VirtualStatus;
 }
 
+// Verified real food photography map for kitchen KDS dish thumbnails
+const DISH_IMAGE_MAP: { keywords: string[]; url: string }[] = [
+  {
+    keywords: ['biryani', 'mutton', 'dum', 'pulao', 'handi'],
+    url: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=160&q=80'
+  },
+  {
+    keywords: ['paneer', 'butter masala', 'shahi paneer', 'cottage', 'kadai paneer', 'palak paneer', 'tikka masala'],
+    url: 'https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=160&q=80'
+  },
+  {
+    keywords: ['naan', 'roti', 'paratha', 'kulcha', 'bread', 'tandoori roti', 'garlic naan'],
+    url: 'https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=160&q=80'
+  },
+  {
+    keywords: ['chilli chicken', 'manchurian', 'szechuan', 'fried rice', 'noodles', 'dragon', 'crispy chicken'],
+    url: 'https://images.unsplash.com/photo-1525755662778-989d0524087e?auto=format&fit=crop&w=160&q=80'
+  },
+  {
+    keywords: ['chicken', 'tandoori chicken', 'murgh', 'wings', 'kebab'],
+    url: 'https://images.unsplash.com/photo-1603894584373-5ac82b2ae398?auto=format&fit=crop&w=160&q=80'
+  },
+  {
+    keywords: ['dosa', 'masala dosa', 'ghee roast', 'uttapam'],
+    url: 'https://images.unsplash.com/photo-1668236543090-82eba5ee5976?auto=format&fit=crop&w=160&q=80'
+  },
+  {
+    keywords: ['idli', 'vada', 'sambar', 'medu vada'],
+    url: 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=160&q=80'
+  },
+  {
+    keywords: ['dal', 'dal makhani', 'tadka', 'lentil'],
+    url: 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=160&q=80'
+  },
+  {
+    keywords: ['gulab', 'jamun', 'dessert', 'ice cream', 'sweet', 'halwa', 'brownie', 'kulfi', 'rasgulla'],
+    url: 'https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=160&q=80'
+  },
+  {
+    keywords: ['water', 'bottle', 'mineral'],
+    url: 'https://images.unsplash.com/photo-1559839914-17aae19cec71?auto=format&fit=crop&w=160&q=80'
+  },
+  {
+    keywords: ['coffee', 'tea', 'chai', 'filter coffee', 'latte'],
+    url: 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?auto=format&fit=crop&w=160&q=80'
+  },
+  {
+    keywords: ['coke', 'cola', 'sprite', 'soda', 'cool drink', 'soft drink', 'mojito', 'juice', 'beverage', 'drink'],
+    url: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=160&q=80'
+  },
+  {
+    keywords: ['samosa', 'chaat', 'pakora', 'fries', 'snack', 'starter'],
+    url: 'https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=160&q=80'
+  }
+];
+
+const DEFAULT_DISH_THUMBNAIL = 'https://images.unsplash.com/photo-1585937421612-70a008356fbe?auto=format&fit=crop&w=160&q=80';
+
+const getDishThumbnail = (name: string): string => {
+  if (!name) return DEFAULT_DISH_THUMBNAIL;
+  const lower = name.toLowerCase();
+  for (const entry of DISH_IMAGE_MAP) {
+    if (entry.keywords.some(k => lower.includes(k))) {
+      return entry.url;
+    }
+  }
+  return DEFAULT_DISH_THUMBNAIL;
+};
+
+interface LightVirtualCardProps {
+  card: VirtualCard;
+  actions: React.ReactNode;
+  currentTime: Date;
+  isExpanded: boolean;
+  onToggleExpand: () => void;
+}
+
+// Module-level card component: never recreated across parent re-renders to prevent state resets
+const LightVirtualCard: React.FC<LightVirtualCardProps> = ({
+  card,
+  actions,
+  currentTime,
+  isExpanded,
+  onToggleExpand
+}) => {
+  const timeDiff = currentTime.getTime() - new Date(card.createdAt).getTime();
+  const minutesElapsed = Math.floor(timeDiff / 60000);
+  const orderPlacingTime = new Date(card.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  // Warning highlights if cooking takes too long
+  const isOverdue = card.status === 'Preparing' && minutesElapsed >= 15;
+
+  // Check if any items in this card have special instructions or custom notes
+  const hasCustomizations = card.items.some(
+    it => (Array.isArray(it.instructions) && it.instructions.length > 0) || Boolean(it.customNotes && it.customNotes.trim())
+  );
+
+  return (
+    <div className={`backdrop-blur-md rounded-xl border transition-all duration-300 flex flex-col justify-between p-3.5 shadow-2xs ${
+      isOverdue 
+        ? 'bg-red-50/90 border-red-200 hover:border-red-300' 
+        : 'bg-white/95 border-slate-200/80 hover:border-slate-300 hover:bg-white shadow-xs'
+    }`}>
+      <div>
+        <div className="flex justify-between items-start border-b border-slate-100 pb-2 mb-2.5">
+          <div>
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Table {card.tableId}</span>
+              <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-full ${
+                card.status === 'Confirmed' 
+                  ? 'bg-slate-100 text-slate-700 border border-slate-200/80' 
+                  : card.status === 'Preparing' 
+                    ? 'bg-blue-50 text-blue-700 border border-blue-200/80' 
+                    : 'bg-amber-50 text-amber-800 border border-amber-200/80'
+              }`}>
+                {card.status === 'Confirmed' ? 'New' : card.status === 'Preparing' ? 'Preparing' : 'Waiting Waiter'}
+              </span>
+            </div>
+            <h4 className="font-extrabold text-slate-800 text-sm">Order #{card.orderId}</h4>
+          </div>
+          <div className="flex flex-col items-end gap-1">
+            <span className="text-[10px] bg-slate-100/90 text-slate-600 font-semibold px-2 py-0.5 rounded-md flex items-center gap-1">
+              <Clock size={10} />
+              {orderPlacingTime}
+            </span>
+            <span className={`text-[9px] font-bold px-1 py-0.5 rounded ${
+              minutesElapsed >= 15 ? 'text-red-600 animate-pulse' : 'text-slate-400'
+            }`}>
+              {minutesElapsed <= 0 ? 'Just now' : `${minutesElapsed}m ago`}
+            </span>
+          </div>
+        </div>
+
+        {/* Ordered items with high-res food thumbnail previews */}
+        <div className="divide-y divide-slate-100 mb-2">
+          {card.items.map((item, idx) => {
+            const thumbUrl = getDishThumbnail(item.name);
+
+            return (
+              <div key={idx} className="flex items-center justify-between py-2 first:pt-0 last:pb-0">
+                <div className="flex items-center space-x-2.5 min-w-0 pr-2">
+                  <img
+                    src={thumbUrl}
+                    alt={item.name}
+                    className="w-10 h-10 rounded-lg object-cover flex-shrink-0 shadow-2xs border border-slate-200/60"
+                    loading="lazy"
+                  />
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-semibold text-slate-900 text-xs truncate">{item.name}</span>
+                    </div>
+                  </div>
+                </div>
+                <span className="font-extrabold text-xs text-primary bg-primary/10 px-2 py-0.5 rounded-md flex-shrink-0">
+                  ×{item.quantity}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Expand/Collapse Customizations Toggle Button */}
+        <button
+          type="button"
+          onClick={onToggleExpand}
+          className={`w-full py-1.5 px-2.5 rounded-lg text-xs font-semibold flex items-center justify-between transition-all mb-2 border cursor-pointer ${
+            hasCustomizations
+              ? 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100 shadow-2xs'
+              : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200'
+          }`}
+        >
+          <span className="flex items-center gap-1.5">
+            {hasCustomizations && (
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+            )}
+            <span>{isExpanded ? 'Collapse Customizations' : 'View Customizations'}</span>
+            {hasCustomizations && (
+              <span className="text-[10px] bg-amber-200/90 text-amber-950 px-1.5 py-0.2 rounded font-bold">
+                Special Notes
+              </span>
+            )}
+          </span>
+          {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        </button>
+
+        {/* Expanded View: All item customizations, modifiers, & instructions */}
+        {isExpanded && (
+          <div className="bg-slate-50/90 border border-slate-200 rounded-xl p-2.5 mb-2.5 space-y-2 text-xs">
+            {card.items.map((item, idx) => {
+              const itemHasCustom = (Array.isArray(item.instructions) && item.instructions.length > 0) || Boolean(item.customNotes && item.customNotes.trim());
+              return (
+                <div key={idx} className="border-b border-slate-200/60 last:border-0 pb-1.5 last:pb-0">
+                  <div className="flex justify-between items-center font-medium text-slate-800">
+                    <span className="font-bold text-[11px] truncate">{item.name}</span>
+                    <span className="text-[10px] font-semibold text-slate-500">×{item.quantity}</span>
+                  </div>
+                  {itemHasCustom ? (
+                    <div className="mt-1 space-y-1">
+                      {item.instructions && item.instructions.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {item.instructions.map((inst, iIdx) => (
+                            <span key={iIdx} className="bg-amber-100 text-amber-900 text-[10px] font-bold px-2 py-0.5 rounded border border-amber-200/80">
+                              • {inst}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {item.customNotes && item.customNotes.trim() && (
+                        <p className="text-[11px] text-amber-950 bg-amber-100/70 border-l-2 border-amber-500 pl-2 py-1 rounded-r italic font-medium">
+                          "{item.customNotes.trim()}"
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-slate-400 italic mt-0.5">Standard preparation (No modifications)</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Action Button */}
+      <div className="border-t border-slate-100 pt-2.5 mt-1 flex flex-col gap-2">
+        {actions}
+      </div>
+    </div>
+  );
+};
+
 export const KitchenDashboard: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -43,6 +274,15 @@ export const KitchenDashboard: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState<string>('');
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
+
+  // Customization card expansion state: keyed by card.id so state persists across 3s live polling & clock ticks
+  const [expandedCardIds, setExpandedCardIds] = useState<Record<string, boolean>>({});
+  const toggleCardExpansion = (cardId: string) => {
+    setExpandedCardIds(prev => ({
+      ...prev,
+      [cardId]: !prev[cardId]
+    }));
+  };
   
   // Web Audio Context for notification sounds
   const prevPendingCountRef = useRef<number>(0);
@@ -323,224 +563,6 @@ export const KitchenDashboard: React.FC = () => {
     });
   };
 
-// Verified real food photography map for kitchen KDS dish thumbnails
-const DISH_IMAGE_MAP: { keywords: string[]; url: string }[] = [
-  {
-    keywords: ['biryani', 'mutton', 'dum', 'pulao', 'handi'],
-    url: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=160&q=80'
-  },
-  {
-    keywords: ['paneer', 'butter masala', 'shahi paneer', 'cottage', 'kadai paneer', 'palak paneer', 'tikka masala'],
-    url: 'https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=160&q=80'
-  },
-  {
-    keywords: ['naan', 'roti', 'paratha', 'kulcha', 'bread', 'tandoori roti', 'garlic naan'],
-    url: 'https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=160&q=80'
-  },
-  {
-    keywords: ['chilli chicken', 'manchurian', 'szechuan', 'fried rice', 'noodles', 'dragon', 'crispy chicken'],
-    url: 'https://images.unsplash.com/photo-1525755662778-989d0524087e?auto=format&fit=crop&w=160&q=80'
-  },
-  {
-    keywords: ['chicken', 'tandoori chicken', 'murgh', 'wings', 'kebab'],
-    url: 'https://images.unsplash.com/photo-1603894584373-5ac82b2ae398?auto=format&fit=crop&w=160&q=80'
-  },
-  {
-    keywords: ['dosa', 'masala dosa', 'ghee roast', 'uttapam'],
-    url: 'https://images.unsplash.com/photo-1668236543090-82eba5ee5976?auto=format&fit=crop&w=160&q=80'
-  },
-  {
-    keywords: ['idli', 'vada', 'sambar', 'medu vada'],
-    url: 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=160&q=80'
-  },
-  {
-    keywords: ['dal', 'dal makhani', 'tadka', 'lentil'],
-    url: 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=160&q=80'
-  },
-  {
-    keywords: ['gulab', 'jamun', 'dessert', 'ice cream', 'sweet', 'halwa', 'brownie', 'kulfi', 'rasgulla'],
-    url: 'https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=160&q=80'
-  },
-  {
-    keywords: ['water', 'bottle', 'mineral'],
-    url: 'https://images.unsplash.com/photo-1559839914-17aae19cec71?auto=format&fit=crop&w=160&q=80'
-  },
-  {
-    keywords: ['coffee', 'tea', 'chai', 'filter coffee', 'latte'],
-    url: 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?auto=format&fit=crop&w=160&q=80'
-  },
-  {
-    keywords: ['coke', 'cola', 'sprite', 'soda', 'cool drink', 'soft drink', 'mojito', 'juice', 'beverage', 'drink'],
-    url: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=160&q=80'
-  },
-  {
-    keywords: ['samosa', 'chaat', 'pakora', 'fries', 'snack', 'starter'],
-    url: 'https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=160&q=80'
-  }
-];
-
-const DEFAULT_DISH_THUMBNAIL = 'https://images.unsplash.com/photo-1585937421612-70a008356fbe?auto=format&fit=crop&w=160&q=80';
-
-const getDishThumbnail = (name: string): string => {
-  if (!name) return DEFAULT_DISH_THUMBNAIL;
-  const lower = name.toLowerCase();
-  for (const entry of DISH_IMAGE_MAP) {
-    if (entry.keywords.some(k => lower.includes(k))) {
-      return entry.url;
-    }
-  }
-  return DEFAULT_DISH_THUMBNAIL;
-};
-
-// Card component for split virtual orders in White Mode (frosted white glass appearance)
-  const LightVirtualCard: React.FC<{ card: VirtualCard; actions: React.ReactNode }> = ({ card, actions }) => {
-    const [isExpanded, setIsExpanded] = useState(false);
-    const timeDiff = currentTime.getTime() - new Date(card.createdAt).getTime();
-    const minutesElapsed = Math.floor(timeDiff / 60000);
-    const orderPlacingTime = new Date(card.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-    // Warning highlights if cooking takes too long
-    const isOverdue = card.status === 'Preparing' && minutesElapsed >= 15;
-
-    // Check if any items in this card have special instructions or custom notes
-    const hasCustomizations = card.items.some(
-      it => (Array.isArray(it.instructions) && it.instructions.length > 0) || Boolean(it.customNotes && it.customNotes.trim())
-    );
-
-    return (
-      <div className={`backdrop-blur-md rounded-xl border transition-all duration-300 flex flex-col justify-between p-3.5 shadow-2xs ${
-        isOverdue 
-          ? 'bg-red-50/90 border-red-200 hover:border-red-300' 
-          : 'bg-white/95 border-slate-200/80 hover:border-slate-300 hover:bg-white shadow-xs'
-      }`}>
-        <div>
-          <div className="flex justify-between items-start border-b border-slate-100 pb-2 mb-2.5">
-            <div>
-              <div className="flex items-center gap-1.5 mb-0.5">
-                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Table {card.tableId}</span>
-                <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-full ${
-                  card.status === 'Confirmed' 
-                    ? 'bg-slate-100 text-slate-700 border border-slate-200/80' 
-                    : card.status === 'Preparing' 
-                      ? 'bg-blue-50 text-blue-700 border border-blue-200/80' 
-                      : 'bg-amber-50 text-amber-800 border border-amber-200/80'
-                }`}>
-                  {card.status === 'Confirmed' ? 'New' : card.status === 'Preparing' ? 'Preparing' : 'Waiting Waiter'}
-                </span>
-              </div>
-              <h4 className="font-extrabold text-slate-800 text-sm">Order #{card.orderId}</h4>
-            </div>
-            <div className="flex flex-col items-end gap-1">
-              <span className="text-[10px] bg-slate-100/90 text-slate-600 font-semibold px-2 py-0.5 rounded-md flex items-center gap-1">
-                <Clock size={10} />
-                {orderPlacingTime}
-              </span>
-              <span className={`text-[9px] font-bold px-1 py-0.5 rounded ${
-                minutesElapsed >= 15 ? 'text-red-600 animate-pulse' : 'text-slate-400'
-              }`}>
-                {minutesElapsed <= 0 ? 'Just now' : `${minutesElapsed}m ago`}
-              </span>
-            </div>
-          </div>
-
-          {/* Ordered items with high-res food thumbnail previews */}
-          <div className="divide-y divide-slate-100 mb-2">
-            {card.items.map((item, idx) => {
-              const thumbUrl = getDishThumbnail(item.name);
-
-              return (
-                <div key={idx} className="flex items-center justify-between py-2 first:pt-0 last:pb-0">
-                  <div className="flex items-center space-x-2.5 min-w-0 pr-2">
-                    <img
-                      src={thumbUrl}
-                      alt={item.name}
-                      className="w-10 h-10 rounded-lg object-cover flex-shrink-0 shadow-2xs border border-slate-200/60"
-                      loading="lazy"
-                    />
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-semibold text-slate-900 text-xs truncate">{item.name}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <span className="font-extrabold text-xs text-primary bg-primary/10 px-2 py-0.5 rounded-md flex-shrink-0">
-                    ×{item.quantity}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Expand/Collapse Customizations Toggle Button */}
-          <button
-            type="button"
-            onClick={() => setIsExpanded(prev => !prev)}
-            className={`w-full py-1.5 px-2.5 rounded-lg text-xs font-semibold flex items-center justify-between transition-all mb-2 border cursor-pointer ${
-              hasCustomizations
-                ? 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100 shadow-2xs'
-                : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200'
-            }`}
-          >
-            <span className="flex items-center gap-1.5">
-              {hasCustomizations && (
-                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-              )}
-              <span>{isExpanded ? 'Collapse Customizations' : 'View Customizations'}</span>
-              {hasCustomizations && (
-                <span className="text-[10px] bg-amber-200/90 text-amber-950 px-1.5 py-0.2 rounded font-bold">
-                  Special Notes
-                </span>
-              )}
-            </span>
-            {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-          </button>
-
-          {/* Expanded View: All item customizations, modifiers, & instructions */}
-          {isExpanded && (
-            <div className="bg-slate-50/90 border border-slate-200 rounded-xl p-2.5 mb-2.5 space-y-2 text-xs">
-              {card.items.map((item, idx) => {
-                const itemHasCustom = (Array.isArray(item.instructions) && item.instructions.length > 0) || Boolean(item.customNotes && item.customNotes.trim());
-                return (
-                  <div key={idx} className="border-b border-slate-200/60 last:border-0 pb-1.5 last:pb-0">
-                    <div className="flex justify-between items-center font-medium text-slate-800">
-                      <span className="font-bold text-[11px] truncate">{item.name}</span>
-                      <span className="text-[10px] font-semibold text-slate-500">×{item.quantity}</span>
-                    </div>
-                    {itemHasCustom ? (
-                      <div className="mt-1 space-y-1">
-                        {item.instructions && item.instructions.length > 0 && (
-                          <div className="flex flex-wrap gap-1">
-                            {item.instructions.map((inst, iIdx) => (
-                              <span key={iIdx} className="bg-amber-100 text-amber-900 text-[10px] font-bold px-2 py-0.5 rounded border border-amber-200/80">
-                                • {inst}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                        {item.customNotes && item.customNotes.trim() && (
-                          <p className="text-[11px] text-amber-950 bg-amber-100/70 border-l-2 border-amber-500 pl-2 py-1 rounded-r italic font-medium">
-                            "{item.customNotes.trim()}"
-                          </p>
-                        )}
-                      </div>
-                    ) : (
-                      <p className="text-[10px] text-slate-400 italic mt-0.5">Standard preparation (No modifications)</p>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Action Button */}
-        <div className="border-t border-slate-100 pt-2.5 mt-1 flex flex-col gap-2">
-          {actions}
-        </div>
-      </div>
-    );
-  };
-
   return (
     <div className="flex flex-col h-screen bg-slate-50 text-slate-800 overflow-hidden max-w-none font-sans">
       
@@ -732,6 +754,9 @@ const getDishThumbnail = (name: string): string => {
                               <LightVirtualCard 
                                 key={card.id} 
                                 card={card} 
+                                currentTime={currentTime}
+                                isExpanded={Boolean(expandedCardIds[card.id])}
+                                onToggleExpand={() => toggleCardExpansion(card.id)}
                                 actions={
                                   <button
                                     onClick={isWaiting ? undefined : () => handleUpdateVirtualStatus(card.id, nextStatus)}
@@ -776,6 +801,9 @@ const getDishThumbnail = (name: string): string => {
                               <LightVirtualCard 
                                 key={card.id} 
                                 card={card} 
+                                currentTime={currentTime}
+                                isExpanded={Boolean(expandedCardIds[card.id])}
+                                onToggleExpand={() => toggleCardExpansion(card.id)}
                                 actions={
                                   <button
                                     onClick={isWaiting ? undefined : () => handleUpdateVirtualStatus(card.id, nextStatus)}
