@@ -347,9 +347,11 @@ export default function BhakasuraChatBot({ contextData }: BhakasuraChatBotProps)
   };
 
   const quickPrompts = [
+    "🎉 How to prepare for tomorrow's festival rush?",
     "🔥 What are today's top sellers?",
     "⚡ Active orders in kitchen?",
     "💰 Summary of today's revenue",
+    "💡 Strategy to boost weekday sales",
     "🥜 Any nut allergy warnings in curries?"
   ];
 

@@ -514,6 +514,34 @@ export async function askBhakasuraAI(history: { role: string; content: string }[
     return result.answer;
   } catch (error) {
     console.error('RAG Orchestrator error in askBhakasuraAI:', error);
+
+    const qLower = latestUserQuery.toLowerCase();
+    if (/festival|holiday|prepare|preparation|diwali|pongal|eid|event|rush|buffet|crowd|thali/i.test(qLower)) {
+      return `### 🪔 Hotel & Restaurant Festival Preparation Blueprint
+
+#### 1. 🍽️ Festive Menu & Special Offerings
+- **Festive Thalis & Set Combos**: Launch a pre-set Festive Special Thali (e.g., ₹299–₹399) with fixed pricing to drastically shorten ordering and kitchen prep time.
+- **Traditional Sweets & Starters**: Prepare Gulab Jamun, Payasam/Kheer, and Masala Chaas/Lassi in bulk for immediate serving upon seating.
+- **Pure Veg / Satvik Options**: Ensure designated satvik items (no onion/garlic) are clearly marked on your TableTap digital menu.
+
+#### 2. 📦 Kitchen Prep & Inventory Buffers
+- **Safety Buffer Stock**: Increase dairy (paneer, milk, butter, ghee), basmati rice, cooking oils, and spices by 35–45% ahead of time.
+- **Pre-cooked Gravy Bases**: Prep large batches of base Makhani and cashew gravies today so ticket times stay under 10 minutes during the rush.
+- **Takeaway Packaging**: Stock up on sturdy meal containers and cutlery packs to capture peak festive family takeaway orders.
+
+#### 3. 🪑 Floor Seating & Faster Table Turns
+- **Group Dining Configurations**: Combine 2-seater tables into 6-to-8 seaters for large visiting families.
+- **Instant QR Bill Settlement**: Ensure TableTap dynamic bill QR stands are on every table so guests can pay directly from their phones without waiting for a waiter card machine.
+
+#### 4. 👥 Staffing & Shift Rostering
+- **All-Hands Floor Allocation**: Schedule your full waitstaff during peak lunch (12:30–3:30 PM) and dinner (7:30–11:00 PM) windows.
+- **Dedicated Food Runners**: Assign runner roles exclusively for water, bread refills, and clearing plates.
+
+#### 5. 🏮 Festive Ambiance & Marketing
+- **Traditional Decor**: Welcome guests with marigold entrance decor, warm lighting, and soothing festive background music.
+- **Guest Notification**: Send a quick festive greeting message to your regular customer list announcing your special festive feast.`;
+    }
+
     const validOrders = (contextData?.orders || []).filter((o: any) => o.status !== 'Cancelled');
     const totalRev = validOrders.reduce((sum: number, o: any) => sum + (Number(o.total) || 0), 0);
     const activeCount = validOrders.filter((o: any) => o.status === 'Confirmed' || o.status === 'Preparing' || o.status === 'Ready to Serve').length;

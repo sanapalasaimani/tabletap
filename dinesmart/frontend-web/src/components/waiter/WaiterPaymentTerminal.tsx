@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { QrCode, Banknote, CheckCircle2, Clock, RotateCcw, AlertTriangle, ArrowLeft, ShieldCheck, Sparkles } from 'lucide-react';
+import { 
+  QrCode, Banknote, CheckCircle2, Clock, RotateCcw, 
+  AlertTriangle, ArrowLeft, ShieldCheck, Sparkles, Copy, Check, ExternalLink 
+} from 'lucide-react';
 import QRCode from 'qrcode';
 import { db } from '../../supabase';
 import { Order } from '../../types';
@@ -9,6 +12,7 @@ interface WaiterPaymentTerminalProps {
   waiterName: string;
   tableId: string;
   orders: Order[];
+  initialMode?: 'SELECT' | 'SHOW_QR' | 'COLLECT_MONEY';
   onClose: () => void;
   onPaymentSuccess: () => void;
 }
@@ -18,10 +22,13 @@ export const WaiterPaymentTerminal: React.FC<WaiterPaymentTerminalProps> = ({
   waiterName,
   tableId,
   orders,
+  initialMode = 'SELECT',
   onClose,
   onPaymentSuccess,
 }) => {
-  const [activeTab, setActiveTab] = useState<'SELECT' | 'UPI_QR' | 'CASH' | 'SUCCESS'>('SELECT');
+  const [activeTab, setActiveTab] = useState<'SELECT' | 'SHOW_QR' | 'COLLECT_MONEY' | 'SUCCESS'>(
+    initialMode === 'SHOW_QR' ? 'SHOW_QR' : initialMode === 'COLLECT_MONEY' ? 'COLLECT_MONEY' : 'SELECT'
+  );
 
   // Filter only unpaid orders for this table
   const unpaidOrders = orders.filter(
@@ -35,18 +42,22 @@ export const WaiterPaymentTerminal: React.FC<WaiterPaymentTerminalProps> = ({
   const tip = unpaidOrders.reduce((sum, o) => sum + (Number(o.tip) || 0), 0);
   const allItems = unpaidOrders.flatMap(o => o.items || []);
 
-  // UPI State
+  const primaryOrderId = unpaidOrders.length > 0 ? unpaidOrders[0].id : `tbl_${tableId}_bill`;
+
+  // QR State
   const [qrImageUrl, setQrImageUrl] = useState<string | null>(null);
+  const [paymentUrl, setPaymentUrl] = useState<string>('');
   const [timerSeconds, setTimerSeconds] = useState<number>(300);
   const [isQrExpired, setIsQrExpired] = useState(false);
   const [generatingQr, setGeneratingQr] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
 
-  // Cash State
-  const [cashTendered, setCashTendered] = useState<string>('');
+  // Money Collection State
+  const [cashTendered, setCashTendered] = useState<string>(String(totalAmount || 0));
   const [changeToReturn, setChangeToReturn] = useState<number>(0);
   const [cashError, setCashError] = useState<string | null>(null);
   const [submittingPayment, setSubmittingPayment] = useState(false);
-  const [settledMethod, setSettledMethod] = useState<'UPI' | 'CASH'>('CASH');
+  const [settledMethod, setSettledMethod] = useState<'QR' | 'CASH'>('CASH');
 
   // Play audio chime on success
   const playSuccessChime = () => {
@@ -77,17 +88,17 @@ export const WaiterPaymentTerminal: React.FC<WaiterPaymentTerminalProps> = ({
     }
   };
 
-  // Generate Dynamic UPI QR Code
-  const generateUpiQr = async () => {
+  // Generate Unique Bill QR Code tied to this exact bill & amount
+  const generateBillQr = async () => {
     setGeneratingQr(true);
     setIsQrExpired(false);
     setTimerSeconds(300);
 
     try {
-      const refId = unpaidOrders.length === 1 ? unpaidOrders[0].id : `tbl_${tableId}_${Date.now().toString().slice(-4)}`;
-      const upiUri = `upi://pay?pa=tabletap@icici&pn=TableTap%20Restaurant&tr=${refId}&am=${totalAmount.toFixed(2)}&cu=INR&tn=Bill%20Table%20${tableId}`;
+      const targetUrl = `${window.location.origin}/pay/${primaryOrderId}?table=${tableId}&amount=${totalAmount.toFixed(2)}`;
+      setPaymentUrl(targetUrl);
 
-      const dataUrl = await QRCode.toDataURL(upiUri, {
+      const dataUrl = await QRCode.toDataURL(targetUrl, {
         errorCorrectionLevel: 'H',
         margin: 2,
         width: 320,
@@ -95,18 +106,25 @@ export const WaiterPaymentTerminal: React.FC<WaiterPaymentTerminalProps> = ({
       });
 
       setQrImageUrl(dataUrl);
-      setActiveTab('UPI_QR');
+      setActiveTab('SHOW_QR');
     } catch (err) {
-      console.error('Failed to generate UPI QR:', err);
-      alert('Unable to generate UPI QR code. Please try again.');
+      console.error('Failed to generate unique Bill QR:', err);
+      alert('Unable to generate Bill QR code. Please try again.');
     } finally {
       setGeneratingQr(false);
     }
   };
 
+  // If opened directly with initialMode === 'SHOW_QR', trigger QR generation
+  useEffect(() => {
+    if (initialMode === 'SHOW_QR') {
+      generateBillQr();
+    }
+  }, [initialMode]);
+
   // 5-Minute Expiry Countdown
   useEffect(() => {
-    if (activeTab !== 'UPI_QR' || isQrExpired) return;
+    if (activeTab !== 'SHOW_QR' || isQrExpired) return;
 
     const timer = setInterval(() => {
       setTimerSeconds((prev) => {
@@ -122,25 +140,45 @@ export const WaiterPaymentTerminal: React.FC<WaiterPaymentTerminalProps> = ({
     return () => clearInterval(timer);
   }, [activeTab, isQrExpired]);
 
-  // UPI Polling / Real-Time Settlement Listener
+  // Real-Time Cross-Device Settlement Listener & Poller
   useEffect(() => {
-    if (activeTab !== 'UPI_QR') return;
+    if (activeTab !== 'SHOW_QR') return;
 
+    // 1. Listen for global in-memory event
     const handleOrderPaid = (e: any) => {
       const paidTbl = e?.detail?.tableId;
       if (String(paidTbl) === String(tableId)) {
-        setSettledMethod('UPI');
+        setSettledMethod('QR');
         playSuccessChime();
         setActiveTab('SUCCESS');
         onPaymentSuccess();
       }
     };
-
     window.addEventListener('dinesmart_order_paid', handleOrderPaid);
-    return () => window.removeEventListener('dinesmart_order_paid', handleOrderPaid);
-  }, [activeTab, tableId, onPaymentSuccess]);
 
-  // Cash Calculation
+    // 2. Poll Supabase/database every 1.5s in case customer paid from another physical device
+    const poller = setInterval(async () => {
+      if (!primaryOrderId) return;
+      try {
+        const live = await db.getOrder(primaryOrderId);
+        if (live && live.paymentStatus === 'Paid') {
+          setSettledMethod('QR');
+          playSuccessChime();
+          setActiveTab('SUCCESS');
+          onPaymentSuccess();
+        }
+      } catch (err) {
+        console.warn('Bill status poll check:', err);
+      }
+    }, 1500);
+
+    return () => {
+      window.removeEventListener('dinesmart_order_paid', handleOrderPaid);
+      clearInterval(poller);
+    };
+  }, [activeTab, tableId, primaryOrderId, onPaymentSuccess]);
+
+  // Money Calculation
   const handleCashInput = (val: string) => {
     setCashTendered(val);
     setCashError(null);
@@ -159,14 +197,15 @@ export const WaiterPaymentTerminal: React.FC<WaiterPaymentTerminalProps> = ({
   };
 
   // Complete Payment Finalizer
-  const finalizePayment = async (method: 'UPI' | 'CASH', tendered?: number, change?: number) => {
+  const finalizePayment = async (method: 'QR' | 'CASH', tendered?: number, change?: number) => {
     setSubmittingPayment(true);
     try {
       const paidTimestamp = new Date().toISOString();
+      const methodLabel = method === 'QR' ? 'QR Code Scan' : 'Direct Cash / Hand';
 
       // 1. Settle each order for this table
       for (const ord of unpaidOrders) {
-        await db.payOrder(ord.id, method);
+        await db.payOrder(ord.id, methodLabel);
       }
 
       // 2. Mark table's bill waiter requests as Completed
@@ -185,7 +224,7 @@ export const WaiterPaymentTerminal: React.FC<WaiterPaymentTerminalProps> = ({
         await (db as any).recordPaymentTransaction?.({
           orderId: ord.id,
           tableId,
-          channel: method,
+          channel: methodLabel,
           amount: ord.total,
           cashTendered: method === 'CASH' ? tendered : undefined,
           cashChangeReturned: method === 'CASH' ? change : undefined,
@@ -200,7 +239,7 @@ export const WaiterPaymentTerminal: React.FC<WaiterPaymentTerminalProps> = ({
 
       // 5. Broadcast global event to update customer screen and kitchen/admin
       window.dispatchEvent(new CustomEvent('dinesmart_order_paid', {
-        detail: { tableId, orderId: unpaidOrders[0]?.id, method }
+        detail: { tableId, orderId: primaryOrderId, method: methodLabel }
       }));
 
       setSettledMethod(method);
@@ -215,19 +254,22 @@ export const WaiterPaymentTerminal: React.FC<WaiterPaymentTerminalProps> = ({
     }
   };
 
-  // Cash Confirmation
+  // Cash / Collect Money Confirmation
   const handleConfirmCashPayment = () => {
     const num = parseFloat(cashTendered);
     if (isNaN(num) || num < totalAmount) {
-      setCashError(`Received cash must be at least ₹${totalAmount.toFixed(2)}`);
+      setCashError(`Received amount must be at least ₹${totalAmount.toFixed(2)}`);
       return;
     }
     finalizePayment('CASH', num, changeToReturn);
   };
 
-  // Simulate/Verify UPI Webhook Confirmation (for testing and demo)
-  const handleSimulateUpiSuccess = () => {
-    finalizePayment('UPI');
+  const handleCopyLink = () => {
+    if (paymentUrl) {
+      navigator.clipboard.writeText(paymentUrl);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2500);
+    }
   };
 
   return (
@@ -243,7 +285,7 @@ export const WaiterPaymentTerminal: React.FC<WaiterPaymentTerminalProps> = ({
             <ArrowLeft size={18} />
           </button>
           <div className="text-center">
-            <h3 className="font-black text-base tracking-tight">Table #{tableId} Bill Terminal</h3>
+            <h3 className="font-black text-base tracking-tight">Table #{tableId} Bill Settlement</h3>
             <p className="text-[11px] text-slate-400 font-medium">Attendant: {waiterName} ({waiterId})</p>
           </div>
           <span className="bg-orange-500/20 text-[#FF6B00] border border-orange-500/40 text-[10px] font-black px-2.5 py-1 rounded-full uppercase">
@@ -254,7 +296,7 @@ export const WaiterPaymentTerminal: React.FC<WaiterPaymentTerminalProps> = ({
         {/* Content Body */}
         <div className="p-5 overflow-y-auto space-y-4">
           
-          {/* TAB 1: SELECT MODE & BILL DETAILS */}
+          {/* VIEW 1: SELECT PAYMENT OPTION */}
           {activeTab === 'SELECT' && (
             <div className="space-y-4">
               {/* Bill Details Box */}
@@ -303,45 +345,49 @@ export const WaiterPaymentTerminal: React.FC<WaiterPaymentTerminalProps> = ({
                 </div>
               </div>
 
-              {/* Action Buttons: Show QR vs Collect Cash */}
+              {/* TWO CLEAR WAITER ACTIONS: "Collect Money" vs "Show QR" */}
               <div className="grid grid-cols-2 gap-3.5 pt-1">
+                {/* Action 1: Collect Money */}
                 <button
-                  onClick={generateUpiQr}
-                  disabled={generatingQr || totalAmount <= 0}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white p-4.5 rounded-2xl flex flex-col items-center justify-center gap-2 font-black transition-all active:scale-95 cursor-pointer shadow-lg shadow-indigo-100 disabled:opacity-50"
-                >
-                  <QrCode size={32} />
-                  <span className="text-xs">Show UPI QR</span>
-                  <span className="text-[10px] font-medium text-indigo-200">GPay, PhonePe, Paytm</span>
-                </button>
-
-                <button
+                  type="button"
                   onClick={() => {
                     setCashTendered(String(totalAmount));
                     setChangeToReturn(0);
-                    setActiveTab('CASH');
+                    setActiveTab('COLLECT_MONEY');
                   }}
                   disabled={totalAmount <= 0}
                   className="bg-emerald-600 hover:bg-emerald-700 text-white p-4.5 rounded-2xl flex flex-col items-center justify-center gap-2 font-black transition-all active:scale-95 cursor-pointer shadow-lg shadow-emerald-100 disabled:opacity-50"
                 >
                   <Banknote size={32} />
-                  <span className="text-xs">Collect Cash</span>
-                  <span className="text-[10px] font-medium text-emerald-200">Tender & Change Math</span>
+                  <span className="text-sm">Collect Money</span>
+                  <span className="text-[10px] font-medium text-emerald-200">Manual / Cash Confirmation</span>
+                </button>
+
+                {/* Action 2: Show QR */}
+                <button
+                  type="button"
+                  onClick={generateBillQr}
+                  disabled={generatingQr || totalAmount <= 0}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white p-4.5 rounded-2xl flex flex-col items-center justify-center gap-2 font-black transition-all active:scale-95 cursor-pointer shadow-lg shadow-indigo-100 disabled:opacity-50"
+                >
+                  <QrCode size={32} />
+                  <span className="text-sm">Show QR</span>
+                  <span className="text-[10px] font-medium text-indigo-200">Unique Bill QR Code</span>
                 </button>
               </div>
 
               <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-400 font-semibold pt-1">
                 <ShieldCheck size={14} />
-                <span>Audited Transaction • Waiter ID #{waiterId}</span>
+                <span>Audited Table Settlement • Waiter ID #{waiterId}</span>
               </div>
             </div>
           )}
 
-          {/* TAB 2: FULL-SCREEN DYNAMIC UPI QR */}
-          {activeTab === 'UPI_QR' && (
+          {/* VIEW 2: UNIQUE BILL QR CODE */}
+          {activeTab === 'SHOW_QR' && (
             <div className="flex flex-col items-center text-center space-y-3 py-1">
               <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-                Customer Scan & Pay
+                Unique Bill QR Code • Table #{tableId}
               </span>
               <h2 className="text-3xl font-black text-slate-900 font-mono">
                 ₹{totalAmount.toFixed(2)}
@@ -350,7 +396,7 @@ export const WaiterPaymentTerminal: React.FC<WaiterPaymentTerminalProps> = ({
               {/* Dynamic QR Container */}
               <div className="relative p-3.5 bg-white border-2 border-indigo-500 rounded-3xl shadow-xl flex items-center justify-center">
                 {qrImageUrl && !isQrExpired ? (
-                  <img src={qrImageUrl} alt="UPI QR" className="w-56 h-56 object-contain rounded-xl" />
+                  <img src={qrImageUrl} alt="Bill Payment QR" className="w-56 h-56 object-contain rounded-xl" />
                 ) : (
                   <div className="w-56 h-56 flex flex-col items-center justify-center bg-slate-50 rounded-xl p-4">
                     <AlertTriangle className="text-amber-500 mb-2" size={36} />
@@ -360,7 +406,13 @@ export const WaiterPaymentTerminal: React.FC<WaiterPaymentTerminalProps> = ({
                 )}
               </div>
 
-              {/* Countdown & Status */}
+              {/* Live Status Indicator */}
+              <div className="w-full flex items-center justify-center gap-2 text-xs bg-indigo-50 border border-indigo-200 text-indigo-700 py-2 px-3 rounded-xl font-bold animate-pulse">
+                <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+                <span>Waiting for customer scan & payment...</span>
+              </div>
+
+              {/* Expiry Countdown */}
               <div className="flex items-center justify-center gap-2 text-xs">
                 <Clock size={15} className={isQrExpired ? 'text-red-500' : 'text-slate-500'} />
                 <span className={isQrExpired ? 'text-red-600 font-bold' : 'text-slate-600 font-semibold'}>
@@ -369,50 +421,76 @@ export const WaiterPaymentTerminal: React.FC<WaiterPaymentTerminalProps> = ({
               </div>
 
               <p className="text-[11px] text-slate-500 max-w-[280px]">
-                Ask customer to scan using any UPI App (Google Pay, PhonePe, Paytm, BHIM).
+                Customer scans with any mobile phone camera or scanner to view and settle the bill instantly.
               </p>
 
               {/* Action Buttons */}
               <div className="w-full space-y-2 pt-2">
                 <button
-                  onClick={handleSimulateUpiSuccess}
+                  type="button"
+                  onClick={() => finalizePayment('QR')}
                   disabled={submittingPayment}
                   className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-2xl text-xs font-black flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-emerald-100 transition-all active:scale-98"
                 >
                   <Sparkles size={16} />
-                  <span>{submittingPayment ? 'Settling...' : 'Confirm UPI Payment Received'}</span>
+                  <span>{submittingPayment ? 'Settling...' : 'Simulate Customer Scan / One-Click Settle'}</span>
                 </button>
 
                 <div className="flex gap-2">
                   <button
-                    onClick={generateUpiQr}
+                    type="button"
+                    onClick={handleCopyLink}
                     className="flex-1 border border-slate-200 hover:bg-slate-50 text-slate-700 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
                   >
-                    <RotateCcw size={14} />
+                    {copiedLink ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
+                    <span>{copiedLink ? 'Link Copied!' : 'Copy Payment Link'}</span>
+                  </button>
+
+                  {paymentUrl && (
+                    <a
+                      href={paymentUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <ExternalLink size={14} />
+                      <span>Open Customer Page</span>
+                    </a>
+                  )}
+                </div>
+
+                <div className="flex gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={generateBillQr}
+                    className="flex-1 border border-slate-200 hover:bg-slate-50 text-slate-700 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <RotateCcw size={13} />
                     <span>Regenerate QR</span>
                   </button>
                   <button
-                    onClick={() => setActiveTab('SELECT')}
-                    className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2.5 rounded-xl text-xs font-bold cursor-pointer"
+                    type="button"
+                    onClick={() => setActiveTab('COLLECT_MONEY')}
+                    className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-xl text-xs font-bold cursor-pointer"
                   >
-                    Switch to Cash
+                    Switch to Collect Money
                   </button>
                 </div>
               </div>
             </div>
           )}
 
-          {/* TAB 3: COLLECT CASH */}
-          {activeTab === 'CASH' && (
+          {/* VIEW 3: COLLECT MONEY (MANUAL COLLECTION) */}
+          {activeTab === 'COLLECT_MONEY' && (
             <div className="space-y-4">
               <div className="bg-emerald-50 border border-emerald-200/80 p-3.5 rounded-2xl flex justify-between items-center">
-                <span className="text-xs font-bold text-emerald-800">Total Payable</span>
+                <span className="text-xs font-bold text-emerald-800">Total Due From Customer</span>
                 <span className="text-2xl font-black text-emerald-950 font-mono">₹{totalAmount.toFixed(2)}</span>
               </div>
 
               <div>
                 <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-500 mb-1.5">
-                  Cash Received From Customer (₹)
+                  Amount Received (₹)
                 </label>
                 <input
                   type="number"
@@ -424,7 +502,7 @@ export const WaiterPaymentTerminal: React.FC<WaiterPaymentTerminalProps> = ({
                 />
               </div>
 
-              {/* Quick Cash Presets */}
+              {/* Quick Amount Presets */}
               <div className="flex flex-wrap gap-2">
                 {[
                   totalAmount,
@@ -436,10 +514,15 @@ export const WaiterPaymentTerminal: React.FC<WaiterPaymentTerminalProps> = ({
                   .map((val) => (
                     <button
                       key={val}
+                      type="button"
                       onClick={() => handleQuickCash(val)}
-                      className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold cursor-pointer transition-colors"
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-colors ${
+                        parseFloat(cashTendered) === val
+                          ? 'bg-emerald-600 text-white shadow-xs'
+                          : 'bg-slate-100 hover:bg-slate-200 text-slate-800'
+                      }`}
                     >
-                      ₹{val}
+                      {val === totalAmount ? `Exact: ₹${val}` : `₹${val}`}
                     </button>
                   ))}
               </div>
@@ -453,61 +536,71 @@ export const WaiterPaymentTerminal: React.FC<WaiterPaymentTerminalProps> = ({
               </div>
 
               {cashError && (
-                <div className="p-3 bg-red-50 text-red-700 text-xs font-semibold rounded-xl">
+                <div className="p-3 bg-red-50 text-red-700 text-xs font-bold rounded-xl border border-red-200">
                   {cashError}
                 </div>
               )}
 
-              <div className="flex gap-2.5 pt-2">
-                <button
-                  onClick={() => setActiveTab('SELECT')}
-                  className="flex-1 border border-slate-200 py-3 rounded-2xl text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer"
-                >
-                  Back
-                </button>
-                <button
-                  onClick={handleConfirmCashPayment}
-                  disabled={submittingPayment}
-                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-2xl text-xs font-black shadow-lg shadow-emerald-200 cursor-pointer transition-all active:scale-98 disabled:opacity-50"
-                >
-                  {submittingPayment ? 'Settling...' : 'Confirm Paid (Mark Settled)'}
-                </button>
-              </div>
+              {/* Confirm Collect Money Action */}
+              <button
+                type="button"
+                onClick={handleConfirmCashPayment}
+                disabled={submittingPayment}
+                className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm rounded-2xl shadow-lg shadow-emerald-600/25 flex items-center justify-center gap-2 transition-all active:scale-98 cursor-pointer disabled:opacity-50"
+              >
+                <CheckCircle2 size={18} />
+                <span>{submittingPayment ? 'Processing Settlement...' : `Confirm Payment Received (₹${totalAmount.toFixed(2)})`}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('SELECT')}
+                className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold cursor-pointer"
+              >
+                Back to Options
+              </button>
             </div>
           )}
 
-          {/* TAB 4: PAYMENT SUCCESS */}
+          {/* VIEW 4: PAYMENT SUCCESS */}
           {activeTab === 'SUCCESS' && (
-            <div className="text-center py-6 space-y-4 animate-fade-in">
-              <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-inner animate-bounce">
-                <CheckCircle2 size={40} />
+            <div className="py-6 flex flex-col items-center text-center space-y-4 animate-scale-up">
+              <div className="w-16 h-16 bg-emerald-500 text-white rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/30">
+                <CheckCircle2 size={36} />
               </div>
 
-              <div className="space-y-1">
-                <h3 className="text-xl font-black text-slate-900">Payment Completed!</h3>
-                <p className="text-xs text-slate-500 max-w-xs mx-auto">
-                  Table #{tableId} has been settled via <strong>{settledMethod}</strong>. The table is now marked Available.
+              <div>
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-md">
+                  Settled Successfully
+                </span>
+                <h3 className="text-2xl font-black text-slate-900 mt-1">₹{totalAmount.toFixed(2)}</h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  Payment confirmed via {settledMethod === 'QR' ? 'Unique Bill QR Code' : 'Direct Money Collection'}.
+                </p>
+                <p className="text-[11px] text-emerald-700 font-semibold mt-0.5">
+                  ✓ Table #{tableId} session released & closed.
                 </p>
               </div>
 
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 text-xs text-left space-y-1.5 max-w-xs mx-auto font-mono">
+              <div className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-3.5 text-xs text-left space-y-1.5">
                 <div className="flex justify-between text-slate-500">
-                  <span>Settled Amount</span>
-                  <span className="font-bold text-slate-900">₹{totalAmount.toFixed(2)}</span>
+                  <span>Bill Reference</span>
+                  <span className="font-mono font-bold text-slate-700">#{primaryOrderId}</span>
                 </div>
                 <div className="flex justify-between text-slate-500">
-                  <span>Method</span>
-                  <span className="font-bold text-slate-900">{settledMethod}</span>
+                  <span>Settled By</span>
+                  <span className="font-semibold text-slate-700">{waiterName} ({waiterId})</span>
                 </div>
                 <div className="flex justify-between text-slate-500">
-                  <span>Collected By</span>
-                  <span className="font-bold text-slate-900">{waiterName}</span>
+                  <span>Time</span>
+                  <span className="font-semibold text-slate-700">{new Date().toLocaleTimeString()}</span>
                 </div>
               </div>
 
               <button
+                type="button"
                 onClick={onClose}
-                className="w-full bg-slate-900 hover:bg-black text-white py-3.5 rounded-2xl text-xs font-black cursor-pointer shadow-lg transition-all"
+                className="w-full bg-slate-900 hover:bg-black text-white font-bold py-3.5 rounded-2xl text-xs transition-all shadow-md cursor-pointer"
               >
                 Close & Return to Dashboard
               </button>

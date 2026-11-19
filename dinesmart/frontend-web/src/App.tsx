@@ -3,6 +3,7 @@ import { Capacitor } from '@capacitor/core';
 import { AppProvider } from './context/AppContext';
 import { MainContainer } from './pages/customer/MainContainer';
 import { ScanQrLanding } from './pages/customer/ScanQrLanding';
+import { BillPaymentLanding } from './pages/customer/BillPaymentLanding';
 import { KitchenModule } from './pages/kitchen/KitchenModule';
 import { AdminModule } from './pages/admin/AdminModule';
 import { WaiterModule } from './pages/waiter/WaiterModule';
@@ -33,6 +34,10 @@ function App() {
 
           {/* Authenticated Customer Table QR Entry Route */}
           <Route path="/table/:tableId" element={<MainContainer />} />
+
+          {/* Unique Bill QR Code Payment / Settlement Route */}
+          <Route path="/pay/:orderId" element={<BillPaymentLanding />} />
+          <Route path="/bill-pay/:orderId" element={<BillPaymentLanding />} />
           
           {/* Kitchen Dashboard Route */}
           <Route path="/kitchen" element={<KitchenModule />} />

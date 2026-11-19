@@ -66,9 +66,11 @@ const SECURITY_PATTERNS = [
   /employee\s+password/i
 ];
 
-const FIRST_PASS_SYSTEM = `You are the DineSmart AI Operations Assistant for TableTap hotel and restaurant management.
+const FIRST_PASS_SYSTEM = `You are the DineSmart Senior AI Hotel & Restaurant Operations Consultant and Executive Copilot for TableTap.
 Current Date in Asia/Kolkata: ${new Date().toISOString().slice(0, 10)}.
-Select the most appropriate tool to fetch live data for the restaurant owner across the operational domains:
+
+Your role:
+1. For concrete operational queries about current figures, dishes, inventory, or staff, select the appropriate live database tool:
 - Chef's Specials, Today's Specials, Signature Dishes: get_menu_catalog (with is_special: true)
 - Full Restaurant Menu, Catalog, All Dishes & Prices, Dietary/Category Lists: get_menu_catalog or search_menu
 - Sales, Covers, Check Sizes, RevPASH, Meal Periods (breakfast/lunch/dinner), Discounts: get_covers_and_meal_periods or get_sales_summary
@@ -81,20 +83,35 @@ Select the most appropriate tool to fetch live data for the restaurant owner acr
 - Cancellations, Voids & Kitchen SLA: get_cancellations or get_prep_time_stats
 - Restaurant Policies (GST, Tip, Cancellation, Safety): get_restaurant_policy
 - Daily Executive Brief & Actions: get_executive_alerts_and_actions
-If the query is a simple greeting or general conversation (e.g. "hi", "hello"), reply directly without calling a tool.`;
 
-const SYNTHESIS_SYSTEM = `You are the DineSmart Executive Operations Assistant for TableTap hotel and restaurant management.
-You communicate directly with the restaurant owner / general manager in plain, executive English.
+2. For strategic planning, business consulting, festival/holiday preparation (e.g., Hindu festivals, Diwali, Pongal, Eid, Christmas, New Year), revenue optimization, catering, or general hospitality advice:
+- Provide an insightful, structured, actionable consulting plan immediately with practical, industry-standard assumptions. Cover:
+  • Festive Menus & Special Offerings (thalis, sweets, satvik options, festive coolers)
+  • Kitchen Prep & Bulk Inventory Buffers (ghee, paneer, dry fruits, spices, packaging)
+  • Floor & Table Seating Optimization (group/family dining, expedited turnarounds)
+  • Staffing & Floor Management (peak shift coverage, dedicated runners, fast billing)
+  • Festive Ambiance & Marketing (decor, traditional music, customer WhatsApp/SMS greeting)
+- If live menu items or sales context are relevant to ground the strategy, call get_menu_catalog or get_sales_summary, OR answer directly if no database query is required.
+- NEVER refuse to answer or state that you lack data for general consulting or festival questions. Make smart, practical assumptions.
 
-CRITICAL RULES:
-1. START WITH DIRECT ANSWER: Always begin with a crisp, one-sentence direct answer containing the key metric(s). (e.g., "Today you have 1 order and ₹305 in revenue (all-time recorded: 38 orders, ₹7,531).")
-2. PLAIN LANGUAGE: Write for a busy restaurant owner. Never output developer jargon, SQL queries, database table names, or internal tags (like [POL-TAX-01] or [MENU-SP6]).
-3. SHORT BULLETS OR TABLES: Use a short 2-4 row Markdown table or clean bullets only when it clarifies rankings or comparisons.
-4. INDIAN NUMBER FORMATTING: Always use the ₹ symbol with standard Indian number grouping (e.g., ₹7,078, ₹24,500).
-5. STATE DATE RANGE & FRESHNESS: Always explicitly mention the date range used and data freshness ("As of ${new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' })} IST").
-6. HONESTY & SCOPE BOUNDARIES: Never invent or fabricate numbers. If data is not recorded in the POS (e.g., hotel room charges or hotel guest bookings, external supplier logistics), state plainly that it belongs to the Hotel Property Management System (PMS) / physical store audit, and report what is tracked in DineSmart POS.
-7. ACTION TRIGGERS: Suggest 1-2 practical next steps or actionable recommendations.
-8. CONCISE: Keep the entire response under ~150 words unless asked for detail.`;
+3. If the query is a simple greeting or pleasantry (e.g. "hi", "hello"), reply cordially and directly without calling a tool.`;
+
+const SYNTHESIS_SYSTEM = `You are the DineSmart Senior AI Hotel & Restaurant Operations Consultant and Executive Copilot for TableTap.
+You advise the restaurant owner / general manager in professional, practical, executive English.
+
+CORE PRINCIPLES & GUIDELINES:
+1. DUAL CAPABILITY:
+   - For specific operational metrics (sales, orders, tables, dishes, inventory, staff): Ground strictly in the verified live data provided. Always use the ₹ symbol with standard Indian number grouping (e.g., ₹7,078, ₹24,500).
+   - For strategic, advisory, festival/holiday planning, or general hospitality questions (e.g., "There is a Hindu festival tomorrow, how should I prepare my hotel?"): Act as a seasoned hotel & restaurant operations consultant. Make smart, practical assumptions and provide an actionable, structured blueprint. NEVER refuse to answer or say "I don't have data for that".
+2. FESTIVAL & HIGH-DEMAND EVENT FRAMEWORK:
+   Structure festive and rush advice across 5 actionable pillars:
+   - 🍽️ Festive Menu & Special Offerings: Festive thalis, traditional sweets (gulab jamun, kheer/payasam), satvik/fasting options, festive coolers.
+   - 📦 Kitchen Prep & Inventory Buffers: 35–45% buffer stock on dairy (paneer, milk, butter, ghee), basmati rice, spices; batch-prepped gravies; takeaway packaging.
+   - 🪑 Seating, Floor & Turnover Optimization: Large family/group table setups, TableTap dynamic QR bill settlement to eliminate payment bottlenecks.
+   - 👥 Staffing & Shift Rostering: Staggered kitchen prep shifts, dedicated floor runners for quick clearing and beverage refills.
+   - 🏮 Festive Ambiance & Marketing: Entrance marigold decor/rangoli, ambient festive music, broadcast message/WhatsApp promo to regular patrons.
+3. BLENDING DATA & STRATEGY: If live menu dishes or revenue data are provided in the context, weave them naturally into your recommendations.
+4. EXECUTIVE FORMATTING: Use crisp Markdown headings, bullet points, and clean 2-4 row tables where appropriate. Avoid raw SQL or technical database table names.`;
 
 /**
  * Robust Groq API caller with automatic 429 rate limit backoff
@@ -132,7 +149,33 @@ async function callGroqWithBackoff(payload: any, retries = 4): Promise<any> {
   throw new Error('Groq rate limit exceeded after retries.');
 }
 
-function formatToolResultFallback(toolName: string, result: any): string {
+function formatToolResultFallback(toolName: string, result: any, query: string = ''): string {
+  if (query && /festival|holiday|prepare|diwali|pongal|eid|event|rush|crowd/i.test(query)) {
+    return `### 🪔 Hotel & Restaurant Festival Preparation Blueprint
+
+#### 1. 🍽️ Festive Menu & Special Offerings
+- **Festive Thalis & Set Combos**: Launch a pre-set Festive Special Thali (e.g., ₹299–₹399) with fixed pricing to drastically shorten ordering and kitchen prep time.
+- **Traditional Sweets & Starters**: Prepare Gulab Jamun, Payasam/Kheer, and Masala Chaas/Lassi in bulk for immediate serving upon seating.
+- **Pure Veg / Satvik Options**: Ensure designated satvik items (no onion/garlic) are clearly marked on your TableTap digital menu.
+
+#### 2. 📦 Kitchen Prep & Inventory Buffers
+- **Safety Buffer Stock**: Increase dairy (paneer, milk, butter, ghee), basmati rice, cooking oils, and spices by 35–45% ahead of time.
+- **Pre-cooked Gravy Bases**: Prep large batches of base Makhani and cashew gravies today so ticket times stay under 10 minutes during the rush.
+- **Takeaway Packaging**: Stock up on sturdy meal containers and cutlery packs to capture peak festive family takeaway orders.
+
+#### 3. 🪑 Floor Seating & Faster Table Turns
+- **Group Dining Configurations**: Combine 2-seater tables into 6-to-8 seaters for large visiting families.
+- **Instant QR Bill Settlement**: Ensure TableTap dynamic bill QR stands are on every table so guests can pay directly from their phones without waiting for a waiter card machine.
+
+#### 4. 👥 Staffing & Shift Rostering
+- **All-Hands Floor Allocation**: Schedule your full waitstaff during peak lunch (12:30–3:30 PM) and dinner (7:30–11:00 PM) windows.
+- **Dedicated Food Runners**: Assign runner roles exclusively for water, bread refills, and clearing plates.
+
+#### 5. 🏮 Festive Ambiance & Marketing
+- **Traditional Decor**: Welcome guests with marigold entrance decor, warm lighting, and soothing festive background music.
+- **Guest Notification**: Send a quick festive greeting message to your regular customer list announcing your special festive feast.`;
+  }
+
   if (!result || typeof result !== 'object') return 'I could not retrieve data for that request. Please try again.';
 
   if (toolName === 'get_menu_catalog') {
@@ -284,10 +327,12 @@ export const ragOrchestrator = {
       console.warn('[RAGOrchestrator] First-pass tool selection error:', err.message);
     }
 
-    // 3. If direct conversational answer (only for pure greetings/pleasantries without data queries)
-    const isOperationalQuery = /special|chef|signature|dish|menu|price|catalog|item|food|revenue|sale|order|cover|period|staff|waiter|table|occupan|reserv|stock|inventory|review|feedback|policy|gst|tax|margin|cost|alert|action|brief|today|tonight|yesterday/i.test(effectiveQuery);
+    // 3. If direct conversational answer or strategic consulting response (without tool calls)
+    const hasToolCalls = choice1?.tool_calls && choice1.tool_calls.length > 0;
+    const hasSubstantiveContent = Boolean(choice1?.content && choice1.content.trim().length > 30);
+    const isStrictDataExtraction = /^(how many|what is the (total|gross|daily) (revenue|sales|profit)|current revenue|today's orders|how much money)/i.test(effectiveQuery.trim());
 
-    if (choice1 && (!choice1.tool_calls || choice1.tool_calls.length === 0) && choice1.content && !isOperationalQuery) {
+    if (choice1 && !hasToolCalls && hasSubstantiveContent && !isStrictDataExtraction) {
       const totalLatency = Math.round(performance.now() - startTime);
       return {
         answer: choice1.content.trim(),
@@ -336,7 +381,11 @@ export const ragOrchestrator = {
       const qLower = effectiveQuery.toLowerCase();
       let fallbackArgs: any = {};
 
-      if (/special|chef|signature/.test(qLower)) {
+      if (/festival|holiday|prepare|preparation|diwali|pongal|eid|holi|navratri|christmas|new year|event|rush|catering|strategy|marketing/.test(qLower)) {
+        // Fetch menu catalog so the synthesis step can integrate real restaurant menu items into the festival strategy
+        toolUsed = 'get_menu_catalog';
+        fallbackArgs = {};
+      } else if (/special|chef|signature/.test(qLower)) {
         toolUsed = 'get_menu_catalog';
         fallbackArgs = { is_special: true };
       } else if (/menu|dish|price|catalog|item|food|category|breakfast|soup|starter|main course|bread|dessert|beverage/.test(qLower)) {
@@ -379,25 +428,25 @@ export const ragOrchestrator = {
     try {
       const groqRes2 = await callGroqWithBackoff({
         model: MODEL,
-        temperature: 0.1,
-        max_tokens: 1024,
+        temperature: 0.2,
+        max_tokens: 1200,
         messages: [
           { role: 'system', content: SYNTHESIS_SYSTEM },
           {
             role: 'user',
-            content: `User Question: "${effectiveQuery}"\n\nLIVE DATABASE DATA / VERIFIED FACTS:\n${JSON.stringify(toolResult, null, 2)}\n\nAnswer the restaurant owner directly following the critical rules.`
+            content: `User Question: "${effectiveQuery}"\n\nLIVE DATABASE DATA / VERIFIED FACTS:\n${JSON.stringify(toolResult, null, 2)}\n\nAnswer the restaurant owner directly following the consulting guidelines. If this is a strategic, festival, or operational preparation question, provide a proactive, comprehensive operational blueprint with smart practical assumptions—do not decline or state lack of data.`
           }
         ]
       });
 
       finalAnswer = groqRes2.choices?.[0]?.message?.content?.trim() || '';
       if (!finalAnswer) {
-        finalAnswer = formatToolResultFallback(toolUsed, toolResult);
+        finalAnswer = formatToolResultFallback(toolUsed, toolResult, effectiveQuery);
       }
     } catch (err: any) {
       console.warn('[RAGOrchestrator] Synthesis error:', err.message);
       // Graceful plain-language fallback from raw tool result
-      finalAnswer = formatToolResultFallback(toolUsed, toolResult);
+      finalAnswer = formatToolResultFallback(toolUsed, toolResult, effectiveQuery);
     }
 
     const inferenceLatency = Math.round(performance.now() - inferStart);
